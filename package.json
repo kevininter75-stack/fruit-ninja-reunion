@@ -1,0 +1,19 @@
+{
+  "name": "fruit-ninja-reunion",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Jeu mobile-first de type fruit-slicer mettant en scène les fruits de La Réunion (Phaser 3 + TypeScript + Vite)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "phaser": "^3.90.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3",
+    "vite": "^7.0.0"
+  }
+}
