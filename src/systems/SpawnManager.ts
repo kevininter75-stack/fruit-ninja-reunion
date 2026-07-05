@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { Fruit } from '../entities/Fruit';
+import { Bomb } from '../entities/Bomb';
 import { ScoreManager } from './ScoreManager';
 import {
   GAME_WIDTH,
@@ -14,33 +15,50 @@ import {
   SPAWN_INTERVAL_DECREMENT_MS,
   SPAWN_MAX_FRUITS_PER_WAVE_START,
   SPAWN_MAX_FRUITS_PER_WAVE_CAP,
+  BOMB_CHANCE_BASE,
+  BOMB_CHANCE_PER_TIER,
+  BOMB_CHANCE_CAP,
+  BOMB_SAFE_TIME_MS,
 } from '../utils/constants';
 
+/** Paramètres de lancement calculés une fois par spawn (objet réutilisé). */
+interface LaunchParams {
+  x: number;
+  velocityX: number;
+  velocityY: number;
+}
+
 /**
- * Orchestration du spawn des fruits avec difficulté progressive.
+ * Orchestration du spawn des fruits et bombes avec difficulté progressive.
  *
- * Fonctionnement : les fruits partent du bas de l'écran (sous le bord visible)
- * avec une vélocité verticale forte (vers le haut) et une composante horizontale
- * orientée vers le centre — la gravité Arcade fait le reste (parabole).
+ * Fonctionnement : les projectiles partent du bas de l'écran (sous le bord
+ * visible) avec une vélocité verticale forte (vers le haut) et une composante
+ * horizontale orientée vers le centre — la gravité Arcade fait le reste.
  *
  * Difficulté : à chaque palier de SPAWN_SCORE_STEP points,
  * - l'intervalle entre les salves diminue (plancher SPAWN_INTERVAL_MIN_MS),
- * - le nombre max de fruits par salve augmente (plafond SPAWN_MAX_FRUITS_PER_WAVE_CAP).
+ * - le nombre max de projectiles par salve augmente (plafond _CAP),
+ * - le ratio de bombes augmente légèrement (plafonné pour rester juste).
+ * Aucune bombe pendant les BOMB_SAFE_TIME_MS premières millisecondes.
  *
- * TODO Phase 2 : spawn de bombes avec ratio croissant, fruit bonus "combava doré".
+ * TODO Phase 3 : fruit bonus "combava doré" (ralenti 2 s ou score x2).
  */
 export class SpawnManager {
   private timer: Phaser.Time.TimerEvent | null = null;
   private running = false;
+  private startTime = 0;
+  private readonly launchParams: LaunchParams = { x: 0, velocityX: 0, velocityY: 0 };
 
   constructor(
     private readonly scene: Phaser.Scene,
     private readonly fruits: Phaser.Physics.Arcade.Group,
+    private readonly bombs: Phaser.Physics.Arcade.Group,
     private readonly scoreManager: ScoreManager
   ) {}
 
   start(): void {
     this.running = true;
+    this.startTime = this.scene.time.now;
     this.scheduleNextWave();
   }
 
@@ -65,11 +83,19 @@ export class SpawnManager {
   }
 
   private getMaxFruitsPerWave(): number {
-    // Un fruit de plus par tranche de 2 paliers (500 pts → 1000 pts → ...)
+    // Un projectile de plus par tranche de 2 paliers (500 pts → 1000 pts → ...)
     return Math.min(
       SPAWN_MAX_FRUITS_PER_WAVE_CAP,
       SPAWN_MAX_FRUITS_PER_WAVE_START + Math.floor(this.getDifficultyTier() / 2)
     );
+  }
+
+  /** Probabilité qu'un spawn soit une bombe plutôt qu'un fruit. */
+  private getBombChance(): number {
+    if (this.scene.time.now - this.startTime < BOMB_SAFE_TIME_MS) {
+      return 0; // début de partie : le joueur prend ses marques
+    }
+    return Math.min(BOMB_CHANCE_CAP, BOMB_CHANCE_BASE + this.getDifficultyTier() * BOMB_CHANCE_PER_TIER);
   }
 
   /**
@@ -88,27 +114,46 @@ export class SpawnManager {
 
   private spawnWave(): void {
     const count = Phaser.Math.Between(1, this.getMaxFruitsPerWave());
+    const bombChance = this.getBombChance();
     for (let i = 0; i < count; i++) {
-      this.spawnFruit();
+      if (Math.random() < bombChance) {
+        this.spawnBomb();
+      } else {
+        this.spawnFruit();
+      }
     }
   }
 
+  /**
+   * Calcule position et vélocités de lancement dans un objet réutilisé.
+   * Vélocité horizontale orientée vers le centre pour que la parabole
+   * reste dans l'écran (un projectile lancé du bord gauche part vers la droite).
+   */
+  private computeLaunch(): LaunchParams {
+    const p = this.launchParams;
+    p.x = Phaser.Math.Between(FRUIT_RADIUS * 2, GAME_WIDTH - FRUIT_RADIUS * 2);
+    const towardCenter = p.x < GAME_WIDTH / 2 ? 1 : -1;
+    p.velocityX = towardCenter * Phaser.Math.Between(20, LAUNCH_VELOCITY_X_MAX);
+    p.velocityY = Phaser.Math.Between(LAUNCH_VELOCITY_Y_MAX, LAUNCH_VELOCITY_Y_MIN);
+    return p;
+  }
+
   private spawnFruit(): void {
-    // get() récupère un fruit inactif du pool (ou en crée un si le pool n'est pas plein)
+    // get() récupère un objet inactif du pool (ou en crée un si le pool n'est pas plein)
     const fruit = this.fruits.get() as Fruit | null;
     if (fruit === null) {
       return; // pool épuisé : on saute ce spawn plutôt que d'allouer
     }
+    const p = this.computeLaunch();
+    fruit.launch(p.x, GAME_HEIGHT + FRUIT_RADIUS, p.velocityX, p.velocityY);
+  }
 
-    const x = Phaser.Math.Between(FRUIT_RADIUS * 2, GAME_WIDTH - FRUIT_RADIUS * 2);
-    const y = GAME_HEIGHT + FRUIT_RADIUS; // juste sous le bord visible
-
-    // Vélocité horizontale orientée vers le centre pour que la parabole
-    // reste dans l'écran (un fruit lancé du bord gauche part vers la droite).
-    const towardCenter = x < GAME_WIDTH / 2 ? 1 : -1;
-    const velocityX = towardCenter * Phaser.Math.Between(20, LAUNCH_VELOCITY_X_MAX);
-    const velocityY = Phaser.Math.Between(LAUNCH_VELOCITY_Y_MAX, LAUNCH_VELOCITY_Y_MIN);
-
-    fruit.launch(x, y, velocityX, velocityY);
+  private spawnBomb(): void {
+    const bomb = this.bombs.get() as Bomb | null;
+    if (bomb === null) {
+      return;
+    }
+    const p = this.computeLaunch();
+    bomb.launch(p.x, GAME_HEIGHT + FRUIT_RADIUS, p.velocityX, p.velocityY);
   }
 }

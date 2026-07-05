@@ -10,6 +10,9 @@ export class Fruit extends Phaser.Physics.Arcade.Sprite {
   /** Rayon utilisé pour la détection de coupe (cercle approximatif). */
   public readonly sliceRadius = FRUIT_RADIUS;
 
+  /** Couleur des particules de jus. TODO Phase 3 : propre à chaque variété. */
+  public readonly juiceColor = 0xe0455a;
+
   /**
    * (Re)lance le fruit depuis une position avec une vélocité initiale.
    * Appelé par le SpawnManager quand il récupère un fruit du pool.

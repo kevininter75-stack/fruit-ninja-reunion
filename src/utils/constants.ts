@@ -53,3 +53,36 @@ export const COLOR_TRAIL = 0xffffff;
 export const TEX_FRUIT_WHOLE = 'litchi_whole';
 export const TEX_FRUIT_HALF_LEFT = 'litchi_half_left';
 export const TEX_FRUIT_HALF_RIGHT = 'litchi_half_right';
+
+// ------------------------------------------------------------------
+// Phase 2 — Feel & polish
+// ------------------------------------------------------------------
+
+/** Modes de jeu disponibles. */
+export type GameMode = 'classic' | 'chrono';
+
+/** Cause de fin de partie (affichage adapté sur l'écran de fin). */
+export type GameOverReason = 'lives' | 'bomb' | 'time';
+
+// Bombes
+export const TEX_BOMB = 'bomb';
+export const BOMB_RADIUS = 54;
+export const BOMB_POOL_SIZE = 8;
+export const BOMB_CHANCE_BASE = 0.07; // probabilité qu'un spawn soit une bombe (début de partie)
+export const BOMB_CHANCE_PER_TIER = 0.015; // augmentation par palier de difficulté
+export const BOMB_CHANCE_CAP = 0.16; // plafond : la bombe ne doit jamais devenir injuste
+export const BOMB_SAFE_TIME_MS = 5000; // aucune bombe dans les premières secondes
+export const BOMB_GAMEOVER_DELAY_MS = 700; // durée du flash avant l'écran de fin
+
+// Particules de jus
+export const TEX_JUICE = 'juice';
+export const JUICE_PARTICLE_COUNT = 14;
+
+// Combo : points bonus par coupe supplémentaire dans la fenêtre COMBO_WINDOW_MS
+export const COMBO_BONUS_PER_STEP = 5;
+
+// Mode Chrono
+export const CHRONO_DURATION_MS = 60_000;
+
+// Pool de textes de feedback flottants (+10, Combo x2…)
+export const POPUP_POOL_SIZE = 10;

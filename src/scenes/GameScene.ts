@@ -1,12 +1,15 @@
 import Phaser from 'phaser';
 import { Fruit } from '../entities/Fruit';
+import { Bomb } from '../entities/Bomb';
 import { SliceTrail } from '../entities/SliceTrail';
 import { SliceDetector } from '../systems/SliceDetector';
 import { ScoreManager } from '../systems/ScoreManager';
 import { ComboManager } from '../systems/ComboManager';
 import { SpawnManager } from '../systems/SpawnManager';
+import { sfx } from '../systems/SfxManager';
 import {
   GAME_WIDTH,
+  GAME_HEIGHT,
   FRUIT_POOL_SIZE,
   HALF_POOL_SIZE,
   HALF_LIFETIME_MS,
@@ -16,25 +19,53 @@ import {
   TEX_FRUIT_WHOLE,
   TEX_FRUIT_HALF_LEFT,
   TEX_FRUIT_HALF_RIGHT,
+  TEX_BOMB,
+  TEX_JUICE,
+  BOMB_POOL_SIZE,
+  BOMB_GAMEOVER_DELAY_MS,
+  JUICE_PARTICLE_COUNT,
+  COMBO_BONUS_PER_STEP,
+  CHRONO_DURATION_MS,
+  POPUP_POOL_SIZE,
+  type GameMode,
+  type GameOverReason,
 } from '../utils/constants';
+
+/** Données passées par le menu au lancement d'une partie. */
+interface GameSceneData {
+  mode?: GameMode;
+}
 
 /**
  * Scène de jeu principale : boucle spawn → swipe → coupe → score.
  *
- * Architecture : la scène orchestre des systèmes découplés
- * (SpawnManager, SliceDetector, ScoreManager, ComboManager) qui
- * communiquent via les événements de scène quand c'est pertinent.
+ * Deux modes :
+ * - Classique : 3 vies, un fruit manqué coûte une vie.
+ * - Chrono : 60 secondes, les fruits manqués sont ignorés.
+ * Dans les deux modes, trancher une bombe termine immédiatement la partie.
  */
 export class GameScene extends Phaser.Scene {
+  private mode: GameMode = 'classic';
+
   private fruits!: Phaser.Physics.Arcade.Group;
   private halves!: Phaser.Physics.Arcade.Group;
+  private bombs!: Phaser.Physics.Arcade.Group;
   private sliceTrail!: SliceTrail;
   private sliceDetector!: SliceDetector;
   private scoreManager!: ScoreManager;
   private comboManager!: ComboManager;
   private spawnManager!: SpawnManager;
+  private juiceEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private flashRect!: Phaser.GameObjects.Rectangle;
   private scoreText!: Phaser.GameObjects.Text;
-  private livesText!: Phaser.GameObjects.Text;
+  private infoText!: Phaser.GameObjects.Text; // vies (classique) ou compte à rebours (chrono)
+  private popupPool: Phaser.GameObjects.Text[] = [];
+
+  // État de la partie — la même instance de scène est réutilisée à chaque
+  // restart, donc TOUT l'état mutable doit être réinitialisé dans init().
+  private gameEnded = false;
+  private chronoEndTime = 0;
+  private lastShownSecond = -1;
 
   // État du geste en cours (position/temps du dernier point enregistré)
   private slicing = false;
@@ -46,11 +77,18 @@ export class GameScene extends Phaser.Scene {
     super('GameScene');
   }
 
+  init(data: GameSceneData): void {
+    this.mode = data.mode ?? 'classic';
+    this.gameEnded = false;
+    this.lastShownSecond = -1;
+    this.slicing = false;
+  }
+
   create(): void {
     this.add.image(0, 0, 'background').setOrigin(0);
 
-    // Pools de sprites : les fruits et moitiés sont recyclés, jamais détruits,
-    // pour éviter les allocations/GC en cours de partie (objectif 60 FPS mobile).
+    // Pools de sprites : fruits, moitiés et bombes sont recyclés, jamais
+    // détruits, pour éviter les allocations/GC en partie (60 FPS mobile).
     this.fruits = this.physics.add.group({
       classType: Fruit,
       defaultKey: TEX_FRUIT_WHOLE,
@@ -60,22 +98,73 @@ export class GameScene extends Phaser.Scene {
       defaultKey: TEX_FRUIT_HALF_LEFT,
       maxSize: HALF_POOL_SIZE,
     });
+    this.bombs = this.physics.add.group({
+      classType: Bomb,
+      defaultKey: TEX_BOMB,
+      maxSize: BOMB_POOL_SIZE,
+    });
 
     this.scoreManager = new ScoreManager(this);
     this.comboManager = new ComboManager();
     this.sliceDetector = new SliceDetector();
     this.sliceTrail = new SliceTrail(this);
-    this.spawnManager = new SpawnManager(this, this.fruits, this.scoreManager);
+    this.spawnManager = new SpawnManager(this, this.fruits, this.bombs, this.scoreManager);
+
+    // Émetteur de jus : un seul émetteur réutilisé, teinté par fruit à l'émission
+    this.juiceEmitter = this.add
+      .particles(0, 0, TEX_JUICE, {
+        speed: { min: 100, max: 340 },
+        angle: { min: 0, max: 360 },
+        scale: { start: 1, end: 0 },
+        lifespan: { min: 300, max: 650 },
+        gravityY: 900,
+        emitting: false,
+      })
+      .setDepth(40);
+
+    // Flash blanc plein écran (bombe) — créé une fois, réactivé au besoin
+    this.flashRect = this.add
+      .rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0xffffff, 1)
+      .setOrigin(0)
+      .setDepth(200)
+      .setVisible(false)
+      .setAlpha(0);
 
     this.createUi();
+    this.createPopupPool();
     this.registerGameEvents();
     this.registerPointerEvents();
+
+    if (this.mode === 'chrono') {
+      this.chronoEndTime = this.time.now + CHRONO_DURATION_MS;
+    }
 
     this.spawnManager.start();
   }
 
   update(): void {
     this.sliceTrail.update(this.time.now);
+    if (this.mode === 'chrono' && !this.gameEnded) {
+      this.updateChrono();
+    }
+  }
+
+  private updateChrono(): void {
+    const remainingMs = this.chronoEndTime - this.time.now;
+    const seconds = Math.max(0, Math.ceil(remainingMs / 1000));
+    // setText coûte cher : on ne met à jour qu'au changement de seconde
+    if (seconds !== this.lastShownSecond) {
+      this.lastShownSecond = seconds;
+      this.infoText.setText(`${seconds} s`);
+      if (seconds <= 5 && seconds > 0) {
+        this.infoText.setColor('#ff5252'); // urgence visuelle en fin de chrono
+      }
+    }
+    if (remainingMs <= 0) {
+      this.gameEnded = true;
+      this.spawnManager.stop();
+      this.endGame('time');
+    }
   }
 
   private createUi(): void {
@@ -90,11 +179,14 @@ export class GameScene extends Phaser.Scene {
       })
       .setDepth(50);
 
-    this.livesText = this.add
-      .text(GAME_WIDTH - 24, 20, '♥'.repeat(STARTING_LIVES), {
+    const infoContent = this.mode === 'classic' ? '♥'.repeat(STARTING_LIVES) : '60 s';
+    const infoColor = this.mode === 'classic' ? '#ff5252' : '#ffffff';
+    this.infoText = this.add
+      .text(GAME_WIDTH - 24, 20, infoContent, {
         fontFamily: '"Trebuchet MS", sans-serif',
         fontSize: '44px',
-        color: '#ff5252',
+        fontStyle: 'bold',
+        color: infoColor,
         stroke: '#2d3a4a',
         strokeThickness: 6,
       })
@@ -102,11 +194,55 @@ export class GameScene extends Phaser.Scene {
       .setDepth(50);
   }
 
+  /** Pool de textes flottants (+10, Combo x2…) — aucune création en partie. */
+  private createPopupPool(): void {
+    this.popupPool = [];
+    for (let i = 0; i < POPUP_POOL_SIZE; i++) {
+      const popup = this.add
+        .text(0, 0, '', {
+          fontFamily: '"Trebuchet MS", sans-serif',
+          fontStyle: 'bold',
+          color: '#ffffff',
+          stroke: '#2d3a4a',
+          strokeThickness: 6,
+        })
+        .setOrigin(0.5)
+        .setDepth(60)
+        .setVisible(false);
+      this.popupPool.push(popup);
+    }
+  }
+
+  /** Affiche un texte flottant qui monte et s'estompe (recycle le pool). */
+  private showPopup(x: number, y: number, message: string, color: string, fontSize: number): void {
+    const popup = this.popupPool.find((p) => !p.visible);
+    if (popup === undefined) {
+      return; // pool saturé : on saute ce feedback plutôt que d'allouer
+    }
+    popup
+      .setText(message)
+      .setColor(color)
+      .setFontSize(fontSize)
+      .setPosition(x, y)
+      .setAlpha(1)
+      .setScale(0.6)
+      .setVisible(true);
+    this.tweens.add({
+      targets: popup,
+      y: y - 90,
+      alpha: 0,
+      scale: 1,
+      duration: 700,
+      ease: 'Cubic.easeOut',
+      onComplete: () => popup.setVisible(false),
+    });
+  }
+
   private registerGameEvents(): void {
     this.events.on('score-changed', this.onScoreChanged, this);
     this.events.on('lives-changed', this.onLivesChanged, this);
     this.events.on('fruit-missed', this.onFruitMissed, this);
-    this.events.on('game-over', this.onGameOver, this);
+    this.events.on('game-over', this.onLivesDepleted, this);
 
     // Les listeners de this.events survivent au restart de la scène :
     // on les retire explicitement au shutdown pour éviter les doublons.
@@ -114,7 +250,7 @@ export class GameScene extends Phaser.Scene {
       this.events.off('score-changed', this.onScoreChanged, this);
       this.events.off('lives-changed', this.onLivesChanged, this);
       this.events.off('fruit-missed', this.onFruitMissed, this);
-      this.events.off('game-over', this.onGameOver, this);
+      this.events.off('game-over', this.onLivesDepleted, this);
     });
   }
 
@@ -145,11 +281,14 @@ export class GameScene extends Phaser.Scene {
   /**
    * À chaque déplacement du pointeur pendant un geste :
    * 1. on ajoute le point à la traînée visuelle,
-   * 2. on teste le segment [dernier point → point courant] contre les fruits,
-   *    mais seulement si le geste est assez rapide — un doigt posé immobile
-   *    sur l'écran ne doit pas couper.
+   * 2. on teste le segment [dernier point → point courant] contre fruits ET
+   *    bombes, mais seulement si le geste est assez rapide — un doigt posé
+   *    immobile sur l'écran ne doit pas couper.
    */
   private handleSliceMove(pointer: Phaser.Input.Pointer): void {
+    if (this.gameEnded) {
+      return;
+    }
     const now = this.time.now;
     const distance = Phaser.Math.Distance.Between(
       this.lastPointerX,
@@ -163,13 +302,21 @@ export class GameScene extends Phaser.Scene {
     this.sliceTrail.addPoint(pointer.x, pointer.y, now);
 
     if (speed >= SLICE_MIN_SPEED) {
-      this.sliceDetector.checkSegment(
+      this.sliceDetector.checkSegment<Fruit>(
         this.lastPointerX,
         this.lastPointerY,
         pointer.x,
         pointer.y,
         this.fruits,
         (fruit) => this.onFruitSliced(fruit, now)
+      );
+      this.sliceDetector.checkSegment<Bomb>(
+        this.lastPointerX,
+        this.lastPointerY,
+        pointer.x,
+        pointer.y,
+        this.bombs,
+        (bomb) => this.onBombSliced(bomb)
       );
     }
 
@@ -178,12 +325,54 @@ export class GameScene extends Phaser.Scene {
     this.lastPointerTime = now;
   }
 
-  /** Un fruit vient d'être tranché : score, combo, et les deux moitiés. */
+  /** Un fruit vient d'être tranché : score, combo, jus, son et moitiés. */
   private onFruitSliced(fruit: Fruit, now: number): void {
-    this.comboManager.registerSlice(now); // comptage seulement en Phase 1
-    this.scoreManager.addScore(SCORE_PER_FRUIT);
+    if (this.gameEnded) {
+      return;
+    }
+    const combo = this.comboManager.registerSlice(now);
+    const bonus = (combo - 1) * COMBO_BONUS_PER_STEP;
+    const points = SCORE_PER_FRUIT + bonus;
+    this.scoreManager.addScore(points);
+
+    // Jus au point d'impact, teinté à la couleur du fruit
+    this.juiceEmitter.setParticleTint(fruit.juiceColor);
+    this.juiceEmitter.emitParticleAt(fruit.x, fruit.y, JUICE_PARTICLE_COUNT);
+
+    this.showPopup(fruit.x, fruit.y - 20, `+${points}`, '#ffffff', 40);
+    if (combo >= 2) {
+      this.showPopup(fruit.x, fruit.y - 100, `Combo x${combo} !`, '#ffe066', 54);
+      sfx.combo(combo);
+    }
+    sfx.slice();
+
     this.spawnHalves(fruit);
     fruit.kill();
+  }
+
+  /** Bombe tranchée : flash, secousse, explosion, fin de partie différée. */
+  private onBombSliced(bomb: Bomb): void {
+    if (this.gameEnded) {
+      return;
+    }
+    this.gameEnded = true;
+    bomb.kill();
+    this.spawnManager.stop();
+    this.slicing = false;
+    this.sliceTrail.clear();
+
+    sfx.explosion();
+    this.cameras.main.shake(400, 0.02);
+    this.flashRect.setVisible(true).setAlpha(1);
+    this.tweens.add({
+      targets: this.flashRect,
+      alpha: 0,
+      duration: BOMB_GAMEOVER_DELAY_MS - 100,
+      onComplete: () => this.flashRect.setVisible(false),
+    });
+
+    // Petit délai pour laisser le flash et la secousse se lire avant l'écran de fin
+    this.time.delayedCall(BOMB_GAMEOVER_DELAY_MS, () => this.endGame('bomb'));
   }
 
   /**
@@ -231,15 +420,36 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onLivesChanged(lives: number): void {
-    this.livesText.setText('♥'.repeat(Math.max(lives, 0)));
+    if (this.mode === 'classic') {
+      this.infoText.setText('♥'.repeat(Math.max(lives, 0)));
+    }
   }
 
   private onFruitMissed(): void {
+    // En mode Chrono, un fruit manqué est sans conséquence
+    if (this.gameEnded || this.mode === 'chrono') {
+      return;
+    }
+    sfx.lifeLost();
     this.scoreManager.loseLife();
   }
 
-  private onGameOver(score: number): void {
+  /** Événement 'game-over' du ScoreManager : plus de vies (mode Classique). */
+  private onLivesDepleted(): void {
+    if (this.gameEnded) {
+      return;
+    }
+    this.gameEnded = true;
     this.spawnManager.stop();
-    this.scene.start('GameOverScene', { score });
+    // Court délai pour que le joueur voie son dernier cœur disparaître
+    this.time.delayedCall(400, () => this.endGame('lives'));
+  }
+
+  private endGame(reason: GameOverReason): void {
+    this.scene.start('GameOverScene', {
+      score: this.scoreManager.getScore(),
+      mode: this.mode,
+      reason,
+    });
   }
 }

@@ -9,6 +9,9 @@ import {
   TEX_FRUIT_WHOLE,
   TEX_FRUIT_HALF_LEFT,
   TEX_FRUIT_HALF_RIGHT,
+  TEX_BOMB,
+  TEX_JUICE,
+  BOMB_RADIUS,
 } from '../utils/constants';
 
 /** Convertit une couleur hex numérique en chaîne CSS (#rrggbb). */
@@ -33,6 +36,8 @@ export class PreloadScene extends Phaser.Scene {
   create(): void {
     this.createBackgroundTexture();
     this.createFruitTextures();
+    this.createBombTexture();
+    this.createJuiceTexture();
     this.scene.start('MenuScene');
   }
 
@@ -109,5 +114,46 @@ export class PreloadScene extends Phaser.Scene {
     right.fillRect(r, 0, 6, size);
     right.generateTexture(TEX_FRUIT_HALF_RIGHT, size, size);
     right.destroy();
+  }
+
+  /** Bombe placeholder : sphère noire, reflet, mèche et étincelle. */
+  private createBombTexture(): void {
+    const r = BOMB_RADIUS;
+    const size = r * 2;
+    const bodyRadius = r - 8; // marge pour laisser la mèche dans le canvas
+    const g = this.make.graphics({ x: 0, y: 0 }, false);
+
+    // Corps sombre + reflet
+    g.fillStyle(0x1d1d26, 1);
+    g.fillCircle(r, r + 6, bodyRadius);
+    g.fillStyle(0x3c3c4e, 1);
+    g.fillCircle(r - bodyRadius * 0.35, r + 6 - bodyRadius * 0.35, bodyRadius * 0.28);
+
+    // Mèche stylisée
+    g.lineStyle(6, 0x8a6d4a, 1);
+    g.beginPath();
+    g.moveTo(r, 16);
+    g.lineTo(r + 14, 8);
+    g.strokePath();
+
+    // Étincelle orange au bout de la mèche
+    g.fillStyle(0xffb347, 1);
+    g.fillCircle(r + 17, 8, 7);
+    g.fillStyle(0xfff3b0, 1);
+    g.fillCircle(r + 17, 8, 3);
+
+    g.generateTexture(TEX_BOMB, size, size);
+    g.destroy();
+  }
+
+  /** Goutte de jus : petit disque blanc à bord doux, teinté à l'émission. */
+  private createJuiceTexture(): void {
+    const g = this.make.graphics({ x: 0, y: 0 }, false);
+    g.fillStyle(0xffffff, 0.5);
+    g.fillCircle(12, 12, 12);
+    g.fillStyle(0xffffff, 1);
+    g.fillCircle(12, 12, 7);
+    g.generateTexture(TEX_JUICE, 24, 24);
+    g.destroy();
   }
 }
