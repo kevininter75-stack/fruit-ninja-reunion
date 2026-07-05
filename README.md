@@ -6,6 +6,13 @@ typiques de La Réunion : letchis, mangues José, ananas Victoria, combavas…
 Tranchez les fruits d'un geste du doigt (ou de la souris), évitez les bombes,
 enchaînez les combos !
 
+Deux modes de jeu :
+
+- **Classique** — 3 vies, chaque fruit manqué en coûte une.
+- **Chrono** — score maximal en 60 secondes, fruits manqués sans pénalité.
+
+Dans les deux modes, trancher une bombe termine immédiatement la partie.
+
 > Projet portfolio — code TypeScript strict, architecture par scènes/systèmes, 100 % client-side.
 
 ## Stack
@@ -51,11 +58,17 @@ Choix techniques notables :
 - **Placeholders procéduraux** : toutes les textures sont générées en code
   (`Graphics.generateTexture`) en attendant les assets finaux ; les clés de
   texture ne changeront pas.
+- **Sons synthétisés** : les SFX (coupe, explosion, combo…) sont générés en
+  Web Audio (`systems/SfxManager.ts`) — aucun fichier audio requis. La façade
+  sera remplacée par de vrais sons (Phaser/Howler) sans changer les appels.
+- **Feedback systématique** : particules de jus teintées, textes flottants
+  (+points, combos) recyclés depuis un pool, flash + secousse caméra sur
+  bombe, records persistés en localStorage.
 
 ## Feuille de route
 
 - [x] **Phase 1 — MVP jouable** : spawn physique, détection de swipe, découpe, score, vies, game over
-- [ ] **Phase 2 — Feel & polish** : combos, bombes, particules de jus, sons, menu complet, mode Chrono
+- [x] **Phase 2 — Feel & polish** : combos, bombes, particules de jus, sons, menu complet, mode Chrono, records
 - [ ] **Phase 3 — Contenu réunionnais** : 9 fruits + combava doré bonus, décor final, musique
 - [ ] **Phase 4 — Mobile** : multi-touch, safe-areas, Capacitor (Android/iOS), PWA
 
