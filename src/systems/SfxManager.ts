@@ -1,3 +1,6 @@
+import { getAudioContext } from '../utils/audioContext';
+import { isMuted } from '../utils/settings';
+
 /**
  * Effets sonores placeholder synthétisés en Web Audio — aucun fichier requis.
  *
@@ -7,26 +10,16 @@
  * Phaser (ou Howler) sans changer les points d'appel.
  *
  * Chaque méthode est silencieusement no-op si l'audio est indisponible
- * (contexte bloqué, environnement de test, etc.). Le contexte est créé
- * paresseusement et repris au premier geste utilisateur (politique
- * d'autoplay des navigateurs).
+ * ou si le joueur a coupé le son (réglage persistant, voir settings.ts).
  */
 export class SfxManager {
-  private ctx: AudioContext | null = null;
   private noiseBuffer: AudioBuffer | null = null;
 
-  private ensureContext(): AudioContext | null {
-    if (this.ctx === null) {
-      try {
-        this.ctx = new AudioContext();
-      } catch {
-        return null; // Web Audio indisponible : le jeu reste muet mais fonctionnel
-      }
+  private context(): AudioContext | null {
+    if (isMuted()) {
+      return null;
     }
-    if (this.ctx.state === 'suspended') {
-      void this.ctx.resume();
-    }
-    return this.ctx;
+    return getAudioContext();
   }
 
   /** Buffer de bruit blanc partagé (base des whooshs et explosions). */
@@ -48,13 +41,14 @@ export class SfxManager {
     fromHz: number,
     toHz: number,
     duration: number,
-    volume: number
+    volume: number,
+    delaySeconds = 0
   ): void {
-    const ctx = this.ensureContext();
+    const ctx = this.context();
     if (ctx === null) {
       return;
     }
-    const t = ctx.currentTime;
+    const t = ctx.currentTime + delaySeconds;
     const osc = ctx.createOscillator();
     osc.type = type;
     osc.frequency.setValueAtTime(fromHz, t);
@@ -69,7 +63,7 @@ export class SfxManager {
 
   /** "Whoosh" de coupe : souffle de bruit filtré, balayage aigu → grave. */
   slice(): void {
-    const ctx = this.ensureContext();
+    const ctx = this.context();
     if (ctx === null) {
       return;
     }
@@ -91,7 +85,7 @@ export class SfxManager {
 
   /** Explosion de bombe : bruit grave qui s'étouffe + chute de basse. */
   explosion(): void {
-    const ctx = this.ensureContext();
+    const ctx = this.context();
     if (ctx === null) {
       return;
     }
@@ -116,6 +110,13 @@ export class SfxManager {
     this.playTone('triangle', 520 + Math.min(step, 8) * 90, 660 + Math.min(step, 8) * 90, 0.12, 0.3);
   }
 
+  /** Combava doré : petit arpège doré ascendant. */
+  bonus(): void {
+    this.playTone('triangle', 660, 680, 0.14, 0.3);
+    this.playTone('triangle', 880, 900, 0.14, 0.3, 0.09);
+    this.playTone('triangle', 1320, 1340, 0.2, 0.3, 0.18);
+  }
+
   /** Vie perdue : blip descendant, court et discret. */
   lifeLost(): void {
     this.playTone('square', 200, 90, 0.22, 0.15);
@@ -127,8 +128,5 @@ export class SfxManager {
   }
 }
 
-/**
- * Instance partagée : un seul AudioContext pour tout le jeu
- * (les navigateurs limitent leur nombre par page).
- */
+/** Instance partagée pour tout le jeu. */
 export const sfx = new SfxManager();
