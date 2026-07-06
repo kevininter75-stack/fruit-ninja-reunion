@@ -26,9 +26,10 @@ export const SPAWN_MAX_FRUITS_PER_WAVE_START = 1;
 export const SPAWN_MAX_FRUITS_PER_WAVE_CAP = 4;
 
 // Découpe
-export const SLICE_BUFFER_SIZE = 10; // nb max de points conservés pour la traînée
-export const SLICE_POINT_MAX_AGE_MS = 180; // durée de vie d'un point de traînée
+export const SLICE_BUFFER_SIZE = 12; // nb max de points conservés pour la traînée
+export const SLICE_POINT_MAX_AGE_MS = 200; // durée de vie d'un point de traînée
 export const SLICE_MIN_SPEED = 0.35; // vitesse min du geste (px/ms) pour qu'une coupe soit valide
+export const TRAIL_MAX_HALF_WIDTH = 9; // demi-largeur du ruban de lame à la pointe (px)
 
 // Fruits
 export const FRUIT_RADIUS = 52; // rayon du placeholder et du cercle de collision
@@ -69,6 +70,18 @@ export const BOMB_GAMEOVER_DELAY_MS = 700; // durée du flash avant l'écran de 
 // Particules de jus
 export const TEX_JUICE = 'juice';
 export const JUICE_PARTICLE_COUNT = 14;
+
+// Éclaboussures persistantes sur le décor (Étape 1 du polish "feel")
+export const TEX_SPLAT_PREFIX = 'splat_';
+export const SPLAT_VARIANTS = 3; // nb de formes de taches générées
+export const SPLAT_POOL_SIZE = 12;
+export const SPLAT_FADE_MS = 7000; // durée avant disparition complète d'une tache
+
+// Profondeurs de rendu (depth) : fond 0 < taches < moitiés < fruits < jus < UI
+export const DEPTH_SPLAT = 2;
+export const DEPTH_HALF = 5;
+export const DEPTH_FRUIT = 6;
+export const DEPTH_JUICE = 40;
 
 // Combo : points bonus par coupe supplémentaire dans la fenêtre COMBO_WINDOW_MS
 export const COMBO_BONUS_PER_STEP = 5;
