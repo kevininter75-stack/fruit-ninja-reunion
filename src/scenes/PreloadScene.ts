@@ -4,6 +4,8 @@ import {
   GAME_HEIGHT,
   TEX_BOMB,
   TEX_JUICE,
+  TEX_SPLAT_PREFIX,
+  SPLAT_VARIANTS,
   BOMB_RADIUS,
 } from '../utils/constants';
 import {
@@ -43,6 +45,7 @@ export class PreloadScene extends Phaser.Scene {
     this.createVarietyTextures(BONUS_VARIETY);
     this.createBombTexture();
     this.createJuiceTexture();
+    this.createSplatTextures();
     this.scene.start('MenuScene');
   }
 
@@ -552,5 +555,37 @@ export class PreloadScene extends Phaser.Scene {
     g.fillCircle(12, 12, 7);
     g.generateTexture(TEX_JUICE, 24, 24);
     g.destroy();
+  }
+
+  /**
+   * Taches de jus persistantes : blobs irréguliers blancs (teintés à la
+   * couleur du fruit à l'affichage). Motifs déterministes — plusieurs
+   * variantes pour que deux taches voisines ne se ressemblent pas.
+   */
+  private createSplatTextures(): void {
+    const size = 180;
+    const c = size / 2;
+    for (let variant = 0; variant < SPLAT_VARIANTS; variant++) {
+      const g = this.make.graphics({ x: 0, y: 0 }, false);
+      // Corps principal de la tache
+      g.fillStyle(0xffffff, 0.85);
+      g.fillCircle(c, c, 34 + variant * 3);
+      // Lobes autour du corps (angles décalés par variante)
+      for (let i = 0; i < 9; i++) {
+        const angle = (i / 9) * Math.PI * 2 + variant * 0.7;
+        const dist = 26 + ((i * 13 + variant * 5) % 22);
+        const radius = 7 + ((i * 7 + variant * 3) % 12);
+        g.fillCircle(c + Math.cos(angle) * dist, c + Math.sin(angle) * dist, radius);
+      }
+      // Gouttelettes projetées plus loin
+      g.fillStyle(0xffffff, 0.7);
+      for (let i = 0; i < 5; i++) {
+        const angle = (i / 5) * Math.PI * 2 + variant * 1.3 + 0.4;
+        const dist = 62 + ((i * 11 + variant * 7) % 20);
+        g.fillCircle(c + Math.cos(angle) * dist, c + Math.sin(angle) * dist, 4 + (i % 3) * 2);
+      }
+      g.generateTexture(`${TEX_SPLAT_PREFIX}${variant}`, size, size);
+      g.destroy();
+    }
   }
 }

@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { BOMB_RADIUS, GAME_HEIGHT } from '../utils/constants';
+import { BOMB_RADIUS, GAME_HEIGHT, DEPTH_FRUIT } from '../utils/constants';
 
 /**
  * Bombe : la trancher provoque le game over immédiat (flash + explosion).
@@ -14,6 +14,7 @@ export class Bomb extends Phaser.Physics.Arcade.Sprite {
   /** (Re)lance la bombe depuis le bas de l'écran. Appelé par le SpawnManager. */
   launch(x: number, y: number, velocityX: number, velocityY: number): void {
     this.enableBody(true, x, y, true, true);
+    this.setDepth(DEPTH_FRUIT);
     this.setVelocity(velocityX, velocityY);
     this.setAngularVelocity(Phaser.Math.Between(-120, 120));
     const body = this.body as Phaser.Physics.Arcade.Body;

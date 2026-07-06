@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_HEIGHT, FRUIT_RADIUS } from '../utils/constants';
+import { GAME_HEIGHT, FRUIT_RADIUS, DEPTH_FRUIT } from '../utils/constants';
 import { type FruitVariety, wholeTextureKey } from '../utils/fruitCatalog';
 
 /**
@@ -43,6 +43,7 @@ export class Fruit extends Phaser.Physics.Arcade.Sprite {
     this.sliceRadius = variety.radius;
     this.juiceColor = variety.juiceColor;
     this.setTexture(wholeTextureKey(variety));
+    this.setDepth(DEPTH_FRUIT); // au-dessus des taches de jus persistantes
 
     this.enableBody(true, x, y, true, true);
     this.setVelocity(velocityX, velocityY);

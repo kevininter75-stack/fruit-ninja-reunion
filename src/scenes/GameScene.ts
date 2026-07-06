@@ -24,6 +24,13 @@ import {
   BOMB_POOL_SIZE,
   BOMB_GAMEOVER_DELAY_MS,
   JUICE_PARTICLE_COUNT,
+  TEX_SPLAT_PREFIX,
+  SPLAT_VARIANTS,
+  SPLAT_POOL_SIZE,
+  SPLAT_FADE_MS,
+  DEPTH_SPLAT,
+  DEPTH_HALF,
+  DEPTH_JUICE,
   COMBO_BONUS_PER_STEP,
   CHRONO_DURATION_MS,
   POPUP_POOL_SIZE,
@@ -80,6 +87,8 @@ export class GameScene extends Phaser.Scene {
   private multiplierBanner!: Phaser.GameObjects.Text;
   private multiplierTimer: Phaser.Time.TimerEvent | null = null;
   private popupPool: Phaser.GameObjects.Text[] = [];
+  private splatPool: Phaser.GameObjects.Image[] = [];
+  private nextSplatIndex = 0;
 
   // État de la partie — la même instance de scène est réutilisée à chaque
   // restart, donc TOUT l'état mutable doit être réinitialisé dans init().
@@ -150,7 +159,7 @@ export class GameScene extends Phaser.Scene {
         gravityY: 900,
         emitting: false,
       })
-      .setDepth(40);
+      .setDepth(DEPTH_JUICE);
 
     // Flash blanc plein écran (bombe) — créé une fois, réactivé au besoin
     this.flashRect = this.add
@@ -162,6 +171,7 @@ export class GameScene extends Phaser.Scene {
 
     this.createUi();
     this.createPopupPool();
+    this.createSplatPool();
     this.registerGameEvents();
     this.registerPointerEvents();
 
@@ -246,6 +256,44 @@ export class GameScene extends Phaser.Scene {
       .setDepth(50);
 
     createMuteButton(this, 52, GAME_HEIGHT - 52);
+  }
+
+  /**
+   * Taches de jus persistantes : pool d'images recyclées en round-robin
+   * (la plus ancienne est réutilisée), teintées à la couleur du fruit.
+   * Elles s'estompent lentement et racontent la partie sur le décor.
+   */
+  private createSplatPool(): void {
+    this.splatPool = [];
+    this.nextSplatIndex = 0;
+    for (let i = 0; i < SPLAT_POOL_SIZE; i++) {
+      const splat = this.add
+        .image(0, 0, `${TEX_SPLAT_PREFIX}0`)
+        .setDepth(DEPTH_SPLAT)
+        .setVisible(false);
+      this.splatPool.push(splat);
+    }
+  }
+
+  private spawnSplat(x: number, y: number, color: number): void {
+    const splat = this.splatPool[this.nextSplatIndex];
+    this.nextSplatIndex = (this.nextSplatIndex + 1) % SPLAT_POOL_SIZE;
+    this.tweens.killTweensOf(splat); // la tache recyclée abandonne son fondu en cours
+    splat
+      .setTexture(`${TEX_SPLAT_PREFIX}${Phaser.Math.Between(0, SPLAT_VARIANTS - 1)}`)
+      .setPosition(x, y)
+      .setRotation(Math.random() * Math.PI * 2)
+      .setScale(Phaser.Math.FloatBetween(0.7, 1.25))
+      .setTint(color)
+      .setAlpha(0.75)
+      .setVisible(true);
+    this.tweens.add({
+      targets: splat,
+      alpha: 0,
+      duration: SPLAT_FADE_MS,
+      ease: 'Quad.easeIn',
+      onComplete: () => splat.setVisible(false),
+    });
   }
 
   /** Pool de textes flottants (+10, Combo x2…) — aucune création en partie. */
@@ -369,13 +417,15 @@ export class GameScene extends Phaser.Scene {
     gesture.trail.addPoint(pointer.x, pointer.y, now);
 
     if (speed >= SLICE_MIN_SPEED) {
+      // Angle du geste : les moitiés s'écarteront perpendiculairement à lui
+      const sliceAngle = Math.atan2(pointer.y - gesture.lastY, pointer.x - gesture.lastX);
       this.sliceDetector.checkSegment<Fruit>(
         gesture.lastX,
         gesture.lastY,
         pointer.x,
         pointer.y,
         this.fruits,
-        (fruit) => this.onFruitSliced(fruit, now)
+        (fruit) => this.onFruitSliced(fruit, now, sliceAngle)
       );
       this.sliceDetector.checkSegment<Bomb>(
         gesture.lastX,
@@ -393,7 +443,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** Un fruit vient d'être tranché : score, combo, jus, son et moitiés. */
-  private onFruitSliced(fruit: Fruit, now: number): void {
+  private onFruitSliced(fruit: Fruit, now: number, sliceAngle: number): void {
     if (this.gameEnded) {
       return;
     }
@@ -408,9 +458,10 @@ export class GameScene extends Phaser.Scene {
     const bonus = (combo - 1) * COMBO_BONUS_PER_STEP;
     const awarded = this.scoreManager.addScore(SCORE_PER_FRUIT + bonus);
 
-    // Jus au point d'impact, teinté à la couleur du fruit
+    // Jus au point d'impact (teinté) + tache persistante sur le décor
     this.juiceEmitter.setParticleTint(fruit.juiceColor);
     this.juiceEmitter.emitParticleAt(fruit.x, fruit.y, JUICE_PARTICLE_COUNT);
+    this.spawnSplat(fruit.x, fruit.y, fruit.juiceColor);
 
     this.showPopup(fruit.x, fruit.y - 20, `+${awarded}`, '#ffffff', 40);
     if (combo >= 2) {
@@ -419,7 +470,7 @@ export class GameScene extends Phaser.Scene {
     }
     sfx.slice();
 
-    this.spawnHalves(fruit);
+    this.spawnHalves(fruit, sliceAngle);
     fruit.kill();
   }
 
@@ -474,16 +525,23 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Remplace le fruit par deux moitiés de sa variété qui partent chacune
-   * de leur côté avec rotation, puis s'estompent avant de retourner au pool.
+   * Remplace le fruit par deux moitiés qui s'écartent PERPENDICULAIREMENT
+   * au geste (comme dans Fruit Ninja : on coupe selon l'angle du swipe).
+   *
+   * Géométrie : la face de coupe des textures est verticale ; une rotation
+   * de (angle + 90°) l'aligne sur la direction du geste. La normale à la
+   * coupe est n = (-sin a, cos a) : la moitié "gauche" (face de coupe à
+   * droite de sa texture) part côté -n, la droite côté +n.
    */
-  private spawnHalves(fruit: Fruit): void {
+  private spawnHalves(fruit: Fruit, sliceAngle: number): void {
     const variety = fruit.getVariety();
     if (variety === null) {
       return; // impossible pour un fruit lancé, garde-fou de typage
     }
     const textures = halfTextureKeys(variety);
     const fruitBody = fruit.body as Phaser.Physics.Arcade.Body;
+    const normalX = -Math.sin(sliceAngle);
+    const normalY = Math.cos(sliceAngle);
     const sides: Array<{ texture: string; direction: number }> = [
       { texture: textures.left, direction: -1 },
       { texture: textures.right, direction: 1 },
@@ -497,13 +555,16 @@ export class GameScene extends Phaser.Scene {
       half.setTexture(side.texture);
       half.enableBody(true, fruit.x, fruit.y, true, true);
       half.setAlpha(1);
-      // Chaque moitié hérite d'une partie de la vélocité du fruit et
-      // part latéralement de son côté, avec une rotation opposée.
+      half.setDepth(DEPTH_HALF);
+      half.setRotation(sliceAngle + Math.PI / 2);
+      // Impulsion de séparation le long de la normale à la coupe,
+      // ajoutée à une fraction de l'élan du fruit.
+      const separation = Phaser.Math.Between(110, 210);
       half.setVelocity(
-        side.direction * Phaser.Math.Between(90, 200),
-        fruitBody.velocity.y * 0.4 - Phaser.Math.Between(40, 140)
+        fruitBody.velocity.x * 0.35 + side.direction * normalX * separation,
+        fruitBody.velocity.y * 0.35 + side.direction * normalY * separation - Phaser.Math.Between(20, 80)
       );
-      half.setAngularVelocity(side.direction * Phaser.Math.Between(160, 320));
+      half.setAngularVelocity(side.direction * Phaser.Math.Between(140, 300));
 
       // Le tween (une allocation par coupe, pas par frame) gère le fondu
       // puis rend la moitié au pool.
