@@ -39,6 +39,22 @@ interface GameSceneData {
 }
 
 /**
+ * État d'un geste de coupe en cours. Multi-touch : chaque doigt posé
+ * occupe un slot (pré-alloué) avec sa propre traînée et son historique.
+ */
+interface SliceGesture {
+  /** id du pointeur Phaser qui occupe ce slot, null si libre. */
+  pointerId: number | null;
+  trail: SliceTrail;
+  lastX: number;
+  lastY: number;
+  lastTime: number;
+}
+
+/** Nombre de gestes simultanés gérés (2 doigts + souris, cf. activePointers). */
+const MAX_GESTURES = 3;
+
+/**
  * Scène de jeu principale : boucle spawn → swipe → coupe → score.
  *
  * Deux modes :
@@ -53,7 +69,6 @@ export class GameScene extends Phaser.Scene {
   private fruits!: Phaser.Physics.Arcade.Group;
   private halves!: Phaser.Physics.Arcade.Group;
   private bombs!: Phaser.Physics.Arcade.Group;
-  private sliceTrail!: SliceTrail;
   private sliceDetector!: SliceDetector;
   private scoreManager!: ScoreManager;
   private comboManager!: ComboManager;
@@ -72,11 +87,8 @@ export class GameScene extends Phaser.Scene {
   private chronoEndTime = 0;
   private lastShownSecond = -1;
 
-  // État du geste en cours (position/temps du dernier point enregistré)
-  private slicing = false;
-  private lastPointerX = 0;
-  private lastPointerY = 0;
-  private lastPointerTime = 0;
+  // Gestes de coupe en cours, un slot par doigt (recréés dans create())
+  private gestures: SliceGesture[] = [];
 
   constructor() {
     super('GameScene');
@@ -86,7 +98,6 @@ export class GameScene extends Phaser.Scene {
     this.mode = data.mode ?? 'classic';
     this.gameEnded = false;
     this.lastShownSecond = -1;
-    this.slicing = false;
     this.multiplierTimer = null;
   }
 
@@ -114,8 +125,20 @@ export class GameScene extends Phaser.Scene {
     this.scoreManager = new ScoreManager(this);
     this.comboManager = new ComboManager();
     this.sliceDetector = new SliceDetector();
-    this.sliceTrail = new SliceTrail(this);
     this.spawnManager = new SpawnManager(this, this.fruits, this.bombs, this.scoreManager);
+
+    // Slots de gestes multi-touch : traînées et états pré-alloués,
+    // aucune allocation quand un doigt se pose en pleine partie.
+    this.gestures = [];
+    for (let i = 0; i < MAX_GESTURES; i++) {
+      this.gestures.push({
+        pointerId: null,
+        trail: new SliceTrail(this),
+        lastX: 0,
+        lastY: 0,
+        lastTime: 0,
+      });
+    }
 
     // Émetteur de jus : un seul émetteur réutilisé, teinté par fruit à l'émission
     this.juiceEmitter = this.add
@@ -150,7 +173,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(): void {
-    this.sliceTrail.update(this.time.now);
+    for (const gesture of this.gestures) {
+      gesture.trail.update(this.time.now);
+    }
     if (this.mode === 'chrono' && !this.gameEnded) {
       this.updateChrono();
     }
@@ -283,25 +308,43 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  /** Slot de geste occupé par ce pointeur (recherche linéaire : 3 slots). */
+  private findGesture(pointerId: number): SliceGesture | undefined {
+    return this.gestures.find((g) => g.pointerId === pointerId);
+  }
+
   private registerPointerEvents(): void {
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      this.slicing = true;
-      this.sliceTrail.clear();
-      this.lastPointerX = pointer.x;
-      this.lastPointerY = pointer.y;
-      this.lastPointerTime = this.time.now;
-      this.sliceTrail.addPoint(pointer.x, pointer.y, this.time.now);
+      // Réutilise le slot si ce pointeur en avait déjà un, sinon en prend un libre
+      const gesture = this.findGesture(pointer.id) ?? this.gestures.find((g) => g.pointerId === null);
+      if (gesture === undefined) {
+        return; // plus de 3 doigts : les suivants sont ignorés
+      }
+      gesture.pointerId = pointer.id;
+      gesture.trail.clear();
+      gesture.lastX = pointer.x;
+      gesture.lastY = pointer.y;
+      gesture.lastTime = this.time.now;
+      gesture.trail.addPoint(pointer.x, pointer.y, this.time.now);
     });
 
     this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
-      if (!this.slicing || !pointer.isDown) {
+      if (!pointer.isDown) {
         return;
       }
-      this.handleSliceMove(pointer);
+      const gesture = this.findGesture(pointer.id);
+      if (gesture === undefined) {
+        return;
+      }
+      this.handleSliceMove(gesture, pointer);
     });
 
-    const endSlice = (): void => {
-      this.slicing = false;
+    // Doigt levé : le slot redevient libre, la traînée s'éteint d'elle-même
+    const endSlice = (pointer: Phaser.Input.Pointer): void => {
+      const gesture = this.findGesture(pointer.id);
+      if (gesture !== undefined) {
+        gesture.pointerId = null;
+      }
     };
     this.input.on('pointerup', endSlice);
     this.input.on('pointerupoutside', endSlice);
@@ -314,34 +357,29 @@ export class GameScene extends Phaser.Scene {
    *    bombes, mais seulement si le geste est assez rapide — un doigt posé
    *    immobile sur l'écran ne doit pas couper.
    */
-  private handleSliceMove(pointer: Phaser.Input.Pointer): void {
+  private handleSliceMove(gesture: SliceGesture, pointer: Phaser.Input.Pointer): void {
     if (this.gameEnded) {
       return;
     }
     const now = this.time.now;
-    const distance = Phaser.Math.Distance.Between(
-      this.lastPointerX,
-      this.lastPointerY,
-      pointer.x,
-      pointer.y
-    );
-    const elapsed = Math.max(now - this.lastPointerTime, 1);
+    const distance = Phaser.Math.Distance.Between(gesture.lastX, gesture.lastY, pointer.x, pointer.y);
+    const elapsed = Math.max(now - gesture.lastTime, 1);
     const speed = distance / elapsed; // px par ms
 
-    this.sliceTrail.addPoint(pointer.x, pointer.y, now);
+    gesture.trail.addPoint(pointer.x, pointer.y, now);
 
     if (speed >= SLICE_MIN_SPEED) {
       this.sliceDetector.checkSegment<Fruit>(
-        this.lastPointerX,
-        this.lastPointerY,
+        gesture.lastX,
+        gesture.lastY,
         pointer.x,
         pointer.y,
         this.fruits,
         (fruit) => this.onFruitSliced(fruit, now)
       );
       this.sliceDetector.checkSegment<Bomb>(
-        this.lastPointerX,
-        this.lastPointerY,
+        gesture.lastX,
+        gesture.lastY,
         pointer.x,
         pointer.y,
         this.bombs,
@@ -349,9 +387,9 @@ export class GameScene extends Phaser.Scene {
       );
     }
 
-    this.lastPointerX = pointer.x;
-    this.lastPointerY = pointer.y;
-    this.lastPointerTime = now;
+    gesture.lastX = pointer.x;
+    gesture.lastY = pointer.y;
+    gesture.lastTime = now;
   }
 
   /** Un fruit vient d'être tranché : score, combo, jus, son et moitiés. */
@@ -415,8 +453,11 @@ export class GameScene extends Phaser.Scene {
     this.gameEnded = true;
     bomb.kill();
     this.spawnManager.stop();
-    this.slicing = false;
-    this.sliceTrail.clear();
+    // Tous les gestes en cours sont interrompus
+    for (const gesture of this.gestures) {
+      gesture.pointerId = null;
+      gesture.trail.clear();
+    }
 
     sfx.explosion();
     this.cameras.main.shake(400, 0.02);
