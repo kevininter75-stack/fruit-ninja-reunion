@@ -7,6 +7,15 @@
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
     <meta name="description" content="Fruit Ninja Réunion — tranchez les fruits péi !" />
+    <meta name="theme-color" content="#1478a0" />
+    <!-- PWA : installable depuis le navigateur mobile -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" type="image/png" href="/icons/icon-192.png" />
+    <!-- iOS : icône et mode plein écran une fois épinglé -->
+    <link rel="apple-touch-icon" href="/icons/icon-180.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="FN Réunion" />
     <title>Fruit Ninja Réunion</title>
     <style>
       /* Plein écran, pas de scroll, fond sombre pendant le chargement */
@@ -19,10 +28,16 @@
         overflow: hidden;
         background: #0b2a3a;
         touch-action: none; /* empêche le scroll/zoom natif pendant les swipes */
+        -webkit-user-select: none;
+        user-select: none;
       }
       #game {
         width: 100%;
         height: 100%;
+        box-sizing: border-box;
+        /* Safe-areas (encoche, barre de geste) : le canvas reste dans la zone sûre */
+        padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+          env(safe-area-inset-left);
       }
     </style>
   </head>

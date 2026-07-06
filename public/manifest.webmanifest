@@ -1,0 +1,30 @@
+{
+  "name": "Fruit Ninja Réunion",
+  "short_name": "FN Réunion",
+  "description": "Tranchez les fruits péi ! Jeu fruit-slicer aux couleurs de La Réunion.",
+  "lang": "fr",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b2a3a",
+  "theme_color": "#1478a0",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
