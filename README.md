@@ -19,6 +19,13 @@ le **combava doré**, qui double le score pendant 5 secondes.
 
 > Projet portfolio — code TypeScript strict, architecture par scènes/systèmes, 100 % client-side.
 
+**🎮 Jouer en ligne : <https://kevininter75-stack.github.io/fruit-ninja-reunion/>**
+
+Sur mobile, le navigateur propose « Ajouter à l'écran d'accueil » : le jeu
+s'installe comme une app (plein écran portrait, jouable hors-ligne).
+Déploiement continu : chaque push sur `master` republie automatiquement
+via GitHub Actions.
+
 ## Stack
 
 - [Phaser 3](https://phaser.io/) — moteur de jeu 2D, physique Arcade
