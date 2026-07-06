@@ -43,16 +43,8 @@ export const STARTING_LIVES = 3;
 // Fenêtre de combo (Phase 2) : délai max entre deux coupes pour chaîner un combo
 export const COMBO_WINDOW_MS = 300;
 
-// Couleurs de la direction artistique (dégradé tropical)
-export const COLOR_SKY_TOP = 0x1e90b4; // bleu lagon
-export const COLOR_SKY_BOTTOM = 0xf2803c; // orange coucher de soleil
-export const COLOR_MOUNTAIN = 0x2d3a4a; // silhouette volcanique
+// Couleur de la traînée de coupe
 export const COLOR_TRAIL = 0xffffff;
-
-// Clés de textures placeholder
-export const TEX_FRUIT_WHOLE = 'litchi_whole';
-export const TEX_FRUIT_HALF_LEFT = 'litchi_half_left';
-export const TEX_FRUIT_HALF_RIGHT = 'litchi_half_right';
 
 // ------------------------------------------------------------------
 // Phase 2 — Feel & polish
@@ -86,3 +78,13 @@ export const CHRONO_DURATION_MS = 60_000;
 
 // Pool de textes de feedback flottants (+10, Combo x2…)
 export const POPUP_POOL_SIZE = 10;
+
+// ------------------------------------------------------------------
+// Phase 3 — Contenu réunionnais
+// ------------------------------------------------------------------
+
+// Fruit bonus (combava doré) : score x2 temporaire
+export const BONUS_CHANCE = 0.035; // probabilité par salve de tenter un combava
+export const BONUS_SAFE_TIME_MS = 10_000; // pas de bonus en tout début de partie
+export const BONUS_X2_FACTOR = 2;
+export const BONUS_X2_DURATION_MS = 5000;

@@ -7,6 +7,9 @@ import { ScoreManager } from '../systems/ScoreManager';
 import { ComboManager } from '../systems/ComboManager';
 import { SpawnManager } from '../systems/SpawnManager';
 import { sfx } from '../systems/SfxManager';
+import { music } from '../systems/MusicManager';
+import { FRUIT_VARIETIES, halfTextureKeys, wholeTextureKey } from '../utils/fruitCatalog';
+import { createMuteButton } from '../utils/ui';
 import {
   GAME_WIDTH,
   GAME_HEIGHT,
@@ -16,9 +19,6 @@ import {
   SCORE_PER_FRUIT,
   SLICE_MIN_SPEED,
   STARTING_LIVES,
-  TEX_FRUIT_WHOLE,
-  TEX_FRUIT_HALF_LEFT,
-  TEX_FRUIT_HALF_RIGHT,
   TEX_BOMB,
   TEX_JUICE,
   BOMB_POOL_SIZE,
@@ -27,6 +27,8 @@ import {
   COMBO_BONUS_PER_STEP,
   CHRONO_DURATION_MS,
   POPUP_POOL_SIZE,
+  BONUS_X2_FACTOR,
+  BONUS_X2_DURATION_MS,
   type GameMode,
   type GameOverReason,
 } from '../utils/constants';
@@ -43,6 +45,7 @@ interface GameSceneData {
  * - Classique : 3 vies, un fruit manqué coûte une vie.
  * - Chrono : 60 secondes, les fruits manqués sont ignorés.
  * Dans les deux modes, trancher une bombe termine immédiatement la partie.
+ * Le combava doré active un score x2 temporaire (bannière sous le score).
  */
 export class GameScene extends Phaser.Scene {
   private mode: GameMode = 'classic';
@@ -59,6 +62,8 @@ export class GameScene extends Phaser.Scene {
   private flashRect!: Phaser.GameObjects.Rectangle;
   private scoreText!: Phaser.GameObjects.Text;
   private infoText!: Phaser.GameObjects.Text; // vies (classique) ou compte à rebours (chrono)
+  private multiplierBanner!: Phaser.GameObjects.Text;
+  private multiplierTimer: Phaser.Time.TimerEvent | null = null;
   private popupPool: Phaser.GameObjects.Text[] = [];
 
   // État de la partie — la même instance de scène est réutilisée à chaque
@@ -82,20 +87,22 @@ export class GameScene extends Phaser.Scene {
     this.gameEnded = false;
     this.lastShownSecond = -1;
     this.slicing = false;
+    this.multiplierTimer = null;
   }
 
   create(): void {
     this.add.image(0, 0, 'background').setOrigin(0);
+    music.ensureRunning();
 
     // Pools de sprites : fruits, moitiés et bombes sont recyclés, jamais
     // détruits, pour éviter les allocations/GC en partie (60 FPS mobile).
     this.fruits = this.physics.add.group({
       classType: Fruit,
-      defaultKey: TEX_FRUIT_WHOLE,
+      defaultKey: wholeTextureKey(FRUIT_VARIETIES[0]),
       maxSize: FRUIT_POOL_SIZE,
     });
     this.halves = this.physics.add.group({
-      defaultKey: TEX_FRUIT_HALF_LEFT,
+      defaultKey: halfTextureKeys(FRUIT_VARIETIES[0]).left,
       maxSize: HALF_POOL_SIZE,
     });
     this.bombs = this.physics.add.group({
@@ -179,6 +186,26 @@ export class GameScene extends Phaser.Scene {
       })
       .setDepth(50);
 
+    // Bannière x2 sous le score, cachée par défaut, clignote quand active
+    this.multiplierBanner = this.add
+      .text(24, 76, `SCORE x${BONUS_X2_FACTOR} !`, {
+        fontFamily: '"Trebuchet MS", sans-serif',
+        fontSize: '34px',
+        fontStyle: 'bold',
+        color: '#ffd700',
+        stroke: '#2d3a4a',
+        strokeThickness: 6,
+      })
+      .setDepth(50)
+      .setVisible(false);
+    this.tweens.add({
+      targets: this.multiplierBanner,
+      alpha: 0.45,
+      duration: 300,
+      yoyo: true,
+      repeat: -1,
+    });
+
     const infoContent = this.mode === 'classic' ? '♥'.repeat(STARTING_LIVES) : '60 s';
     const infoColor = this.mode === 'classic' ? '#ff5252' : '#ffffff';
     this.infoText = this.add
@@ -192,6 +219,8 @@ export class GameScene extends Phaser.Scene {
       })
       .setOrigin(1, 0)
       .setDepth(50);
+
+    createMuteButton(this, 52, GAME_HEIGHT - 52);
   }
 
   /** Pool de textes flottants (+10, Combo x2…) — aucune création en partie. */
@@ -330,16 +359,22 @@ export class GameScene extends Phaser.Scene {
     if (this.gameEnded) {
       return;
     }
+
+    // Le combava doré active le multiplicateur AVANT le crédit des points :
+    // sa propre coupe profite déjà du x2.
+    if (fruit.isBonus) {
+      this.activateBonus(fruit);
+    }
+
     const combo = this.comboManager.registerSlice(now);
     const bonus = (combo - 1) * COMBO_BONUS_PER_STEP;
-    const points = SCORE_PER_FRUIT + bonus;
-    this.scoreManager.addScore(points);
+    const awarded = this.scoreManager.addScore(SCORE_PER_FRUIT + bonus);
 
     // Jus au point d'impact, teinté à la couleur du fruit
     this.juiceEmitter.setParticleTint(fruit.juiceColor);
     this.juiceEmitter.emitParticleAt(fruit.x, fruit.y, JUICE_PARTICLE_COUNT);
 
-    this.showPopup(fruit.x, fruit.y - 20, `+${points}`, '#ffffff', 40);
+    this.showPopup(fruit.x, fruit.y - 20, `+${awarded}`, '#ffffff', 40);
     if (combo >= 2) {
       this.showPopup(fruit.x, fruit.y - 100, `Combo x${combo} !`, '#ffe066', 54);
       sfx.combo(combo);
@@ -348,6 +383,28 @@ export class GameScene extends Phaser.Scene {
 
     this.spawnHalves(fruit);
     fruit.kill();
+  }
+
+  /** Combava doré tranché : score x2 temporaire + feedback doré appuyé. */
+  private activateBonus(fruit: Fruit): void {
+    this.scoreManager.activateMultiplier(BONUS_X2_FACTOR, BONUS_X2_DURATION_MS);
+    this.showPopup(fruit.x, fruit.y - 160, 'COMBAVA DORÉ !', '#ffd700', 48);
+    sfx.bonus();
+
+    // Gros jet de jus doré en plus du jus normal
+    this.juiceEmitter.setParticleTint(0xffd700);
+    this.juiceEmitter.emitParticleAt(fruit.x, fruit.y, JUICE_PARTICLE_COUNT * 2);
+
+    // Bannière x2 affichée pendant toute la durée du multiplicateur ;
+    // un nouveau combava pendant la fenêtre repousse simplement l'échéance.
+    this.multiplierBanner.setVisible(true);
+    if (this.multiplierTimer !== null) {
+      this.multiplierTimer.remove();
+    }
+    this.multiplierTimer = this.time.delayedCall(BONUS_X2_DURATION_MS, () => {
+      this.multiplierBanner.setVisible(false);
+      this.multiplierTimer = null;
+    });
   }
 
   /** Bombe tranchée : flash, secousse, explosion, fin de partie différée. */
@@ -376,14 +433,19 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Remplace le fruit par deux moitiés qui partent chacune de leur côté
-   * avec rotation, puis s'estompent avant de retourner au pool.
+   * Remplace le fruit par deux moitiés de sa variété qui partent chacune
+   * de leur côté avec rotation, puis s'estompent avant de retourner au pool.
    */
   private spawnHalves(fruit: Fruit): void {
+    const variety = fruit.getVariety();
+    if (variety === null) {
+      return; // impossible pour un fruit lancé, garde-fou de typage
+    }
+    const textures = halfTextureKeys(variety);
     const fruitBody = fruit.body as Phaser.Physics.Arcade.Body;
     const sides: Array<{ texture: string; direction: number }> = [
-      { texture: TEX_FRUIT_HALF_LEFT, direction: -1 },
-      { texture: TEX_FRUIT_HALF_RIGHT, direction: 1 },
+      { texture: textures.left, direction: -1 },
+      { texture: textures.right, direction: 1 },
     ];
 
     for (const side of sides) {
@@ -425,9 +487,10 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private onFruitMissed(): void {
-    // En mode Chrono, un fruit manqué est sans conséquence
-    if (this.gameEnded || this.mode === 'chrono') {
+  private onFruitMissed(fruit: Fruit): void {
+    // En mode Chrono, un fruit manqué est sans conséquence ;
+    // un combava manqué non plus (c'était un cadeau, pas une obligation).
+    if (this.gameEnded || this.mode === 'chrono' || fruit.isBonus) {
       return;
     }
     sfx.lifeLost();

@@ -19,7 +19,10 @@ import {
   BOMB_CHANCE_PER_TIER,
   BOMB_CHANCE_CAP,
   BOMB_SAFE_TIME_MS,
+  BONUS_CHANCE,
+  BONUS_SAFE_TIME_MS,
 } from '../utils/constants';
+import { pickRandomVariety, BONUS_VARIETY } from '../utils/fruitCatalog';
 
 /** Paramètres de lancement calculés une fois par spawn (objet réutilisé). */
 interface LaunchParams {
@@ -41,7 +44,9 @@ interface LaunchParams {
  * - le ratio de bombes augmente légèrement (plafonné pour rester juste).
  * Aucune bombe pendant les BOMB_SAFE_TIME_MS premières millisecondes.
  *
- * TODO Phase 3 : fruit bonus "combava doré" (ralenti 2 s ou score x2).
+ * Variétés : chaque fruit spawné tire une variété au poids dans le
+ * catalogue réunionnais. Le combava doré (bonus score x2) a un spawn
+ * dédié : rare, jamais en début de partie, un seul à l'écran à la fois.
  */
 export class SpawnManager {
   private timer: Phaser.Time.TimerEvent | null = null;
@@ -122,6 +127,31 @@ export class SpawnManager {
         this.spawnFruit();
       }
     }
+    this.maybeSpawnBonus();
+  }
+
+  /** Tente un combava doré : rare, pas en début de partie, unique à l'écran. */
+  private maybeSpawnBonus(): void {
+    if (this.scene.time.now - this.startTime < BONUS_SAFE_TIME_MS) {
+      return;
+    }
+    if (Math.random() >= BONUS_CHANCE) {
+      return;
+    }
+    // Un seul combava actif à la fois pour préserver sa rareté
+    const children = this.fruits.getChildren();
+    for (let i = 0; i < children.length; i++) {
+      const fruit = children[i] as Fruit;
+      if (fruit.active && fruit.isBonus) {
+        return;
+      }
+    }
+    const bonus = this.fruits.get() as Fruit | null;
+    if (bonus === null) {
+      return;
+    }
+    const p = this.computeLaunch();
+    bonus.launchAs(BONUS_VARIETY, true, p.x, GAME_HEIGHT + FRUIT_RADIUS, p.velocityX, p.velocityY);
   }
 
   /**
@@ -145,7 +175,7 @@ export class SpawnManager {
       return; // pool épuisé : on saute ce spawn plutôt que d'allouer
     }
     const p = this.computeLaunch();
-    fruit.launch(p.x, GAME_HEIGHT + FRUIT_RADIUS, p.velocityX, p.velocityY);
+    fruit.launchAs(pickRandomVariety(), false, p.x, GAME_HEIGHT + FRUIT_RADIUS, p.velocityX, p.velocityY);
   }
 
   private spawnBomb(): void {
