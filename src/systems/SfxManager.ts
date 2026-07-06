@@ -61,6 +61,35 @@ export class SfxManager {
     osc.stop(t + duration + 0.02);
   }
 
+  /**
+   * "Fwip" de lancement : souffle doux qui monte, joué à chaque fruit
+   * qui part du bas de l'écran. C'est le signal d'anticipation — il fait
+   * lever les yeux avant même que le fruit apparaisse. Hauteur légèrement
+   * aléatoire pour éviter la répétition mécanique.
+   */
+  launch(): void {
+    const ctx = this.context();
+    if (ctx === null) {
+      return;
+    }
+    const t = ctx.currentTime;
+    const src = ctx.createBufferSource();
+    src.buffer = this.getNoise(ctx);
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.Q.value = 1.6;
+    const baseHz = 260 * (0.9 + Math.random() * 0.3);
+    filter.frequency.setValueAtTime(baseHz, t);
+    filter.frequency.exponentialRampToValueAtTime(baseHz * 3.4, t + 0.22);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.012, t);
+    gain.gain.exponentialRampToValueAtTime(0.13, t + 0.08); // gonflement
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.26);
+    src.connect(filter).connect(gain).connect(ctx.destination);
+    src.start(t);
+    src.stop(t + 0.28);
+  }
+
   /** "Whoosh" de coupe : souffle de bruit filtré, balayage aigu → grave. */
   slice(): void {
     const ctx = this.context();

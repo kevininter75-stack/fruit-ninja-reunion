@@ -9,21 +9,29 @@
 export const GAME_WIDTH = 720;
 export const GAME_HEIGHT = 1280;
 
-// Physique
-export const GRAVITY_Y = 1400;
+// Physique — gravité réduite pour un vrai temps de suspension à l'apex
+// (façon Fruit Ninja : le fruit "flotte" un instant, fenêtre de tir confortable)
+export const GRAVITY_Y = 1000;
 
-// Lancement des fruits (vélocités initiales)
-export const LAUNCH_VELOCITY_Y_MIN = -1550;
-export const LAUNCH_VELOCITY_Y_MAX = -1750;
-export const LAUNCH_VELOCITY_X_MAX = 260; // vélocité horizontale max (vers le centre)
+// Lancement des fruits (vélocités initiales, recalées sur la gravité)
+export const LAUNCH_VELOCITY_Y_MIN = -1250;
+export const LAUNCH_VELOCITY_Y_MAX = -1480;
+export const LAUNCH_VELOCITY_X_MAX = 200; // vélocité horizontale max (vers le centre)
 
 // Spawn
 export const SPAWN_INTERVAL_START_MS = 1400; // intervalle entre deux salves au début
 export const SPAWN_INTERVAL_MIN_MS = 550; // intervalle plancher (difficulté max)
 export const SPAWN_SCORE_STEP = 500; // palier de score qui augmente la difficulté
 export const SPAWN_INTERVAL_DECREMENT_MS = 150; // réduction d'intervalle par palier
-export const SPAWN_MAX_FRUITS_PER_WAVE_START = 1;
 export const SPAWN_MAX_FRUITS_PER_WAVE_CAP = 4;
+// Échelonnement des lancers d'une même salve (jamais simultanés)
+export const SPAWN_STAGGER_MIN_MS = 80;
+export const SPAWN_STAGGER_MAX_MS = 150;
+// Courbe d'introduction façon Fruit Ninja :
+// vagues 1-3 : un seul fruit • vagues 4-8 : 1 à 2 fruits • ensuite : salves
+export const SPAWN_GENTLE_WAVES = 3;
+export const SPAWN_WARMUP_WAVES = 8;
+export const BOMB_SAFE_WAVES = 8; // aucune bombe avant la 9e vague
 
 // Découpe
 export const SLICE_BUFFER_SIZE = 12; // nb max de points conservés pour la traînée
