@@ -14,7 +14,8 @@ if (import.meta.env.DEV) {
 // (en dev, il fausserait le rechargement à chaud de Vite).
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {
+    // Chemin relatif : le SW garde la bonne portée même hébergé en sous-chemin
+    navigator.serviceWorker.register('sw.js').catch(() => {
       // L'enregistrement peut échouer (contexte non sécurisé…) :
       // le jeu fonctionne alors simplement sans mode hors-ligne.
     });

@@ -1,6 +1,9 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+  // Chemins relatifs : le jeu fonctionne servi depuis la racine (Capacitor,
+  // localhost) comme depuis un sous-chemin (GitHub Pages /fruit-ninja-reunion/)
+  base: './',
   server: {
     port: 3010,
     host: true,
