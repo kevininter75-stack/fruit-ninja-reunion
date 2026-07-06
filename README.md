@@ -13,6 +13,10 @@ Deux modes de jeu :
 
 Dans les deux modes, trancher une bombe termine immédiatement la partie.
 
+Au menu : 9 fruits péi (letchi, ananas Victoria, mangue José, fruit de la
+passion, papaye, corossol, longane, jacque, carambole) et un fruit bonus,
+le **combava doré**, qui double le score pendant 5 secondes.
+
 > Projet portfolio — code TypeScript strict, architecture par scènes/systèmes, 100 % client-side.
 
 ## Stack
@@ -61,6 +65,14 @@ Choix techniques notables :
 - **Sons synthétisés** : les SFX (coupe, explosion, combo…) sont générés en
   Web Audio (`systems/SfxManager.ts`) — aucun fichier audio requis. La façade
   sera remplacée par de vrais sons (Phaser/Howler) sans changer les appels.
+- **Musique d'ambiance synthétisée** : boucle instrumentale d'inspiration séga
+  (marimba pentatonique, basse, cabosse, ressac d'océan) générée en Web Audio
+  (`systems/MusicManager.ts`) avec ordonnanceur à anticipation. Bouton 🔊/🔇
+  persistant.
+- **Catalogue de fruits data-driven** (`utils/fruitCatalog.ts`) : chaque
+  variété définit rayon, couleurs de jus/chair et poids de spawn ; les trois
+  textures par fruit (entier + 2 moitiés) sont dessinées en canvas 2D avec
+  découpe par clipping.
 - **Feedback systématique** : particules de jus teintées, textes flottants
   (+points, combos) recyclés depuis un pool, flash + secousse caméra sur
   bombe, records persistés en localStorage.
@@ -69,7 +81,7 @@ Choix techniques notables :
 
 - [x] **Phase 1 — MVP jouable** : spawn physique, détection de swipe, découpe, score, vies, game over
 - [x] **Phase 2 — Feel & polish** : combos, bombes, particules de jus, sons, menu complet, mode Chrono, records
-- [ ] **Phase 3 — Contenu réunionnais** : 9 fruits + combava doré bonus, décor final, musique
+- [x] **Phase 3 — Contenu réunionnais** : 9 fruits + combava doré bonus (score x2), décor final (volcan, océan, palmiers), musique séga
 - [ ] **Phase 4 — Mobile** : multi-touch, safe-areas, Capacitor (Android/iOS), PWA
 
 ## Captures d'écran
