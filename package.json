@@ -7,12 +7,17 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "sync": "cap sync",
+    "build:android": "npm run build && cap sync android"
   },
   "dependencies": {
+    "@capacitor/android": "^8.4.1",
+    "@capacitor/core": "^8.4.1",
     "phaser": "^3.90.0"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.4.1",
     "typescript": "^5.8.3",
     "vite": "^7.0.0"
   }

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Fruit Ninja Réunion</string>
+    <string name="title_activity_main">Fruit Ninja Réunion</string>
+    <string name="package_name">com.kevininter.fruitninjareunion</string>
+    <string name="custom_url_scheme">com.kevininter.fruitninjareunion</string>
+</resources>
