@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_HEIGHT, FRUIT_RADIUS, DEPTH_FRUIT } from '../utils/constants';
+import { FRUIT_RADIUS, DEPTH_FRUIT } from '../utils/constants';
 import { type FruitVariety, wholeTextureKey } from '../utils/fruitCatalog';
 
 /**
@@ -87,7 +87,7 @@ export class Fruit extends Phaser.Physics.Arcade.Sprite {
   preUpdate(time: number, delta: number): void {
     super.preUpdate(time, delta);
     const body = this.body as Phaser.Physics.Arcade.Body;
-    if (this.active && body.velocity.y > 0 && this.y > GAME_HEIGHT + this.sliceRadius * 2) {
+    if (this.active && body.velocity.y > 0 && this.y > this.scene.scale.height + this.sliceRadius * 2) {
       this.scene.events.emit('fruit-missed', this);
       this.kill();
     }

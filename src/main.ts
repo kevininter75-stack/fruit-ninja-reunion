@@ -1,8 +1,30 @@
 import Phaser from 'phaser';
 import { gameConfig } from './config/gameConfig';
+import { computeViewport } from './utils/viewport';
 
 // Point d'entrée : instancie le jeu Phaser avec la configuration globale.
 const game = new Phaser.Game(gameConfig);
+
+// Responsive : le jeu suit l'orientation du device. Quand elle change, on
+// bascule la résolution logique (portrait ↔ paysage) et on relance la scène
+// active pour qu'elle se réagence à la nouvelle taille.
+let currentPortrait = computeViewport().isPortrait;
+function handleOrientation(): void {
+  const vp = computeViewport();
+  if (vp.isPortrait === currentPortrait) {
+    return; // simple redimensionnement sans changement d'orientation : FIT gère seul
+  }
+  currentPortrait = vp.isPortrait;
+  game.scale.setGameSize(vp.width, vp.height);
+  // Relayout : la seule scène active (Menu, Game ou GameOver) se recrée à la
+  // nouvelle taille. Tourner l'écran en pleine partie repart donc à zéro —
+  // c'est un geste volontaire et rare, on l'accepte.
+  for (const scene of game.scene.getScenes(true)) {
+    scene.scene.restart();
+  }
+}
+window.addEventListener('resize', handleOrientation);
+window.addEventListener('orientationchange', handleOrientation);
 
 // Poignée de debug exposée en développement uniquement :
 // permet d'inspecter/piloter le jeu depuis la console ou des tests navigateur.

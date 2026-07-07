@@ -1,7 +1,9 @@
 import Phaser from 'phaser';
 import {
-  GAME_WIDTH,
-  GAME_HEIGHT,
+  PORTRAIT_WIDTH,
+  PORTRAIT_HEIGHT,
+  LANDSCAPE_WIDTH,
+  LANDSCAPE_HEIGHT,
   TEX_BOMB,
   TEX_JUICE,
   TEX_SPLAT_PREFIX,
@@ -38,7 +40,9 @@ export class PreloadScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.createBackgroundTexture();
+    // Un décor par orientation : la scène active choisit le bon (backgroundKey)
+    this.createBackgroundTexture('background_portrait', PORTRAIT_WIDTH, PORTRAIT_HEIGHT);
+    this.createBackgroundTexture('background_landscape', LANDSCAPE_WIDTH, LANDSCAPE_HEIGHT);
     for (const variety of FRUIT_VARIETIES) {
       this.createVarietyTextures(variety);
     }
@@ -53,14 +57,12 @@ export class PreloadScene extends Phaser.Scene {
   // Décor : coucher de soleil tropical, volcan, océan, palmiers
   // ------------------------------------------------------------------
 
-  private createBackgroundTexture(): void {
-    const texture = this.textures.createCanvas('background', GAME_WIDTH, GAME_HEIGHT);
+  private createBackgroundTexture(key: string, W: number, H: number): void {
+    const texture = this.textures.createCanvas(key, W, H);
     if (texture === null) {
       return; // ne peut arriver que si la clé existe déjà
     }
     const ctx = texture.getContext();
-    const W = GAME_WIDTH;
-    const H = GAME_HEIGHT;
 
     // Ciel : lagon en haut → or → corail au couchant
     const sky = ctx.createLinearGradient(0, 0, 0, H);

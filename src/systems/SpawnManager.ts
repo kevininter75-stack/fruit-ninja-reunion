@@ -4,12 +4,11 @@ import { Bomb } from '../entities/Bomb';
 import { ScoreManager } from './ScoreManager';
 import { sfx } from './SfxManager';
 import {
-  GAME_WIDTH,
-  GAME_HEIGHT,
   FRUIT_RADIUS,
-  LAUNCH_VELOCITY_Y_MIN,
-  LAUNCH_VELOCITY_Y_MAX,
-  LAUNCH_VELOCITY_X_MAX,
+  GRAVITY_Y,
+  APEX_FRACTION_MIN,
+  APEX_FRACTION_MAX,
+  LAUNCH_VX_FACTOR,
   SPAWN_INTERVAL_START_MS,
   SPAWN_INTERVAL_MIN_MS,
   SPAWN_SCORE_STEP,
@@ -32,6 +31,7 @@ import { pickRandomVariety, BONUS_VARIETY } from '../utils/fruitCatalog';
 /** Paramètres de lancement calculés une fois par spawn (objet réutilisé). */
 interface LaunchParams {
   x: number;
+  y: number;
   velocityX: number;
   velocityY: number;
 }
@@ -59,7 +59,7 @@ export class SpawnManager {
   private running = false;
   private startTime = 0;
   private waveIndex = 0;
-  private readonly launchParams: LaunchParams = { x: 0, velocityX: 0, velocityY: 0 };
+  private readonly launchParams: LaunchParams = { x: 0, y: 0, velocityX: 0, velocityY: 0 };
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -190,21 +190,33 @@ export class SpawnManager {
       return;
     }
     const p = this.computeLaunch();
-    bonus.launchAs(BONUS_VARIETY, true, p.x, GAME_HEIGHT + FRUIT_RADIUS, p.velocityX, p.velocityY);
+    bonus.launchAs(BONUS_VARIETY, true, p.x, p.y, p.velocityX, p.velocityY);
     sfx.launch();
   }
 
   /**
-   * Calcule position et vélocités de lancement dans un objet réutilisé.
-   * Vélocité horizontale orientée vers le centre pour que la parabole
-   * reste dans l'écran (un projectile lancé du bord gauche part vers la droite).
+   * Calcule position et vélocités de lancement dans un objet réutilisé,
+   * à partir de la taille COURANTE de l'écran (responsive) :
+   * - départ juste sous le bord bas ;
+   * - vélocité verticale telle que l'apex atteigne une fraction de la hauteur
+   *   (v = √(2·g·apex)) — les arcs remplissent l'écran en portrait comme en
+   *   paysage sans jamais sortir par le haut ;
+   * - vélocité horizontale orientée vers le centre, proportionnelle à la
+   *   largeur, pour que la parabole reste dans l'écran.
    */
   private computeLaunch(): LaunchParams {
+    const width = this.scene.scale.width;
+    const height = this.scene.scale.height;
     const p = this.launchParams;
-    p.x = Phaser.Math.Between(FRUIT_RADIUS * 2, GAME_WIDTH - FRUIT_RADIUS * 2);
-    const towardCenter = p.x < GAME_WIDTH / 2 ? 1 : -1;
-    p.velocityX = towardCenter * Phaser.Math.Between(20, LAUNCH_VELOCITY_X_MAX);
-    p.velocityY = Phaser.Math.Between(LAUNCH_VELOCITY_Y_MAX, LAUNCH_VELOCITY_Y_MIN);
+
+    p.x = Phaser.Math.Between(FRUIT_RADIUS * 2, width - FRUIT_RADIUS * 2);
+    p.y = height + FRUIT_RADIUS;
+
+    const apex = Phaser.Math.FloatBetween(APEX_FRACTION_MIN, APEX_FRACTION_MAX) * height;
+    p.velocityY = -Math.sqrt(2 * GRAVITY_Y * apex);
+
+    const towardCenter = p.x < width / 2 ? 1 : -1;
+    p.velocityX = towardCenter * Phaser.Math.Between(20, Math.round(width * LAUNCH_VX_FACTOR));
     return p;
   }
 
@@ -215,7 +227,7 @@ export class SpawnManager {
       return; // pool épuisé : on saute ce spawn plutôt que d'allouer
     }
     const p = this.computeLaunch();
-    fruit.launchAs(pickRandomVariety(), false, p.x, GAME_HEIGHT + FRUIT_RADIUS, p.velocityX, p.velocityY);
+    fruit.launchAs(pickRandomVariety(), false, p.x, p.y, p.velocityX, p.velocityY);
     sfx.launch();
   }
 
@@ -225,7 +237,7 @@ export class SpawnManager {
       return;
     }
     const p = this.computeLaunch();
-    bomb.launch(p.x, GAME_HEIGHT + FRUIT_RADIUS, p.velocityX, p.velocityY);
+    bomb.launch(p.x, p.y, p.velocityX, p.velocityY);
     sfx.launch();
   }
 }

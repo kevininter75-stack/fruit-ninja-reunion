@@ -1,15 +1,19 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, GAME_HEIGHT, type GameMode } from '../utils/constants';
+import { type GameMode } from '../utils/constants';
 import { getBestScore } from '../utils/bestScore';
 import { sfx } from '../systems/SfxManager';
 import { music } from '../systems/MusicManager';
 import { FRUIT_VARIETIES, wholeTextureKey } from '../utils/fruitCatalog';
 import { createMuteButton } from '../utils/ui';
+import { backgroundKey } from '../utils/viewport';
 
 /**
  * Écran titre : choix du mode de jeu et vitrine des fruits péi.
  * - Classique : 3 vies, un fruit manqué coûte une vie.
  * - Chrono : score maximal en 60 secondes, fruits manqués sans pénalité.
+ *
+ * Responsive : la mise en page suit l'orientation — les deux modes sont
+ * empilés en portrait, côte à côte en paysage.
  */
 export class MenuScene extends Phaser.Scene {
   constructor() {
@@ -17,11 +21,15 @@ export class MenuScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.add.image(0, 0, 'background').setOrigin(0);
+    const w = this.scale.width;
+    const h = this.scale.height;
+    const portrait = h > w;
+
+    this.add.image(0, 0, backgroundKey(this)).setOrigin(0);
     music.ensureRunning();
 
     const title = this.add
-      .text(GAME_WIDTH / 2, GAME_HEIGHT * 0.16, 'Fruit Ninja Réunion', {
+      .text(w / 2, h * 0.16, portrait ? 'Fruit Ninja\nRéunion' : 'Fruit Ninja Réunion', {
         fontFamily: '"Trebuchet MS", "Arial Rounded MT Bold", sans-serif',
         fontSize: '80px',
         fontStyle: 'bold',
@@ -33,11 +41,11 @@ export class MenuScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     // Entrée douce du titre
-    title.setAlpha(0).setY(GAME_HEIGHT * 0.13);
-    this.tweens.add({ targets: title, alpha: 1, y: GAME_HEIGHT * 0.16, duration: 500, ease: 'Cubic.easeOut' });
+    title.setAlpha(0).setY(h * 0.13);
+    this.tweens.add({ targets: title, alpha: 1, y: h * 0.16, duration: 500, ease: 'Cubic.easeOut' });
 
     this.add
-      .text(GAME_WIDTH / 2, GAME_HEIGHT * 0.3, 'Tranchez les fruits péi !', {
+      .text(w / 2, h * (portrait ? 0.28 : 0.3), 'Tranchez les fruits péi !', {
         fontFamily: '"Trebuchet MS", sans-serif',
         fontSize: '36px',
         color: '#fff3e0',
@@ -45,42 +53,63 @@ export class MenuScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    this.createFruitParade();
+    // Vitrine : plus de fruits en paysage (plus large), moins en portrait
+    this.createFruitParade(portrait ? 6 : FRUIT_VARIETIES.length, h * (portrait ? 0.42 : 0.46));
 
-    // Paysage : les deux modes côte à côte plutôt qu'empilés
-    this.createModeButton(
-      GAME_WIDTH * 0.3,
-      GAME_HEIGHT * 0.72,
-      'Classique',
-      `3 vies — Record : ${getBestScore('classic')}`,
-      0xe0455a,
-      'classic',
-      true
-    );
-    this.createModeButton(
-      GAME_WIDTH * 0.7,
-      GAME_HEIGHT * 0.72,
-      'Chrono',
-      `60 s — Record : ${getBestScore('chrono')}`,
-      0x1e90b4,
-      'chrono',
-      false
-    );
+    if (portrait) {
+      // Portrait : les deux modes empilés
+      this.createModeButton(
+        w / 2,
+        h * 0.62,
+        'Classique',
+        `3 vies — Record : ${getBestScore('classic')}`,
+        0xe0455a,
+        'classic',
+        true
+      );
+      this.createModeButton(
+        w / 2,
+        h * 0.76,
+        'Chrono',
+        `60 s — Record : ${getBestScore('chrono')}`,
+        0x1e90b4,
+        'chrono',
+        false
+      );
+    } else {
+      // Paysage : les deux modes côte à côte
+      this.createModeButton(
+        w * 0.3,
+        h * 0.72,
+        'Classique',
+        `3 vies — Record : ${getBestScore('classic')}`,
+        0xe0455a,
+        'classic',
+        true
+      );
+      this.createModeButton(
+        w * 0.7,
+        h * 0.72,
+        'Chrono',
+        `60 s — Record : ${getBestScore('chrono')}`,
+        0x1e90b4,
+        'chrono',
+        false
+      );
+    }
 
-    createMuteButton(this, GAME_WIDTH - 52, GAME_HEIGHT - 52);
+    createMuteButton(this, w - 52, h - 52);
   }
 
   /**
    * Défilé des fruits du catalogue sous le titre : vitrine du contenu
    * réunionnais, chaque fruit ondule doucement en décalé.
    */
-  private createFruitParade(): void {
-    // Paysage : plus de largeur, on montre les 9 fruits + le combava en vitrine
-    const showcased = FRUIT_VARIETIES;
-    const spacing = GAME_WIDTH / (showcased.length + 1);
+  private createFruitParade(count: number, y: number): void {
+    const showcased = FRUIT_VARIETIES.slice(0, count);
+    const spacing = this.scale.width / (showcased.length + 1);
     showcased.forEach((variety, index) => {
       const x = spacing * (index + 1);
-      const y = GAME_HEIGHT * 0.46;
       const sprite = this.add.image(x, y, wholeTextureKey(variety)).setScale(0.5);
       this.tweens.add({
         targets: sprite,

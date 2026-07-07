@@ -1,12 +1,8 @@
 import Phaser from 'phaser';
-import {
-  GAME_WIDTH,
-  GAME_HEIGHT,
-  type GameMode,
-  type GameOverReason,
-} from '../utils/constants';
+import { type GameMode, type GameOverReason } from '../utils/constants';
 import { getBestScore, saveBestScore } from '../utils/bestScore';
 import { sfx } from '../systems/SfxManager';
+import { backgroundKey } from '../utils/viewport';
 
 /** Données passées par la GameScene à la fin d'une partie. */
 interface GameOverData {
@@ -25,6 +21,7 @@ const REASON_DISPLAY: Record<GameOverReason, { title: string; subtitle: string; 
 /**
  * Écran de fin : score final, record persistant (localStorage),
  * relance dans le même mode ou retour au menu.
+ * Responsive : boutons empilés en portrait, côte à côte en paysage.
  */
 export class GameOverScene extends Phaser.Scene {
   private finalScore = 0;
@@ -42,13 +39,16 @@ export class GameOverScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.add.image(0, 0, 'background').setOrigin(0);
-    this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x0b2a3a, 0.55).setOrigin(0);
+    const w = this.scale.width;
+    const h = this.scale.height;
+
+    this.add.image(0, 0, backgroundKey(this)).setOrigin(0);
+    this.add.rectangle(0, 0, w, h, 0x0b2a3a, 0.55).setOrigin(0);
 
     const display = REASON_DISPLAY[this.reason];
 
     this.add
-      .text(GAME_WIDTH / 2, GAME_HEIGHT * 0.2, display.title, {
+      .text(w / 2, h * 0.2, display.title, {
         fontFamily: '"Trebuchet MS", sans-serif',
         fontSize: '84px',
         fontStyle: 'bold',
@@ -59,7 +59,7 @@ export class GameOverScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.add
-      .text(GAME_WIDTH / 2, GAME_HEIGHT * 0.33, display.subtitle, {
+      .text(w / 2, h * 0.33, display.subtitle, {
         fontFamily: '"Trebuchet MS", sans-serif',
         fontSize: '32px',
         color: '#fff3e0',
@@ -67,7 +67,7 @@ export class GameOverScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.add
-      .text(GAME_WIDTH / 2, GAME_HEIGHT * 0.47, `Score : ${this.finalScore}`, {
+      .text(w / 2, h * 0.47, `Score : ${this.finalScore}`, {
         fontFamily: '"Trebuchet MS", sans-serif',
         fontSize: '60px',
         fontStyle: 'bold',
@@ -81,10 +81,12 @@ export class GameOverScene extends Phaser.Scene {
 
   /** Affiche « Nouveau record ! » (animé) ou le record courant du mode. */
   private createRecordText(): void {
+    const w = this.scale.width;
+    const h = this.scale.height;
     const isNewRecord = saveBestScore(this.mode, this.finalScore);
     if (isNewRecord) {
       const record = this.add
-        .text(GAME_WIDTH / 2, GAME_HEIGHT * 0.58, '★ Nouveau record ! ★', {
+        .text(w / 2, h * 0.58, '★ Nouveau record ! ★', {
           fontFamily: '"Trebuchet MS", sans-serif',
           fontSize: '40px',
           fontStyle: 'bold',
@@ -103,7 +105,7 @@ export class GameOverScene extends Phaser.Scene {
       });
     } else {
       this.add
-        .text(GAME_WIDTH / 2, GAME_HEIGHT * 0.58, `Record : ${getBestScore(this.mode)}`, {
+        .text(w / 2, h * 0.58, `Record : ${getBestScore(this.mode)}`, {
           fontFamily: '"Trebuchet MS", sans-serif',
           fontSize: '32px',
           color: '#fff3e0',
@@ -113,9 +115,18 @@ export class GameOverScene extends Phaser.Scene {
   }
 
   private createButtons(): void {
-    // Paysage : les deux boutons côte à côte
+    const w = this.scale.width;
+    const h = this.scale.height;
+    const portrait = h > w;
+
+    // Portrait : boutons empilés ; paysage : côte à côte
+    const replayX = portrait ? w / 2 : w / 2 - 150;
+    const replayY = portrait ? h * 0.71 : h * 0.78;
+    const menuX = portrait ? w / 2 : w / 2 + 150;
+    const menuY = portrait ? h * 0.81 : h * 0.78;
+
     const replay = this.add
-      .text(GAME_WIDTH / 2 - 150, GAME_HEIGHT * 0.78, 'Rejouer', {
+      .text(replayX, replayY, 'Rejouer', {
         fontFamily: '"Trebuchet MS", sans-serif',
         fontSize: '44px',
         fontStyle: 'bold',
@@ -132,7 +143,7 @@ export class GameOverScene extends Phaser.Scene {
     });
 
     const menu = this.add
-      .text(GAME_WIDTH / 2 + 150, GAME_HEIGHT * 0.78, 'Menu', {
+      .text(menuX, menuY, 'Menu', {
         fontFamily: '"Trebuchet MS", sans-serif',
         fontSize: '40px',
         fontStyle: 'bold',

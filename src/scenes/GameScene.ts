@@ -10,9 +10,8 @@ import { sfx } from '../systems/SfxManager';
 import { music } from '../systems/MusicManager';
 import { FRUIT_VARIETIES, halfTextureKeys, wholeTextureKey } from '../utils/fruitCatalog';
 import { createMuteButton } from '../utils/ui';
+import { backgroundKey } from '../utils/viewport';
 import {
-  GAME_WIDTH,
-  GAME_HEIGHT,
   FRUIT_POOL_SIZE,
   HALF_POOL_SIZE,
   HALF_LIFETIME_MS,
@@ -118,11 +117,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.add.image(0, 0, 'background').setOrigin(0);
+    this.add.image(0, 0, backgroundKey(this)).setOrigin(0);
     // Voile sombre : atténue le décor pendant la partie pour que les fruits
     // ressortent. Entre le fond (depth 0) et les taches de jus (depth 2).
     this.add
-      .rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, GAME_DARKEN_COLOR, GAME_DARKEN_ALPHA)
+      .rectangle(0, 0, this.scale.width, this.scale.height, GAME_DARKEN_COLOR, GAME_DARKEN_ALPHA)
       .setOrigin(0)
       .setDepth(DEPTH_DARKEN);
     music.ensureRunning();
@@ -176,7 +175,7 @@ export class GameScene extends Phaser.Scene {
 
     // Flash blanc plein écran (bombe) — créé une fois, réactivé au besoin
     this.flashRect = this.add
-      .rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0xffffff, 1)
+      .rectangle(0, 0, this.scale.width, this.scale.height, 0xffffff, 1)
       .setOrigin(0)
       .setDepth(200)
       .setVisible(false)
@@ -258,7 +257,7 @@ export class GameScene extends Phaser.Scene {
       this.createLifeCrosses();
     } else {
       this.infoText = this.add
-        .text(GAME_WIDTH - 24, 20, '60 s', {
+        .text(this.scale.width - 24, 20, '60 s', {
           fontFamily: '"Trebuchet MS", sans-serif',
           fontSize: '44px',
           fontStyle: 'bold',
@@ -270,7 +269,7 @@ export class GameScene extends Phaser.Scene {
         .setDepth(50);
     }
 
-    createMuteButton(this, 52, GAME_HEIGHT - 52);
+    createMuteButton(this, 52, this.scale.height - 52);
   }
 
   /**
@@ -281,7 +280,7 @@ export class GameScene extends Phaser.Scene {
   private createLifeCrosses(): void {
     this.lifeCrosses = [];
     const gap = 52;
-    const rightEdge = GAME_WIDTH - 30;
+    const rightEdge = this.scale.width - 30;
     for (let i = 0; i < STARTING_LIVES; i++) {
       // i = 0 le plus à gauche : les croix s'allument de gauche à droite
       const x = rightEdge - (STARTING_LIVES - 1 - i) * gap;

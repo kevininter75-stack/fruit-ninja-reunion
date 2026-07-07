@@ -1,14 +1,19 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, GAME_HEIGHT, GRAVITY_Y } from '../utils/constants';
+import { GRAVITY_Y } from '../utils/constants';
+import { computeViewport } from '../utils/viewport';
 import { BootScene } from '../scenes/BootScene';
 import { PreloadScene } from '../scenes/PreloadScene';
 import { MenuScene } from '../scenes/MenuScene';
 import { GameScene } from '../scenes/GameScene';
 import { GameOverScene } from '../scenes/GameOverScene';
 
+// Résolution logique initiale = orientation au démarrage. Elle bascule ensuite
+// à la rotation du device (main.ts appelle scale.setGameSize + relayout).
+const initial = computeViewport();
+
 /**
  * Configuration principale de Phaser.
- * - Scale.FIT + autoCenter : le canvas s'adapte à l'écran en gardant le ratio paysage 16:9.
+ * - Scale.FIT + autoCenter : le canvas s'adapte à l'écran en gardant le ratio courant.
  * - Physique Arcade avec gravité verticale : trajectoires paraboliques des fruits.
  */
 export const gameConfig: Phaser.Types.Core.GameConfig = {
@@ -18,8 +23,8 @@ export const gameConfig: Phaser.Types.Core.GameConfig = {
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
-    width: GAME_WIDTH,
-    height: GAME_HEIGHT,
+    width: initial.width,
+    height: initial.height,
   },
   physics: {
     default: 'arcade',
