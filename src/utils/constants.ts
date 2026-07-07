@@ -4,19 +4,20 @@
  * pour faciliter l'équilibrage.
  */
 
-// Résolution logique du jeu (portrait, mobile-first).
+// Résolution logique du jeu (paysage 16:9, façon Fruit Ninja original).
 // Phaser met à l'échelle via Scale.FIT, donc ces valeurs sont une base de calcul stable.
-export const GAME_WIDTH = 720;
-export const GAME_HEIGHT = 1280;
+export const GAME_WIDTH = 1280;
+export const GAME_HEIGHT = 720;
 
-// Physique — gravité réduite pour un vrai temps de suspension à l'apex
+// Physique — gravité douce pour un vrai temps de suspension à l'apex
 // (façon Fruit Ninja : le fruit "flotte" un instant, fenêtre de tir confortable)
 export const GRAVITY_Y = 1000;
 
-// Lancement des fruits (vélocités initiales, recalées sur la gravité)
-export const LAUNCH_VELOCITY_Y_MIN = -1250;
-export const LAUNCH_VELOCITY_Y_MAX = -1480;
-export const LAUNCH_VELOCITY_X_MAX = 200; // vélocité horizontale max (vers le centre)
+// Lancement des fruits (vélocités initiales recalées sur la hauteur paysage :
+// apex ~520-680 px pour que les fruits montent haut sans sortir par le haut).
+export const LAUNCH_VELOCITY_Y_MIN = -1000;
+export const LAUNCH_VELOCITY_Y_MAX = -1130;
+export const LAUNCH_VELOCITY_X_MAX = 300; // vélocité horizontale max (vers le centre)
 
 // Spawn
 export const SPAWN_INTERVAL_START_MS = 1400; // intervalle entre deux salves au début

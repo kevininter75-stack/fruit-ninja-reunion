@@ -8,7 +8,7 @@ import { GameOverScene } from '../scenes/GameOverScene';
 
 /**
  * Configuration principale de Phaser.
- * - Scale.FIT + autoCenter : le canvas s'adapte à l'écran en gardant le ratio portrait.
+ * - Scale.FIT + autoCenter : le canvas s'adapte à l'écran en gardant le ratio paysage 16:9.
  * - Physique Arcade avec gravité verticale : trajectoires paraboliques des fruits.
  */
 export const gameConfig: Phaser.Types.Core.GameConfig = {

@@ -21,9 +21,9 @@ export class MenuScene extends Phaser.Scene {
     music.ensureRunning();
 
     const title = this.add
-      .text(GAME_WIDTH / 2, GAME_HEIGHT * 0.22, 'Fruit Ninja\nRéunion', {
+      .text(GAME_WIDTH / 2, GAME_HEIGHT * 0.16, 'Fruit Ninja Réunion', {
         fontFamily: '"Trebuchet MS", "Arial Rounded MT Bold", sans-serif',
-        fontSize: '88px',
+        fontSize: '80px',
         fontStyle: 'bold',
         color: '#ffffff',
         align: 'center',
@@ -33,11 +33,11 @@ export class MenuScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     // Entrée douce du titre
-    title.setAlpha(0).setY(GAME_HEIGHT * 0.2);
-    this.tweens.add({ targets: title, alpha: 1, y: GAME_HEIGHT * 0.22, duration: 500, ease: 'Cubic.easeOut' });
+    title.setAlpha(0).setY(GAME_HEIGHT * 0.13);
+    this.tweens.add({ targets: title, alpha: 1, y: GAME_HEIGHT * 0.16, duration: 500, ease: 'Cubic.easeOut' });
 
     this.add
-      .text(GAME_WIDTH / 2, GAME_HEIGHT * 0.36, 'Tranchez les fruits péi !', {
+      .text(GAME_WIDTH / 2, GAME_HEIGHT * 0.3, 'Tranchez les fruits péi !', {
         fontFamily: '"Trebuchet MS", sans-serif',
         fontSize: '36px',
         color: '#fff3e0',
@@ -47,8 +47,10 @@ export class MenuScene extends Phaser.Scene {
 
     this.createFruitParade();
 
+    // Paysage : les deux modes côte à côte plutôt qu'empilés
     this.createModeButton(
-      GAME_HEIGHT * 0.58,
+      GAME_WIDTH * 0.3,
+      GAME_HEIGHT * 0.72,
       'Classique',
       `3 vies — Record : ${getBestScore('classic')}`,
       0xe0455a,
@@ -56,15 +58,16 @@ export class MenuScene extends Phaser.Scene {
       true
     );
     this.createModeButton(
-      GAME_HEIGHT * 0.74,
+      GAME_WIDTH * 0.7,
+      GAME_HEIGHT * 0.72,
       'Chrono',
-      `60 secondes — Record : ${getBestScore('chrono')}`,
+      `60 s — Record : ${getBestScore('chrono')}`,
       0x1e90b4,
       'chrono',
       false
     );
 
-    createMuteButton(this, GAME_WIDTH / 2, GAME_HEIGHT * 0.9);
+    createMuteButton(this, GAME_WIDTH - 52, GAME_HEIGHT - 52);
   }
 
   /**
@@ -72,12 +75,13 @@ export class MenuScene extends Phaser.Scene {
    * réunionnais, chaque fruit ondule doucement en décalé.
    */
   private createFruitParade(): void {
-    const showcased = FRUIT_VARIETIES.slice(0, 6);
+    // Paysage : plus de largeur, on montre les 9 fruits + le combava en vitrine
+    const showcased = FRUIT_VARIETIES;
     const spacing = GAME_WIDTH / (showcased.length + 1);
     showcased.forEach((variety, index) => {
       const x = spacing * (index + 1);
-      const y = GAME_HEIGHT * 0.455;
-      const sprite = this.add.image(x, y, wholeTextureKey(variety)).setScale(0.52);
+      const y = GAME_HEIGHT * 0.46;
+      const sprite = this.add.image(x, y, wholeTextureKey(variety)).setScale(0.5);
       this.tweens.add({
         targets: sprite,
         y: y - 14,
@@ -93,6 +97,7 @@ export class MenuScene extends Phaser.Scene {
 
   /** Bouton de mode : grande zone tactile (>= 44px), feedback au survol/appui. */
   private createModeButton(
+    x: number,
     y: number,
     label: string,
     subtitle: string,
@@ -101,12 +106,12 @@ export class MenuScene extends Phaser.Scene {
     pulse: boolean
   ): void {
     const button = this.add
-      .rectangle(GAME_WIDTH / 2, y, 480, 140, color)
+      .rectangle(x, y, 440, 150, color)
       .setStrokeStyle(4, 0xffffff, 0.9)
       .setInteractive({ useHandCursor: true });
 
     const labelText = this.add
-      .text(GAME_WIDTH / 2, y - 22, label, {
+      .text(x, y - 24, label, {
         fontFamily: '"Trebuchet MS", sans-serif',
         fontSize: '48px',
         fontStyle: 'bold',
@@ -115,7 +120,7 @@ export class MenuScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     const subtitleText = this.add
-      .text(GAME_WIDTH / 2, y + 32, subtitle, {
+      .text(x, y + 34, subtitle, {
         fontFamily: '"Trebuchet MS", sans-serif',
         fontSize: '26px',
         color: '#fff3e0',

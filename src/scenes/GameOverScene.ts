@@ -48,9 +48,9 @@ export class GameOverScene extends Phaser.Scene {
     const display = REASON_DISPLAY[this.reason];
 
     this.add
-      .text(GAME_WIDTH / 2, GAME_HEIGHT * 0.26, display.title, {
+      .text(GAME_WIDTH / 2, GAME_HEIGHT * 0.2, display.title, {
         fontFamily: '"Trebuchet MS", sans-serif',
-        fontSize: '92px',
+        fontSize: '84px',
         fontStyle: 'bold',
         color: display.color,
         stroke: '#2d3a4a',
@@ -59,7 +59,7 @@ export class GameOverScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.add
-      .text(GAME_WIDTH / 2, GAME_HEIGHT * 0.34, display.subtitle, {
+      .text(GAME_WIDTH / 2, GAME_HEIGHT * 0.33, display.subtitle, {
         fontFamily: '"Trebuchet MS", sans-serif',
         fontSize: '32px',
         color: '#fff3e0',
@@ -67,7 +67,7 @@ export class GameOverScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.add
-      .text(GAME_WIDTH / 2, GAME_HEIGHT * 0.46, `Score : ${this.finalScore}`, {
+      .text(GAME_WIDTH / 2, GAME_HEIGHT * 0.47, `Score : ${this.finalScore}`, {
         fontFamily: '"Trebuchet MS", sans-serif',
         fontSize: '60px',
         fontStyle: 'bold',
@@ -84,7 +84,7 @@ export class GameOverScene extends Phaser.Scene {
     const isNewRecord = saveBestScore(this.mode, this.finalScore);
     if (isNewRecord) {
       const record = this.add
-        .text(GAME_WIDTH / 2, GAME_HEIGHT * 0.54, '★ Nouveau record ! ★', {
+        .text(GAME_WIDTH / 2, GAME_HEIGHT * 0.58, '★ Nouveau record ! ★', {
           fontFamily: '"Trebuchet MS", sans-serif',
           fontSize: '40px',
           fontStyle: 'bold',
@@ -103,7 +103,7 @@ export class GameOverScene extends Phaser.Scene {
       });
     } else {
       this.add
-        .text(GAME_WIDTH / 2, GAME_HEIGHT * 0.54, `Record : ${getBestScore(this.mode)}`, {
+        .text(GAME_WIDTH / 2, GAME_HEIGHT * 0.58, `Record : ${getBestScore(this.mode)}`, {
           fontFamily: '"Trebuchet MS", sans-serif',
           fontSize: '32px',
           color: '#fff3e0',
@@ -113,14 +113,15 @@ export class GameOverScene extends Phaser.Scene {
   }
 
   private createButtons(): void {
+    // Paysage : les deux boutons côte à côte
     const replay = this.add
-      .text(GAME_WIDTH / 2, GAME_HEIGHT * 0.68, 'Rejouer', {
+      .text(GAME_WIDTH / 2 - 150, GAME_HEIGHT * 0.78, 'Rejouer', {
         fontFamily: '"Trebuchet MS", sans-serif',
         fontSize: '44px',
         fontStyle: 'bold',
         color: '#ffffff',
         backgroundColor: '#e0455a',
-        padding: { x: 48, y: 20 }, // zone tactile généreuse (> 44px)
+        padding: { x: 40, y: 18 }, // zone tactile généreuse (> 44px)
       })
       .setOrigin(0.5)
       .setInteractive({ useHandCursor: true });
@@ -131,13 +132,13 @@ export class GameOverScene extends Phaser.Scene {
     });
 
     const menu = this.add
-      .text(GAME_WIDTH / 2, GAME_HEIGHT * 0.79, 'Menu', {
+      .text(GAME_WIDTH / 2 + 150, GAME_HEIGHT * 0.78, 'Menu', {
         fontFamily: '"Trebuchet MS", sans-serif',
-        fontSize: '36px',
+        fontSize: '40px',
         fontStyle: 'bold',
         color: '#ffffff',
         backgroundColor: '#2d3a4a',
-        padding: { x: 40, y: 16 },
+        padding: { x: 40, y: 18 },
       })
       .setOrigin(0.5)
       .setInteractive({ useHandCursor: true });
