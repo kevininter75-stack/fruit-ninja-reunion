@@ -1,13 +1,20 @@
 /**
  * Service worker de Fruit Ninja Réunion.
  *
- * Stratégie volontairement simple pour un jeu 100 % client-side :
- * - pré-cache de la coquille (index, manifest, icônes) à l'installation ;
- * - cache-first à l'exécution : les assets buildés (noms hachés par Vite)
- *   sont mis en cache à la première visite puis servis hors-ligne.
- * Incrémenter CACHE_NAME invalide tout l'ancien cache au déploiement suivant.
+ * Stratégie choisie pour ne JAMAIS figer les joueurs sur une vieille version :
+ * - Navigations (HTML) : NETWORK-FIRST. On récupère toujours la dernière
+ *   index.html en ligne (qui pointe vers le bundle haché courant), avec repli
+ *   sur le cache uniquement hors-ligne. Un cache-first sur index.html
+ *   emprisonnait les joueurs sur la toute première version publiée — c'est
+ *   précisément le bug que cette stratégie corrige.
+ * - Assets hachés (/assets/…) et icônes : CACHE-FIRST. Leur URL change à
+ *   chaque build (empreinte), donc les mettre en cache est sûr et rapide.
+ *
+ * skipWaiting + clients.claim : la nouvelle version prend le contrôle
+ * immédiatement ; le client se recharge alors une fois (voir main.ts,
+ * écouteur 'controllerchange'). Incrémenter CACHE_NAME purge l'ancien cache.
  */
-const CACHE_NAME = 'fnr-v1';
+const CACHE_NAME = 'fnr-v2';
 const PRECACHE = [
   '.',
   'index.html',
@@ -40,26 +47,34 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET' || !request.url.startsWith(self.location.origin)) {
     return; // on ne gère que les GET de la même origine
   }
+
+  // Navigations : réseau d'abord (dernière version), cache en secours hors-ligne
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put('index.html', copy));
+          return response;
+        })
+        .catch(() => caches.match('index.html').then((cached) => cached || caches.match('.')))
+    );
+    return;
+  }
+
+  // Autres GET (assets hachés, icônes) : cache d'abord, réseau en secours
   event.respondWith(
     caches.match(request).then((cached) => {
       if (cached) {
         return cached;
       }
-      return fetch(request)
-        .then((response) => {
-          if (response.ok) {
-            const copy = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
-          }
-          return response;
-        })
-        .catch(() => {
-          // Hors-ligne sur une navigation : on ressert la coquille du jeu
-          if (request.mode === 'navigate') {
-            return caches.match('index.html');
-          }
-          return Response.error();
-        });
+      return fetch(request).then((response) => {
+        if (response.ok) {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+        }
+        return response;
+      });
     })
   );
 });
