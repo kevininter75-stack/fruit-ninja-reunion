@@ -85,7 +85,14 @@ export const SPLAT_VARIANTS = 3; // nb de formes de taches générées
 export const SPLAT_POOL_SIZE = 12;
 export const SPLAT_FADE_MS = 7000; // durée avant disparition complète d'une tache
 
-// Profondeurs de rendu (depth) : fond 0 < taches < moitiés < fruits < jus < UI
+// Assombrissement du décor pendant la partie : voile sombre translucide
+// qui désature/atténue le fond pour que les fruits claquent visuellement
+// (le décor complet reste éclatant au menu). Étape 3 du polish "feel".
+export const GAME_DARKEN_COLOR = 0x0a1a26;
+export const GAME_DARKEN_ALPHA = 0.4;
+
+// Profondeurs de rendu (depth) : fond 0 < voile < taches < moitiés < fruits < jus < UI
+export const DEPTH_DARKEN = 1;
 export const DEPTH_SPLAT = 2;
 export const DEPTH_HALF = 5;
 export const DEPTH_FRUIT = 6;

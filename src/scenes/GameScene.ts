@@ -31,6 +31,9 @@ import {
   DEPTH_SPLAT,
   DEPTH_HALF,
   DEPTH_JUICE,
+  DEPTH_DARKEN,
+  GAME_DARKEN_COLOR,
+  GAME_DARKEN_ALPHA,
   COMBO_BONUS_PER_STEP,
   CHRONO_DURATION_MS,
   POPUP_POOL_SIZE,
@@ -83,7 +86,8 @@ export class GameScene extends Phaser.Scene {
   private juiceEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
   private flashRect!: Phaser.GameObjects.Rectangle;
   private scoreText!: Phaser.GameObjects.Text;
-  private infoText!: Phaser.GameObjects.Text; // vies (classique) ou compte à rebours (chrono)
+  private infoText!: Phaser.GameObjects.Text; // compte à rebours (mode Chrono uniquement)
+  private lifeCrosses: Phaser.GameObjects.Text[] = []; // strikes (mode Classique)
   private multiplierBanner!: Phaser.GameObjects.Text;
   private multiplierTimer: Phaser.Time.TimerEvent | null = null;
   private popupPool: Phaser.GameObjects.Text[] = [];
@@ -108,10 +112,19 @@ export class GameScene extends Phaser.Scene {
     this.gameEnded = false;
     this.lastShownSecond = -1;
     this.multiplierTimer = null;
+    // La scène est réutilisée au restart : on repart d'un tableau vide pour
+    // ne pas garder de références aux croix (détruites) de la partie passée.
+    this.lifeCrosses = [];
   }
 
   create(): void {
     this.add.image(0, 0, 'background').setOrigin(0);
+    // Voile sombre : atténue le décor pendant la partie pour que les fruits
+    // ressortent. Entre le fond (depth 0) et les taches de jus (depth 2).
+    this.add
+      .rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, GAME_DARKEN_COLOR, GAME_DARKEN_ALPHA)
+      .setOrigin(0)
+      .setDepth(DEPTH_DARKEN);
     music.ensureRunning();
 
     // Pools de sprites : fruits, moitiés et bombes sont recyclés, jamais
@@ -241,21 +254,51 @@ export class GameScene extends Phaser.Scene {
       repeat: -1,
     });
 
-    const infoContent = this.mode === 'classic' ? '♥'.repeat(STARTING_LIVES) : '60 s';
-    const infoColor = this.mode === 'classic' ? '#ff5252' : '#ffffff';
-    this.infoText = this.add
-      .text(GAME_WIDTH - 24, 20, infoContent, {
-        fontFamily: '"Trebuchet MS", sans-serif',
-        fontSize: '44px',
-        fontStyle: 'bold',
-        color: infoColor,
-        stroke: '#2d3a4a',
-        strokeThickness: 6,
-      })
-      .setOrigin(1, 0)
-      .setDepth(50);
+    if (this.mode === 'classic') {
+      this.createLifeCrosses();
+    } else {
+      this.infoText = this.add
+        .text(GAME_WIDTH - 24, 20, '60 s', {
+          fontFamily: '"Trebuchet MS", sans-serif',
+          fontSize: '44px',
+          fontStyle: 'bold',
+          color: '#ffffff',
+          stroke: '#2d3a4a',
+          strokeThickness: 6,
+        })
+        .setOrigin(1, 0)
+        .setDepth(50);
+    }
 
     createMuteButton(this, 52, GAME_HEIGHT - 52);
+  }
+
+  /**
+   * Croix de vie (strikes) façon Fruit Ninja : trois croix éteintes en
+   * haut à droite. Chaque fruit manqué en allume une en rouge avec un
+   * "pop", jusqu'au game over — plus lisible que des cœurs qui disparaissent.
+   */
+  private createLifeCrosses(): void {
+    this.lifeCrosses = [];
+    const gap = 52;
+    const rightEdge = GAME_WIDTH - 30;
+    for (let i = 0; i < STARTING_LIVES; i++) {
+      // i = 0 le plus à gauche : les croix s'allument de gauche à droite
+      const x = rightEdge - (STARTING_LIVES - 1 - i) * gap;
+      const cross = this.add
+        .text(x, 22, '✕', {
+          fontFamily: '"Trebuchet MS", sans-serif',
+          fontSize: '46px',
+          fontStyle: 'bold',
+          color: '#55697a', // gris-bleu éteint : "vie encore disponible"
+          stroke: '#2d3a4a',
+          strokeThickness: 6,
+        })
+        .setOrigin(0.5, 0)
+        .setDepth(50)
+        .setAlpha(0.5);
+      this.lifeCrosses.push(cross);
+    }
   }
 
   /**
@@ -584,9 +627,22 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onLivesChanged(lives: number): void {
-    if (this.mode === 'classic') {
-      this.infoText.setText('♥'.repeat(Math.max(lives, 0)));
+    if (this.mode !== 'classic') {
+      return;
     }
+    // Allume la croix correspondant au strike qui vient de tomber
+    const filled = STARTING_LIVES - Math.max(lives, 0);
+    const cross = this.lifeCrosses[filled - 1];
+    if (cross === undefined) {
+      return;
+    }
+    cross.setColor('#ff3b3b').setAlpha(1).setScale(1.8);
+    this.tweens.add({
+      targets: cross,
+      scale: 1,
+      duration: 350,
+      ease: 'Back.easeOut', // rebond franc : le strike "claque"
+    });
   }
 
   private onFruitMissed(fruit: Fruit): void {

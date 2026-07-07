@@ -200,7 +200,9 @@ export class PreloadScene extends Phaser.Scene {
   // ------------------------------------------------------------------
 
   private createVarietyTextures(variety: FruitVariety): void {
-    const size = variety.radius * 2 + 8; // marge pour feuilles/couronnes/halo
+    // Marge élargie : place pour feuilles/couronnes ET pour l'ombre portée
+    // douce (halo sombre) qui détache le fruit du décor assombri.
+    const size = variety.radius * 2 + 40;
     const variants: Array<'whole' | 'left' | 'right'> = ['whole', 'left', 'right'];
     const halves = halfTextureKeys(variety);
 
@@ -223,6 +225,13 @@ export class PreloadScene extends Phaser.Scene {
         ctx.rect(size / 2, 0, size / 2, size);
         ctx.clip();
       }
+      // Ombre portée symétrique (offset 0) : un halo sombre entoure toute la
+      // silhouette pour la faire ressortir. Offset nul → l'ombre reste
+      // correcte même quand le sprite tourne en vol. Le gros aplat du corps
+      // du fruit domine le halo ; les détails internes, dessinés par-dessus
+      // leur propre ombre, restent nets.
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+      ctx.shadowBlur = 13;
       this.drawFruit(ctx, variety, size);
       ctx.restore();
 

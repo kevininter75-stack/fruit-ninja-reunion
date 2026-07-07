@@ -77,7 +77,7 @@ export class MenuScene extends Phaser.Scene {
     showcased.forEach((variety, index) => {
       const x = spacing * (index + 1);
       const y = GAME_HEIGHT * 0.455;
-      const sprite = this.add.image(x, y, wholeTextureKey(variety)).setScale(0.72);
+      const sprite = this.add.image(x, y, wholeTextureKey(variety)).setScale(0.52);
       this.tweens.add({
         targets: sprite,
         y: y - 14,
