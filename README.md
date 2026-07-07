@@ -22,7 +22,7 @@ le **combava doré**, qui double le score pendant 5 secondes.
 **🎮 Jouer en ligne : <https://kevininter75-stack.github.io/fruit-ninja-reunion/>**
 
 Sur mobile, le navigateur propose « Ajouter à l'écran d'accueil » : le jeu
-s'installe comme une app (plein écran portrait, jouable hors-ligne).
+s'installe comme une app (plein écran paysage, jouable hors-ligne).
 Déploiement continu : chaque push sur `master` republie automatiquement
 via GitHub Actions.
 
@@ -55,12 +55,12 @@ npm run build
 Le build de production est une PWA complète : manifest, service worker
 (cache-first, jouable hors-ligne après la première visite) et icônes.
 Servi en HTTPS, le jeu propose « Ajouter à l'écran d'accueil » sur
-Android/iOS et se lance en plein écran portrait.
+Android/iOS et se lance en plein écran paysage.
 
 ### Android (Capacitor)
 
-Le projet natif Android est généré dans `android/` (orientation portrait
-verrouillée). Pour compiler l'APK, il faut Android Studio (ou le SDK +
+Le projet natif Android est généré dans `android/` (orientation paysage).
+Pour compiler l'APK, il faut Android Studio (ou le SDK +
 Java 21) :
 
 ```bash
@@ -111,7 +111,7 @@ Choix techniques notables :
 - [x] **Phase 1 — MVP jouable** : spawn physique, détection de swipe, découpe, score, vies, game over
 - [x] **Phase 2 — Feel & polish** : combos, bombes, particules de jus, sons, menu complet, mode Chrono, records
 - [x] **Phase 3 — Contenu réunionnais** : 9 fruits + combava doré bonus (score x2), décor final (volcan, océan, palmiers), musique séga
-- [x] **Phase 4 — Mobile** : multi-touch (swipes simultanés), safe-areas, PWA installable (manifest + service worker), Capacitor Android (portrait verrouillé)
+- [x] **Phase 4 — Mobile** : multi-touch (swipes simultanés), safe-areas, PWA installable (manifest + service worker), Capacitor Android (paysage)
 
 ## Captures d'écran
 
