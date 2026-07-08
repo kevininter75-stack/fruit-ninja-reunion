@@ -5,8 +5,8 @@ import { sfx } from '../systems/SfxManager';
 import { music } from '../systems/MusicManager';
 import { FRUIT_VARIETIES, wholeTextureKey, type FruitVariety } from '../utils/fruitCatalog';
 import { SliceTrail } from '../entities/SliceTrail';
+import { AnimatedBackground } from '../entities/AnimatedBackground';
 import { createMuteButton } from '../utils/ui';
-import { backgroundKey } from '../utils/viewport';
 
 /** Un emblème-fruit tranchable qui lance un mode de jeu. */
 interface ModeEmblem {
@@ -49,7 +49,7 @@ export class MenuScene extends Phaser.Scene {
     this.slicing = false;
     this.emblems = [];
 
-    this.add.image(0, 0, backgroundKey(this)).setOrigin(0);
+    new AnimatedBackground(this);
     music.ensureRunning();
 
     const title = this.add

@@ -143,3 +143,19 @@ export const CRIT_MULTIPLIER = 3;
 // Fruit Ninja). Célébré en grand à partir du seuil, avec bonus par fruit.
 export const GESTURE_COMBO_MIN = 3;
 export const GESTURE_COMBO_BONUS = 15;
+
+// ------------------------------------------------------------------
+// Fond animé
+// ------------------------------------------------------------------
+export const TEX_GLOW = 'glow';
+export const TEX_CLOUD = 'cloud';
+// Position du soleil (fraction de l'écran) — partagée entre le décor baké
+// et le halo animé pour qu'ils coïncident dans les deux orientations.
+export const SUN_FRAC_X = 0.66;
+export const SUN_FRAC_Y = 0.52;
+export const BG_CLOUD_COUNT = 5;
+// Profondeurs du fond animé (sous tout le reste, sous le voile sombre)
+export const DEPTH_BG_BASE = -20;
+export const DEPTH_BG_GLOW = -18;
+export const DEPTH_BG_CLOUD = -16;
+export const DEPTH_BG_MOTE = -14;

@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { type GameMode, type GameOverReason } from '../utils/constants';
 import { getBestScore, saveBestScore } from '../utils/bestScore';
 import { sfx } from '../systems/SfxManager';
-import { backgroundKey } from '../utils/viewport';
+import { AnimatedBackground } from '../entities/AnimatedBackground';
 
 /** Données passées par la GameScene à la fin d'une partie. */
 interface GameOverData {
@@ -48,7 +48,7 @@ export class GameOverScene extends Phaser.Scene {
     const w = this.scale.width;
     const h = this.scale.height;
 
-    this.add.image(0, 0, backgroundKey(this)).setOrigin(0);
+    new AnimatedBackground(this);
     this.add.rectangle(0, 0, w, h, 0x0b2a3a, 0.55).setOrigin(0);
 
     const display = REASON_DISPLAY[this.reason];

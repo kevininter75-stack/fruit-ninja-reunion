@@ -9,6 +9,10 @@ import {
   TEX_SPLAT_PREFIX,
   SPLAT_VARIANTS,
   BOMB_RADIUS,
+  TEX_GLOW,
+  TEX_CLOUD,
+  SUN_FRAC_X,
+  SUN_FRAC_Y,
 } from '../utils/constants';
 import {
   FRUIT_VARIETIES,
@@ -50,7 +54,53 @@ export class PreloadScene extends Phaser.Scene {
     this.createBombTexture();
     this.createJuiceTexture();
     this.createSplatTextures();
+    this.createGlowTexture();
+    this.createCloudTexture();
     this.scene.start('MenuScene');
+  }
+
+  /** Halo lumineux radial : le "glow" animé placé sur le soleil du décor. */
+  private createGlowTexture(): void {
+    const size = 520;
+    const c = size / 2;
+    const tex = this.textures.createCanvas(TEX_GLOW, size, size);
+    if (tex === null) {
+      return;
+    }
+    const ctx = tex.getContext();
+    const g = ctx.createRadialGradient(c, c, 0, c, c, c);
+    g.addColorStop(0, 'rgba(255, 238, 190, 0.85)');
+    g.addColorStop(0.4, 'rgba(255, 220, 150, 0.35)');
+    g.addColorStop(1, 'rgba(255, 220, 150, 0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
+    tex.refresh();
+  }
+
+  /** Nuage doux : amas de cercles flous (bord adouci par shadowBlur). */
+  private createCloudTexture(): void {
+    const w = 360;
+    const h = 150;
+    const tex = this.textures.createCanvas(TEX_CLOUD, w, h);
+    if (tex === null) {
+      return;
+    }
+    const ctx = tex.getContext();
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowColor = 'rgba(255, 255, 255, 1)';
+    ctx.shadowBlur = 28;
+    for (const [cx, cy, r] of [
+      [110, 95, 42],
+      [165, 72, 54],
+      [225, 90, 46],
+      [150, 98, 48],
+      [205, 98, 44],
+    ]) {
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    tex.refresh();
   }
 
   // ------------------------------------------------------------------
@@ -73,21 +123,12 @@ export class PreloadScene extends Phaser.Scene {
     ctx.fillStyle = sky;
     ctx.fillRect(0, 0, W, H);
 
-    // Nuages doux
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.14)';
-    for (const [cx, cy, rx] of [
-      [W * 0.24, H * 0.13, 120],
-      [W * 0.62, H * 0.08, 90],
-      [W * 0.8, H * 0.2, 110],
-    ]) {
-      ctx.beginPath();
-      ctx.ellipse(cx, cy, rx, rx * 0.24, 0, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    // (Les nuages sont désormais des sprites animés qui dérivent — cf. AnimatedBackground.)
 
-    // Soleil couchant avec halo, partiellement derrière les montagnes
-    const sunX = W * 0.66;
-    const sunY = H * 0.52;
+    // Soleil couchant avec halo, partiellement derrière les montagnes.
+    // Position partagée avec le halo animé (SUN_FRAC_*) pour qu'ils coïncident.
+    const sunX = W * SUN_FRAC_X;
+    const sunY = H * SUN_FRAC_Y;
     const halo = ctx.createRadialGradient(sunX, sunY, 20, sunX, sunY, 240);
     halo.addColorStop(0, 'rgba(255, 222, 150, 0.55)');
     halo.addColorStop(1, 'rgba(255, 222, 150, 0)');

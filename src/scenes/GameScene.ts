@@ -10,7 +10,7 @@ import { sfx } from '../systems/SfxManager';
 import { music } from '../systems/MusicManager';
 import { FRUIT_VARIETIES, halfTextureKeys, wholeTextureKey } from '../utils/fruitCatalog';
 import { createMuteButton } from '../utils/ui';
-import { backgroundKey } from '../utils/viewport';
+import { AnimatedBackground } from '../entities/AnimatedBackground';
 import {
   FRUIT_POOL_SIZE,
   HALF_POOL_SIZE,
@@ -142,9 +142,9 @@ export class GameScene extends Phaser.Scene {
     // d'une partie précédente (le reset au shutdown planterait : world null).
     this.physics.world.timeScale = 1;
 
-    this.add.image(0, 0, backgroundKey(this)).setOrigin(0);
+    new AnimatedBackground(this);
     // Voile sombre : atténue le décor pendant la partie pour que les fruits
-    // ressortent. Entre le fond (depth 0) et les taches de jus (depth 2).
+    // ressortent. Au-dessus du fond animé (depths négatifs), sous les taches.
     this.add
       .rectangle(0, 0, this.scale.width, this.scale.height, GAME_DARKEN_COLOR, GAME_DARKEN_ALPHA)
       .setOrigin(0)
