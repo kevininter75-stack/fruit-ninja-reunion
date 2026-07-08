@@ -9,6 +9,8 @@ interface GameOverData {
   score: number;
   mode: GameMode;
   reason: GameOverReason;
+  fruitsSliced: number;
+  bestCombo: number;
 }
 
 /** Titre et sous-titre adaptés à la cause de fin de partie. */
@@ -27,6 +29,8 @@ export class GameOverScene extends Phaser.Scene {
   private finalScore = 0;
   private mode: GameMode = 'classic';
   private reason: GameOverReason = 'lives';
+  private fruitsSliced = 0;
+  private bestCombo = 0;
 
   constructor() {
     super('GameOverScene');
@@ -36,6 +40,8 @@ export class GameOverScene extends Phaser.Scene {
     this.finalScore = data.score ?? 0;
     this.mode = data.mode ?? 'classic';
     this.reason = data.reason ?? 'lives';
+    this.fruitsSliced = data.fruitsSliced ?? 0;
+    this.bestCombo = data.bestCombo ?? 0;
   }
 
   create(): void {
@@ -76,7 +82,25 @@ export class GameOverScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.createRecordText();
+    this.createStatsText();
     this.createButtons();
+  }
+
+  /** Ligne de statistiques : fruits tranchés et meilleur combo d'un geste. */
+  private createStatsText(): void {
+    const w = this.scale.width;
+    const h = this.scale.height;
+    let text = `${this.fruitsSliced} fruits tranchés`;
+    if (this.bestCombo >= 2) {
+      text += `   ·   Meilleur combo : x${this.bestCombo}`;
+    }
+    this.add
+      .text(w / 2, h * 0.66, text, {
+        fontFamily: '"Trebuchet MS", sans-serif',
+        fontSize: '28px',
+        color: '#cfe6f0',
+      })
+      .setOrigin(0.5);
   }
 
   /** Affiche « Nouveau record ! » (animé) ou le record courant du mode. */

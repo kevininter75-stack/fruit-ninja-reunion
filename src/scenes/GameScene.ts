@@ -38,6 +38,15 @@ import {
   POPUP_POOL_SIZE,
   BONUS_X2_FACTOR,
   BONUS_X2_DURATION_MS,
+  BOMB_ZOOM,
+  BOMB_ZOOM_MS,
+  BOMB_PHYSICS_SLOWMO,
+  FUSE_SPARK_TINT,
+  FUSE_SPARK_EVERY,
+  CRIT_CHANCE,
+  CRIT_MULTIPLIER,
+  GESTURE_COMBO_MIN,
+  GESTURE_COMBO_BONUS,
   type GameMode,
   type GameOverReason,
 } from '../utils/constants';
@@ -58,6 +67,8 @@ interface SliceGesture {
   lastX: number;
   lastY: number;
   lastTime: number;
+  /** Nombre de fruits tranchés depuis que ce doigt s'est posé (combo par geste). */
+  comboCount: number;
 }
 
 /** Nombre de gestes simultanés gérés (2 doigts + souris, cf. activePointers). */
@@ -83,6 +94,9 @@ export class GameScene extends Phaser.Scene {
   private comboManager!: ComboManager;
   private spawnManager!: SpawnManager;
   private juiceEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private fuseEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private readonly fuseTip = new Phaser.Math.Vector2(); // réutilisé (pas d'alloc/frame)
+  private frameCount = 0;
   private flashRect!: Phaser.GameObjects.Rectangle;
   private scoreText!: Phaser.GameObjects.Text;
   private infoText!: Phaser.GameObjects.Text; // compte à rebours (mode Chrono uniquement)
@@ -92,6 +106,10 @@ export class GameScene extends Phaser.Scene {
   private popupPool: Phaser.GameObjects.Text[] = [];
   private splatPool: Phaser.GameObjects.Image[] = [];
   private nextSplatIndex = 0;
+
+  // Statistiques de la partie (affichées sur l'écran de fin — Étape 4)
+  private fruitsSliced = 0;
+  private bestGestureCombo = 0;
 
   // État de la partie — la même instance de scène est réutilisée à chaque
   // restart, donc TOUT l'état mutable doit être réinitialisé dans init().
@@ -111,12 +129,19 @@ export class GameScene extends Phaser.Scene {
     this.gameEnded = false;
     this.lastShownSecond = -1;
     this.multiplierTimer = null;
+    this.fruitsSliced = 0;
+    this.bestGestureCombo = 0;
+    this.frameCount = 0;
     // La scène est réutilisée au restart : on repart d'un tableau vide pour
     // ne pas garder de références aux croix (détruites) de la partie passée.
     this.lifeCrosses = [];
   }
 
   create(): void {
+    // Normalise le temps physique au cas où un ralenti de bombe traînerait
+    // d'une partie précédente (le reset au shutdown planterait : world null).
+    this.physics.world.timeScale = 1;
+
     this.add.image(0, 0, backgroundKey(this)).setOrigin(0);
     // Voile sombre : atténue le décor pendant la partie pour que les fruits
     // ressortent. Entre le fond (depth 0) et les taches de jus (depth 2).
@@ -158,6 +183,7 @@ export class GameScene extends Phaser.Scene {
         lastX: 0,
         lastY: 0,
         lastTime: 0,
+        comboCount: 0,
       });
     }
 
@@ -169,6 +195,20 @@ export class GameScene extends Phaser.Scene {
         scale: { start: 1, end: 0 },
         lifespan: { min: 300, max: 650 },
         gravityY: 900,
+        emitting: false,
+      })
+      .setDepth(DEPTH_JUICE);
+
+    // Étincelles de mèche : petites particules vives émises au bout de la mèche
+    // des bombes en vol (crépitement). Réutilise la texture de jus, teinte orange.
+    this.fuseEmitter = this.add
+      .particles(0, 0, TEX_JUICE, {
+        speed: { min: 20, max: 90 },
+        angle: { min: 200, max: 340 }, // vers le haut, gerbe étroite
+        scale: { start: 0.5, end: 0 },
+        lifespan: { min: 150, max: 320 },
+        tint: FUSE_SPARK_TINT,
+        gravityY: 300,
         emitting: false,
       })
       .setDepth(DEPTH_JUICE);
@@ -198,8 +238,26 @@ export class GameScene extends Phaser.Scene {
     for (const gesture of this.gestures) {
       gesture.trail.update(this.time.now);
     }
+    this.updateFuseSparks();
     if (this.mode === 'chrono' && !this.gameEnded) {
       this.updateChrono();
+    }
+  }
+
+  /** Fait crépiter la mèche de chaque bombe en vol (étincelles à son bout). */
+  private updateFuseSparks(): void {
+    this.frameCount++;
+    if (this.gameEnded || this.frameCount % FUSE_SPARK_EVERY !== 0) {
+      return;
+    }
+    const bombs = this.bombs.getChildren();
+    for (let i = 0; i < bombs.length; i++) {
+      const bomb = bombs[i] as Bomb;
+      if (!bomb.active) {
+        continue;
+      }
+      bomb.fuseTip(this.fuseTip);
+      this.fuseEmitter.emitParticleAt(this.fuseTip.x, this.fuseTip.y, 1);
     }
   }
 
@@ -411,6 +469,7 @@ export class GameScene extends Phaser.Scene {
         return; // plus de 3 doigts : les suivants sont ignorés
       }
       gesture.pointerId = pointer.id;
+      gesture.comboCount = 0; // nouveau geste : le combo par swipe repart de zéro
       gesture.trail.clear();
       gesture.lastX = pointer.x;
       gesture.lastY = pointer.y;
@@ -429,10 +488,11 @@ export class GameScene extends Phaser.Scene {
       this.handleSliceMove(gesture, pointer);
     });
 
-    // Doigt levé : le slot redevient libre, la traînée s'éteint d'elle-même
+    // Doigt levé : on évalue le combo de ce geste, puis le slot redevient libre
     const endSlice = (pointer: Phaser.Input.Pointer): void => {
       const gesture = this.findGesture(pointer.id);
       if (gesture !== undefined) {
+        this.celebrateGestureCombo(gesture);
         gesture.pointerId = null;
       }
     };
@@ -467,7 +527,7 @@ export class GameScene extends Phaser.Scene {
         pointer.x,
         pointer.y,
         this.fruits,
-        (fruit) => this.onFruitSliced(fruit, now, sliceAngle)
+        (fruit) => this.onFruitSliced(fruit, gesture, now, sliceAngle)
       );
       this.sliceDetector.checkSegment<Bomb>(
         gesture.lastX,
@@ -484,11 +544,16 @@ export class GameScene extends Phaser.Scene {
     gesture.lastTime = now;
   }
 
-  /** Un fruit vient d'être tranché : score, combo, jus, son et moitiés. */
-  private onFruitSliced(fruit: Fruit, now: number, sliceAngle: number): void {
+  /** Un fruit vient d'être tranché : score, combo, coup critique, jus, moitiés. */
+  private onFruitSliced(fruit: Fruit, gesture: SliceGesture, now: number, sliceAngle: number): void {
     if (this.gameEnded) {
       return;
     }
+
+    // Suivi du combo par geste et des statistiques de fin
+    gesture.comboCount++;
+    this.fruitsSliced++;
+    this.bestGestureCombo = Math.max(this.bestGestureCombo, gesture.comboCount);
 
     // Le combava doré active le multiplicateur AVANT le crédit des points :
     // sa propre coupe profite déjà du x2.
@@ -496,24 +561,80 @@ export class GameScene extends Phaser.Scene {
       this.activateBonus(fruit);
     }
 
-    const combo = this.comboManager.registerSlice(now);
-    const bonus = (combo - 1) * COMBO_BONUS_PER_STEP;
-    const awarded = this.scoreManager.addScore(SCORE_PER_FRUIT + bonus);
+    // Coup critique : bonus rare et appuyé (jamais sur le combava, déjà spécial)
+    const isCrit = !fruit.isBonus && Math.random() < CRIT_CHANCE;
+    const comboBonus = (this.comboManager.registerSlice(now) - 1) * COMBO_BONUS_PER_STEP;
+    let points = SCORE_PER_FRUIT + comboBonus;
+    if (isCrit) {
+      points *= CRIT_MULTIPLIER;
+    }
+    const awarded = this.scoreManager.addScore(points);
 
     // Jus au point d'impact (teinté) + tache persistante sur le décor
     this.juiceEmitter.setParticleTint(fruit.juiceColor);
     this.juiceEmitter.emitParticleAt(fruit.x, fruit.y, JUICE_PARTICLE_COUNT);
     this.spawnSplat(fruit.x, fruit.y, fruit.juiceColor);
 
-    this.showPopup(fruit.x, fruit.y - 20, `+${awarded}`, '#ffffff', 40);
-    if (combo >= 2) {
-      this.showPopup(fruit.x, fruit.y - 100, `Combo x${combo} !`, '#ffe066', 54);
-      sfx.combo(combo);
+    if (isCrit) {
+      // Coup critique : popup doré, double jet de jus et son dédié
+      this.juiceEmitter.emitParticleAt(fruit.x, fruit.y, JUICE_PARTICLE_COUNT);
+      this.showPopup(fruit.x, fruit.y - 20, `CRITIQUE ! +${awarded}`, '#ffd700', 46);
+      sfx.crit();
+    } else {
+      this.showPopup(fruit.x, fruit.y - 20, `+${awarded}`, '#ffffff', 40);
     }
-    sfx.slice();
 
+    sfx.slice();
     this.spawnHalves(fruit, sliceAngle);
     fruit.kill();
+  }
+
+  /**
+   * Fin d'un geste : si le doigt a tranché GESTURE_COMBO_MIN fruits ou plus
+   * dans le même swipe, on célèbre en grand (bannière centrée + bonus + son)
+   * — la signature de Fruit Ninja, « couper plein de fruits d'un coup ».
+   */
+  private celebrateGestureCombo(gesture: SliceGesture): void {
+    if (this.gameEnded || gesture.comboCount < GESTURE_COMBO_MIN) {
+      return;
+    }
+    const n = gesture.comboCount;
+    const awarded = this.scoreManager.addScore(n * GESTURE_COMBO_BONUS);
+    this.showBigBanner(`COMBO x${n} !\n+${awarded}`);
+    sfx.bigCombo(n);
+  }
+
+  /** Bannière centrée éphémère (gros combo) : apparition en "pop" puis fondu. */
+  private showBigBanner(message: string): void {
+    const banner = this.add
+      .text(this.scale.width / 2, this.scale.height * 0.34, message, {
+        fontFamily: '"Trebuchet MS", sans-serif',
+        fontSize: '76px',
+        fontStyle: 'bold',
+        color: '#ffe066',
+        align: 'center',
+        stroke: '#2d3a4a',
+        strokeThickness: 10,
+      })
+      .setOrigin(0.5)
+      .setDepth(70)
+      .setScale(0.3);
+    this.tweens.add({
+      targets: banner,
+      scale: 1,
+      duration: 320,
+      ease: 'Back.easeOut',
+      onComplete: () => {
+        this.tweens.add({
+          targets: banner,
+          alpha: 0,
+          scale: 1.15,
+          delay: 350,
+          duration: 350,
+          onComplete: () => banner.destroy(),
+        });
+      },
+    });
   }
 
   /** Combava doré tranché : score x2 temporaire + feedback doré appuyé. */
@@ -538,12 +659,18 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  /** Bombe tranchée : flash, secousse, explosion, fin de partie différée. */
+  /**
+   * Bombe tranchée : moment fatal théâtral — gerbe d'explosion, ralenti
+   * (bullet-time sur les fruits en vol), zoom caméra, secousse, flash, puis
+   * transition différée vers l'écran de fin.
+   */
   private onBombSliced(bomb: Bomb): void {
     if (this.gameEnded) {
       return;
     }
     this.gameEnded = true;
+    const bx = bomb.x;
+    const by = bomb.y;
     bomb.kill();
     this.spawnManager.stop();
     // Tous les gestes en cours sont interrompus
@@ -553,17 +680,28 @@ export class GameScene extends Phaser.Scene {
     }
 
     sfx.explosion();
-    this.cameras.main.shake(400, 0.02);
+
+    // Gerbe au point d'impact : fumée sombre + pluie d'étincelles
+    this.juiceEmitter.setParticleTint(0x2a2a33);
+    this.juiceEmitter.emitParticleAt(bx, by, JUICE_PARTICLE_COUNT * 2);
+    this.fuseEmitter.emitParticleAt(bx, by, 26);
+
+    // Bullet-time : la physique ralentit, les fruits en vol figent le temps
+    this.physics.world.timeScale = BOMB_PHYSICS_SLOWMO;
+
+    // Zoom caméra (centré → punch-in) + secousse + flash plein écran
+    this.cameras.main.shake(450, 0.022);
+    this.cameras.main.zoomTo(BOMB_ZOOM, BOMB_ZOOM_MS, 'Sine.easeInOut');
     this.flashRect.setVisible(true).setAlpha(1);
     this.tweens.add({
       targets: this.flashRect,
       alpha: 0,
-      duration: BOMB_GAMEOVER_DELAY_MS - 100,
+      duration: BOMB_GAMEOVER_DELAY_MS,
       onComplete: () => this.flashRect.setVisible(false),
     });
 
-    // Petit délai pour laisser le flash et la secousse se lire avant l'écran de fin
-    this.time.delayedCall(BOMB_GAMEOVER_DELAY_MS, () => this.endGame('bomb'));
+    // Fin différée, un peu allongée pour savourer le ralenti et le zoom
+    this.time.delayedCall(BOMB_GAMEOVER_DELAY_MS + 350, () => this.endGame('bomb'));
   }
 
   /**
@@ -670,6 +808,8 @@ export class GameScene extends Phaser.Scene {
       score: this.scoreManager.getScore(),
       mode: this.mode,
       reason,
+      fruitsSliced: this.fruitsSliced,
+      bestCombo: this.bestGestureCombo,
     });
   }
 }

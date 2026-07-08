@@ -7,9 +7,27 @@ import { BOMB_RADIUS, DEPTH_FRUIT } from '../utils/constants';
  * qui retombe hors écran disparaît sans pénalité — la laisser passer est
  * précisément le bon réflexe.
  */
+// Position du bout de la mèche dans la texture, relative au centre de la bombe
+// (voir PreloadScene.createBombTexture : étincelle en (r+17, 8) sur un canvas 2r).
+const FUSE_LOCAL_X = 17;
+const FUSE_LOCAL_Y = 8 - BOMB_RADIUS;
+
 export class Bomb extends Phaser.Physics.Arcade.Sprite {
   /** Rayon utilisé pour la détection de coupe (cercle approximatif). */
   public readonly sliceRadius = BOMB_RADIUS;
+
+  /**
+   * Écrit dans `out` la position MONDE du bout de la mèche (là où crépitent
+   * les étincelles). La mèche tourne avec la bombe : on fait donc pivoter
+   * l'offset local par la rotation courante. `out` est réutilisé (pas d'alloc).
+   */
+  fuseTip(out: Phaser.Math.Vector2): Phaser.Math.Vector2 {
+    const cos = Math.cos(this.rotation);
+    const sin = Math.sin(this.rotation);
+    out.x = this.x + FUSE_LOCAL_X * cos - FUSE_LOCAL_Y * sin;
+    out.y = this.y + FUSE_LOCAL_X * sin + FUSE_LOCAL_Y * cos;
+    return out;
+  }
 
   /** (Re)lance la bombe depuis le bas de l'écran. Appelé par le SpawnManager. */
   launch(x: number, y: number, velocityX: number, velocityY: number): void {

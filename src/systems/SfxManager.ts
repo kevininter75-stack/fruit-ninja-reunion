@@ -146,6 +146,21 @@ export class SfxManager {
     this.playTone('triangle', 1320, 1340, 0.2, 0.3, 0.18);
   }
 
+  /** Coup critique : double ping brillant et métallique. */
+  crit(): void {
+    this.playTone('triangle', 900, 1200, 0.1, 0.3);
+    this.playTone('triangle', 1400, 1700, 0.14, 0.28, 0.06);
+  }
+
+  /** Gros combo par geste : arpège ascendant, plus haut quand le combo grandit. */
+  bigCombo(count: number): void {
+    const n = Math.min(count, 6);
+    for (let i = 0; i < 3; i++) {
+      const hz = 520 + n * 40 + i * 220;
+      this.playTone('triangle', hz, hz + 40, 0.16, 0.28, i * 0.07);
+    }
+  }
+
   /** Vie perdue : blip descendant, court et discret. */
   lifeLost(): void {
     this.playTone('square', 200, 90, 0.22, 0.15);

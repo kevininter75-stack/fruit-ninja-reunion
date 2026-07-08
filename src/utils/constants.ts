@@ -122,3 +122,24 @@ export const BONUS_CHANCE = 0.035; // probabilité par salve de tenter un combav
 export const BONUS_SAFE_TIME_MS = 10_000; // pas de bonus en tout début de partie
 export const BONUS_X2_FACTOR = 2;
 export const BONUS_X2_DURATION_MS = 5000;
+
+// ------------------------------------------------------------------
+// Étape 4 — Théâtralité
+// ------------------------------------------------------------------
+
+// Drame de la bombe : zoom caméra + ralenti (bullet-time) au moment fatal
+export const BOMB_ZOOM = 1.5;
+export const BOMB_ZOOM_MS = 500;
+export const BOMB_PHYSICS_SLOWMO = 2.4; // timeScale Arcade (>1 = plus lent) sur les fruits en vol
+// Mèche qui crépite : étincelles émises au bout de la mèche des bombes en vol
+export const FUSE_SPARK_TINT = 0xffb347;
+export const FUSE_SPARK_EVERY = 2; // une salve d'étincelles toutes N frames
+
+// Coups critiques : une coupe sur ~11 rapporte gros, avec feedback appuyé
+export const CRIT_CHANCE = 0.09;
+export const CRIT_MULTIPLIER = 3;
+
+// Combo par geste : nombre de fruits tranchés dans UN même swipe (façon
+// Fruit Ninja). Célébré en grand à partir du seuil, avec bonus par fruit.
+export const GESTURE_COMBO_MIN = 3;
+export const GESTURE_COMBO_BONUS = 15;
