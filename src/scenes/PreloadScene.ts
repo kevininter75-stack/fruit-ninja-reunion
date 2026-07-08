@@ -27,6 +27,47 @@ function hexToCss(color: number): string {
   return `#${color.toString(16).padStart(6, '0')}`;
 }
 
+/** Éclaircit (amt > 0) ou assombrit (amt < 0, jusqu'à -1) une couleur hex. */
+function shade(color: number, amt: number): string {
+  const r = (color >> 16) & 0xff;
+  const g = (color >> 8) & 0xff;
+  const b = color & 0xff;
+  const f = (ch: number): number =>
+    Math.max(0, Math.min(255, Math.round(amt >= 0 ? ch + (255 - ch) * amt : ch * (1 + amt))));
+  return `rgb(${f(r)}, ${f(g)}, ${f(b)})`;
+}
+
+/**
+ * Dégradé "sphère éclairée" : source lumineuse en haut-gauche, ombre au
+ * bord opposé → donne du volume 3D à un aplat. base = couleur hex du fruit.
+ */
+function sphereGradient(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  r: number,
+  base: number
+): CanvasGradient {
+  const g = ctx.createRadialGradient(cx - r * 0.32, cy - r * 0.35, r * 0.1, cx, cy, r * 1.08);
+  g.addColorStop(0, shade(base, 0.5));
+  g.addColorStop(0.55, shade(base, 0.05));
+  g.addColorStop(1, shade(base, -0.42));
+  return g;
+}
+
+/** Reflet brillant (spéculaire) en haut-gauche, pour l'aspect verni. */
+function addGloss(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number): void {
+  const gx = cx - r * 0.34;
+  const gy = cy - r * 0.38;
+  const g = ctx.createRadialGradient(gx, gy, 0, gx, gy, r * 0.5);
+  g.addColorStop(0, 'rgba(255, 255, 255, 0.6)');
+  g.addColorStop(1, 'rgba(255, 255, 255, 0)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(gx, gy, r * 0.5, 0, Math.PI * 2);
+  ctx.fill();
+}
+
 /**
  * Génération des assets placeholder.
  *
@@ -317,12 +358,12 @@ export class PreloadScene extends Phaser.Scene {
 
     switch (variety.key) {
       case 'litchi': {
-        // Coque rose-rouge granuleuse + feuille
-        ctx.fillStyle = '#e0455a';
+        // Coque rose-rouge granuleuse, avec volume et reflet verni
+        ctx.fillStyle = sphereGradient(ctx, c, c, r, 0xe0455a);
         ctx.beginPath();
         ctx.arc(c, c, r, 0, Math.PI * 2);
         ctx.fill();
-        ctx.fillStyle = '#c23349';
+        ctx.fillStyle = shade(0xe0455a, -0.28);
         for (let i = 0; i < 12; i++) {
           const angle = (i / 12) * Math.PI * 2;
           const rr = r * (i % 2 === 0 ? 0.62 : 0.32);
@@ -330,17 +371,14 @@ export class PreloadScene extends Phaser.Scene {
           ctx.arc(c + Math.cos(angle) * rr, c + Math.sin(angle) * rr, 3.2, 0, Math.PI * 2);
           ctx.fill();
         }
-        ctx.fillStyle = '#f78fa0';
-        ctx.beginPath();
-        ctx.arc(c - r * 0.35, c - r * 0.35, r * 0.22, 0, Math.PI * 2);
-        ctx.fill();
+        addGloss(ctx, c, c, r);
         break;
       }
       case 'ananas_victoria': {
         // Corps doré quadrillé + couronne verte
         const ry = r * 0.9;
         const cy = c + 5;
-        ctx.fillStyle = '#f0b429';
+        ctx.fillStyle = sphereGradient(ctx, c, cy, ry, 0xf0b429);
         ctx.beginPath();
         ctx.ellipse(c, cy, r * 0.72, ry, 0, 0, Math.PI * 2);
         ctx.fill();
@@ -348,7 +386,7 @@ export class PreloadScene extends Phaser.Scene {
         ctx.beginPath();
         ctx.ellipse(c, cy, r * 0.72, ry, 0, 0, Math.PI * 2);
         ctx.clip();
-        ctx.strokeStyle = '#c98d1b';
+        ctx.strokeStyle = 'rgba(150, 105, 20, 0.5)';
         ctx.lineWidth = 2;
         for (let d = -size; d < size * 2; d += 15) {
           ctx.beginPath();
@@ -361,6 +399,7 @@ export class PreloadScene extends Phaser.Scene {
           ctx.stroke();
         }
         ctx.restore();
+        addGloss(ctx, c, cy, ry);
         // Couronne
         ctx.fillStyle = '#2e7d4f';
         const crownBase = cy - ry + 4;
@@ -384,26 +423,28 @@ export class PreloadScene extends Phaser.Scene {
         ctx.save();
         ctx.translate(c, c);
         ctx.rotate(-0.35);
-        ctx.fillStyle = '#f28c28';
+        ctx.fillStyle = sphereGradient(ctx, 0, 0, r * 0.8, 0xf28c28);
         ctx.beginPath();
         ctx.ellipse(0, 0, r * 0.92, r * 0.68, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.clip();
-        ctx.globalAlpha = 0.75;
+        ctx.globalAlpha = 0.7;
         ctx.fillStyle = '#d94f35';
         ctx.beginPath();
         ctx.arc(-r * 0.35, -r * 0.28, r * 0.62, 0, Math.PI * 2);
         ctx.fill();
+        ctx.globalAlpha = 1;
+        addGloss(ctx, 0, 0, r * 0.8);
         ctx.restore();
         break;
       }
       case 'fruit_de_la_passion': {
-        // Sphère violette mouchetée
-        ctx.fillStyle = '#5d3277';
+        // Sphère violette mouchetée, volume + reflet
+        ctx.fillStyle = sphereGradient(ctx, c, c, r, 0x5d3277);
         ctx.beginPath();
         ctx.arc(c, c, r, 0, Math.PI * 2);
         ctx.fill();
-        ctx.fillStyle = '#7a4a99';
+        ctx.fillStyle = shade(0x5d3277, 0.28);
         for (let i = 0; i < 9; i++) {
           const angle = (i / 9) * Math.PI * 2 + 0.4;
           const rr = r * (i % 3 === 0 ? 0.55 : 0.75);
@@ -411,30 +452,28 @@ export class PreloadScene extends Phaser.Scene {
           ctx.arc(c + Math.cos(angle) * rr, c + Math.sin(angle) * rr, 2.4, 0, Math.PI * 2);
           ctx.fill();
         }
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
-        ctx.beginPath();
-        ctx.arc(c - r * 0.35, c - r * 0.35, r * 0.2, 0, Math.PI * 2);
-        ctx.fill();
+        addGloss(ctx, c, c, r);
         break;
       }
       case 'papaye': {
-        // Grand ovale vertical jaune-orangé strié
-        ctx.fillStyle = '#ffa552';
+        // Grand ovale vertical jaune-orangé strié, avec volume
+        ctx.fillStyle = sphereGradient(ctx, c, c, r * 0.85, 0xffa552);
         ctx.beginPath();
         ctx.ellipse(c, c, r * 0.62, r * 0.95, 0, 0, Math.PI * 2);
         ctx.fill();
-        ctx.strokeStyle = '#f0c04a';
+        ctx.strokeStyle = 'rgba(240, 192, 74, 0.6)';
         ctx.lineWidth = 5;
         for (const dx of [-r * 0.3, 0, r * 0.3]) {
           ctx.beginPath();
           ctx.ellipse(c + dx * 0.5, c, Math.max(r * 0.62 - Math.abs(dx), 6), r * 0.9, 0, -0.5, 0.5);
           ctx.stroke();
         }
+        addGloss(ctx, c, c, r * 0.85);
         break;
       }
       case 'corossol': {
-        // Ovoïde vert hérissé de picots sombres
-        ctx.fillStyle = '#6faa4f';
+        // Ovoïde vert hérissé de picots sombres, avec volume
+        ctx.fillStyle = sphereGradient(ctx, c, c, r * 0.87, 0x6faa4f);
         ctx.beginPath();
         ctx.ellipse(c, c, r * 0.8, r * 0.94, 0.2, 0, Math.PI * 2);
         ctx.fill();
@@ -459,27 +498,24 @@ export class PreloadScene extends Phaser.Scene {
         break;
       }
       case 'longane': {
-        // Petite sphère brun sable
-        ctx.fillStyle = '#c49a6c';
+        // Petite sphère brun sable, volume + reflet
+        ctx.fillStyle = sphereGradient(ctx, c, c, r, 0xc49a6c);
         ctx.beginPath();
         ctx.arc(c, c, r, 0, Math.PI * 2);
         ctx.fill();
-        ctx.fillStyle = '#a97f4f';
+        ctx.fillStyle = shade(0xc49a6c, -0.22);
         for (let i = 0; i < 8; i++) {
           const angle = (i / 8) * Math.PI * 2 + 0.2;
           ctx.beginPath();
           ctx.arc(c + Math.cos(angle) * r * 0.55, c + Math.sin(angle) * r * 0.55, 2.6, 0, Math.PI * 2);
           ctx.fill();
         }
-        ctx.fillStyle = '#dcb98d';
-        ctx.beginPath();
-        ctx.arc(c - r * 0.32, c - r * 0.32, r * 0.24, 0, Math.PI * 2);
-        ctx.fill();
+        addGloss(ctx, c, c, r);
         break;
       }
       case 'jacque': {
-        // Gros ovoïde vert-jaune à picots denses
-        ctx.fillStyle = '#a8b545';
+        // Gros ovoïde vert-jaune à picots denses, avec volume
+        ctx.fillStyle = sphereGradient(ctx, c, c, r * 0.88, 0xa8b545);
         ctx.beginPath();
         ctx.ellipse(c, c, r * 0.82, r * 0.95, -0.15, 0, Math.PI * 2);
         ctx.fill();
@@ -501,8 +537,8 @@ export class PreloadScene extends Phaser.Scene {
         break;
       }
       case 'carambole': {
-        // Étoile à 5 branches — le fruit étoile
-        ctx.fillStyle = '#f5d442';
+        // Étoile à 5 branches — le fruit étoile, avec volume
+        ctx.fillStyle = sphereGradient(ctx, c, c, r, 0xf5d442);
         ctx.strokeStyle = '#c9a83a';
         ctx.lineWidth = 3;
         ctx.beginPath();
@@ -520,10 +556,7 @@ export class PreloadScene extends Phaser.Scene {
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-        ctx.beginPath();
-        ctx.arc(c - r * 0.2, c - r * 0.25, r * 0.16, 0, Math.PI * 2);
-        ctx.fill();
+        addGloss(ctx, c, c, r * 0.7);
         break;
       }
       case 'combava_bonus': {
@@ -535,7 +568,7 @@ export class PreloadScene extends Phaser.Scene {
         ctx.beginPath();
         ctx.arc(c, c, r + 4, 0, Math.PI * 2);
         ctx.fill();
-        ctx.fillStyle = '#ffd700';
+        ctx.fillStyle = sphereGradient(ctx, c, c, r - 7, 0xffd700);
         ctx.beginPath();
         ctx.arc(c, c, r - 7, 0, Math.PI * 2);
         ctx.fill();
@@ -548,10 +581,7 @@ export class PreloadScene extends Phaser.Scene {
           ctx.arc(c + Math.cos(angle) * rr, c + Math.sin(angle) * rr, 3.4, 0, Math.PI * 2);
           ctx.fill();
         }
-        ctx.fillStyle = '#fff3b0';
-        ctx.beginPath();
-        ctx.arc(c - r * 0.3, c - r * 0.3, r * 0.18, 0, Math.PI * 2);
-        ctx.fill();
+        addGloss(ctx, c, c, r - 7);
         break;
       }
       default: {
