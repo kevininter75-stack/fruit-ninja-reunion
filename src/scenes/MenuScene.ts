@@ -1,12 +1,19 @@
 import Phaser from 'phaser';
-import { type GameMode, SLICE_MIN_SPEED, JUICE_PARTICLE_COUNT, TEX_JUICE, DEPTH_JUICE } from '../utils/constants';
+import {
+  type GameMode,
+  SLICE_MIN_SPEED,
+  JUICE_PARTICLE_COUNT,
+  TEX_JUICE,
+  DEPTH_JUICE,
+  TEX_GLOW,
+} from '../utils/constants';
 import { getBestScore } from '../utils/bestScore';
 import { sfx } from '../systems/SfxManager';
 import { music } from '../systems/MusicManager';
 import { FRUIT_VARIETIES, wholeTextureKey, type FruitVariety } from '../utils/fruitCatalog';
 import { SliceTrail } from '../entities/SliceTrail';
 import { AnimatedBackground } from '../entities/AnimatedBackground';
-import { createMuteButton } from '../utils/ui';
+import { createMuteButton, addVignette } from '../utils/ui';
 
 /** Un emblème-fruit tranchable qui lance un mode de jeu. */
 interface ModeEmblem {
@@ -101,6 +108,7 @@ export class MenuScene extends Phaser.Scene {
     this.trail = new SliceTrail(this);
 
     this.registerPointerEvents();
+    addVignette(this);
     createMuteButton(this, w - 52, h - 52);
   }
 
@@ -121,12 +129,30 @@ export class MenuScene extends Phaser.Scene {
     subtitle: string
   ): void {
     const scale = 1.7;
+    // Rayon de coupe = rayon logique du fruit mis à l'échelle
+    const radius = variety.radius * scale;
+
+    // Halo chaud qui respire derrière l'emblème → il ressort comme une cible
+    const glow = this.add
+      .image(x, y, TEX_GLOW)
+      .setDisplaySize(radius * 2.9, radius * 2.9)
+      .setAlpha(0.38)
+      .setDepth(-1)
+      .setBlendMode(Phaser.BlendModes.ADD);
+    this.tweens.add({
+      targets: glow,
+      scale: glow.scale * 1.12,
+      alpha: 0.6,
+      duration: 1500,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+
     const sprite = this.add
       .image(x, y, wholeTextureKey(variety))
       .setScale(scale)
       .setInteractive({ useHandCursor: true });
-    // Rayon de coupe = rayon logique du fruit mis à l'échelle
-    const radius = variety.radius * scale;
 
     // Ondulation permanente pour attirer l'œil
     this.tweens.add({

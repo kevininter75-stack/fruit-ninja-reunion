@@ -11,6 +11,7 @@ import {
   BOMB_RADIUS,
   TEX_GLOW,
   TEX_CLOUD,
+  TEX_VIGNETTE,
   SUN_FRAC_X,
   SUN_FRAC_Y,
 } from '../utils/constants';
@@ -97,7 +98,25 @@ export class PreloadScene extends Phaser.Scene {
     this.createSplatTextures();
     this.createGlowTexture();
     this.createCloudTexture();
+    this.createVignetteTexture();
     this.scene.start('MenuScene');
+  }
+
+  /** Vignettage : cadre radial sombre (transparent au centre, sombre aux bords). */
+  private createVignetteTexture(): void {
+    const size = 512;
+    const c = size / 2;
+    const tex = this.textures.createCanvas(TEX_VIGNETTE, size, size);
+    if (tex === null) {
+      return;
+    }
+    const ctx = tex.getContext();
+    const g = ctx.createRadialGradient(c, c, size * 0.34, c, c, size * 0.63);
+    g.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    g.addColorStop(1, 'rgba(6, 15, 22, 0.5)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
+    tex.refresh();
   }
 
   /** Halo lumineux radial : le "glow" animé placé sur le soleil du décor. */
@@ -628,15 +647,22 @@ export class PreloadScene extends Phaser.Scene {
     g.destroy();
   }
 
-  /** Goutte de jus : petit disque blanc à bord doux, teinté à l'émission. */
+  /** Goutte de jus : disque à dégradé radial doux (bord fondu), teinté à l'émission. */
   private createJuiceTexture(): void {
-    const g = this.make.graphics({ x: 0, y: 0 }, false);
-    g.fillStyle(0xffffff, 0.5);
-    g.fillCircle(12, 12, 12);
-    g.fillStyle(0xffffff, 1);
-    g.fillCircle(12, 12, 7);
-    g.generateTexture(TEX_JUICE, 24, 24);
-    g.destroy();
+    const size = 28;
+    const c = size / 2;
+    const tex = this.textures.createCanvas(TEX_JUICE, size, size);
+    if (tex === null) {
+      return;
+    }
+    const ctx = tex.getContext();
+    const g = ctx.createRadialGradient(c, c, 0, c, c, c);
+    g.addColorStop(0, 'rgba(255, 255, 255, 1)');
+    g.addColorStop(0.55, 'rgba(255, 255, 255, 0.85)');
+    g.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
+    tex.refresh();
   }
 
   /**

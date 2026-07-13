@@ -159,3 +159,13 @@ export const DEPTH_BG_BASE = -20;
 export const DEPTH_BG_GLOW = -18;
 export const DEPTH_BG_CLOUD = -16;
 export const DEPTH_BG_MOTE = -14;
+
+// ------------------------------------------------------------------
+// Polish visuel global
+// ------------------------------------------------------------------
+// Vignettage : cadre sombre discret sur les bords → rendu cinématique
+export const TEX_VIGNETTE = 'vignette';
+export const DEPTH_VIGNETTE = 45; // au-dessus du jeu et du jus, sous le HUD (50)
+// HUD en cartouches translucides arrondis
+export const HUD_PANEL_COLOR = 0x0b2a3a;
+export const HUD_PANEL_ALPHA = 0.4;

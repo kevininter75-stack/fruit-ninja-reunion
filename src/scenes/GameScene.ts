@@ -9,7 +9,7 @@ import { SpawnManager } from '../systems/SpawnManager';
 import { sfx } from '../systems/SfxManager';
 import { music } from '../systems/MusicManager';
 import { FRUIT_VARIETIES, halfTextureKeys, wholeTextureKey } from '../utils/fruitCatalog';
-import { createMuteButton } from '../utils/ui';
+import { createMuteButton, addHudPanel, addVignette } from '../utils/ui';
 import { AnimatedBackground } from '../entities/AnimatedBackground';
 import {
   FRUIT_POOL_SIZE,
@@ -221,6 +221,7 @@ export class GameScene extends Phaser.Scene {
       .setVisible(false)
       .setAlpha(0);
 
+    addVignette(this);
     this.createUi();
     this.createPopupPool();
     this.createSplatPool();
@@ -280,10 +281,12 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createUi(): void {
+    // Cartouche + score (HUD "produit fini")
+    addHudPanel(this, 14, 12, 250, 54);
     this.scoreText = this.add
-      .text(24, 20, 'Score : 0', {
+      .text(34, 22, 'Score : 0', {
         fontFamily: '"Trebuchet MS", sans-serif',
-        fontSize: '40px',
+        fontSize: '34px',
         fontStyle: 'bold',
         color: '#ffffff',
         stroke: '#2d3a4a',
@@ -293,7 +296,7 @@ export class GameScene extends Phaser.Scene {
 
     // Bannière x2 sous le score, cachée par défaut, clignote quand active
     this.multiplierBanner = this.add
-      .text(24, 76, `SCORE x${BONUS_X2_FACTOR} !`, {
+      .text(24, 78, `SCORE x${BONUS_X2_FACTOR} !`, {
         fontFamily: '"Trebuchet MS", sans-serif',
         fontSize: '34px',
         fontStyle: 'bold',
@@ -311,13 +314,16 @@ export class GameScene extends Phaser.Scene {
       repeat: -1,
     });
 
+    const w = this.scale.width;
     if (this.mode === 'classic') {
+      addHudPanel(this, w - 14 - 190, 12, 190, 54);
       this.createLifeCrosses();
     } else {
+      addHudPanel(this, w - 14 - 150, 12, 150, 54);
       this.infoText = this.add
-        .text(this.scale.width - 24, 20, '60 s', {
+        .text(w - 32, 22, '60 s', {
           fontFamily: '"Trebuchet MS", sans-serif',
-          fontSize: '44px',
+          fontSize: '38px',
           fontStyle: 'bold',
           color: '#ffffff',
           stroke: '#2d3a4a',
@@ -337,15 +343,15 @@ export class GameScene extends Phaser.Scene {
    */
   private createLifeCrosses(): void {
     this.lifeCrosses = [];
-    const gap = 52;
-    const rightEdge = this.scale.width - 30;
+    const gap = 50;
+    const rightEdge = this.scale.width - 36;
     for (let i = 0; i < STARTING_LIVES; i++) {
       // i = 0 le plus à gauche : les croix s'allument de gauche à droite
       const x = rightEdge - (STARTING_LIVES - 1 - i) * gap;
       const cross = this.add
-        .text(x, 22, '✕', {
+        .text(x, 24, '✕', {
           fontFamily: '"Trebuchet MS", sans-serif',
-          fontSize: '46px',
+          fontSize: '40px',
           fontStyle: 'bold',
           color: '#55697a', // gris-bleu éteint : "vie encore disponible"
           stroke: '#2d3a4a',

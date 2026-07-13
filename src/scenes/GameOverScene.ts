@@ -3,6 +3,7 @@ import { type GameMode, type GameOverReason } from '../utils/constants';
 import { getBestScore, saveBestScore } from '../utils/bestScore';
 import { sfx } from '../systems/SfxManager';
 import { AnimatedBackground } from '../entities/AnimatedBackground';
+import { addVignette } from '../utils/ui';
 
 /** Données passées par la GameScene à la fin d'une partie. */
 interface GameOverData {
@@ -84,6 +85,7 @@ export class GameOverScene extends Phaser.Scene {
     this.createRecordText();
     this.createStatsText();
     this.createButtons();
+    addVignette(this);
   }
 
   /** Ligne de statistiques : fruits tranchés et meilleur combo d'un geste. */
@@ -149,38 +151,42 @@ export class GameOverScene extends Phaser.Scene {
     const menuX = portrait ? w / 2 : w / 2 + 150;
     const menuY = portrait ? h * 0.81 : h * 0.78;
 
-    const replay = this.add
-      .text(replayX, replayY, 'Rejouer', {
-        fontFamily: '"Trebuchet MS", sans-serif',
-        fontSize: '44px',
-        fontStyle: 'bold',
-        color: '#ffffff',
-        backgroundColor: '#e0455a',
-        padding: { x: 40, y: 18 }, // zone tactile généreuse (> 44px)
-      })
-      .setOrigin(0.5)
-      .setInteractive({ useHandCursor: true });
-
-    replay.on('pointerdown', () => {
+    this.makeButton(replayX, replayY, 264, 78, 'Rejouer', 0xe0455a, () => {
       sfx.click();
       this.scene.start('GameScene', { mode: this.mode });
     });
+    this.makeButton(menuX, menuY, 224, 70, 'Menu', 0x2d3a4a, () => {
+      sfx.click();
+      this.scene.start('MenuScene');
+    });
+  }
 
-    const menu = this.add
-      .text(menuX, menuY, 'Menu', {
+  /** Bouton arrondi : cartouche plein + liseré clair + libellé + zone tactile. */
+  private makeButton(
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    label: string,
+    fill: number,
+    onClick: () => void
+  ): void {
+    const g = this.add.graphics();
+    g.fillStyle(fill, 1);
+    g.fillRoundedRect(x - width / 2, y - height / 2, width, height, height / 2);
+    g.lineStyle(3, 0xffffff, 0.85);
+    g.strokeRoundedRect(x - width / 2, y - height / 2, width, height, height / 2);
+    this.add
+      .text(x, y, label, {
         fontFamily: '"Trebuchet MS", sans-serif',
         fontSize: '40px',
         fontStyle: 'bold',
         color: '#ffffff',
-        backgroundColor: '#2d3a4a',
-        padding: { x: 40, y: 18 },
       })
-      .setOrigin(0.5)
-      .setInteractive({ useHandCursor: true });
-
-    menu.on('pointerdown', () => {
-      sfx.click();
-      this.scene.start('MenuScene');
-    });
+      .setOrigin(0.5);
+    this.add
+      .zone(x, y, width, height)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', onClick);
   }
 }
