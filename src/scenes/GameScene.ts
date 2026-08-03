@@ -22,6 +22,11 @@ import {
   FRENZY_DURATION_MS,
   FRENZY_HIT_COOLDOWN_MS,
   FRENZY_POINTS_PER_SLASH,
+  FRENZY_AURA_SCALE,
+  TEX_GLOW,
+  TEX_RING,
+  RING_POOL_SIZE,
+  DEPTH_FRENZY_AURA,
   TEX_BOMB,
   TEX_JUICE,
   BOMB_POOL_SIZE,
@@ -104,6 +109,14 @@ export class GameScene extends Phaser.Scene {
   private flashRect!: Phaser.GameObjects.Rectangle;
   private scoreText!: Phaser.GameObjects.Text;
   private infoText!: Phaser.GameObjects.Text; // compte à rebours (mode Chrono uniquement)
+  /** Halo doré collé à la grenade tant qu'elle est en scène. */
+  private frenzyAura!: Phaser.GameObjects.Image;
+  /** Compteur de coups affiché au-dessus de la grenade. */
+  private frenzyCounter!: Phaser.GameObjects.Text;
+  /** Grenade suivie par le halo (null quand il n'y en a pas). */
+  private frenzyGrenade: Fruit | null = null;
+  /** Pool d'ondes de choc (effets de la grenade). */
+  private rings!: Phaser.GameObjects.Group;
   private lifeCrosses: Phaser.GameObjects.Text[] = []; // strikes (mode Classique)
   /** Nb de croix allumées au dernier rendu — sert à repérer celle qui change. */
   private filledCrosses = 0;
@@ -231,6 +244,7 @@ export class GameScene extends Phaser.Scene {
     this.createUi();
     this.createPopupPool();
     this.createSplatPool();
+    this.createFrenzyEffects();
     this.registerGameEvents();
     this.registerPointerEvents();
 
@@ -246,9 +260,138 @@ export class GameScene extends Phaser.Scene {
       gesture.trail.update(this.time.now);
     }
     this.updateFuseSparks();
+    this.updateFrenzyAura();
     if (this.mode === 'chrono' && !this.gameEnded) {
       this.updateChrono();
     }
+  }
+
+  /**
+   * Prépare les effets réservés à la grenade : le halo (un seul sprite
+   * repositionné) et le pool d'ondes de choc. Tout est créé une fois ici pour
+   * qu'aucune allocation n'ait lieu au moment de l'action.
+   */
+  private createFrenzyEffects(): void {
+    this.frenzyGrenade = null;
+    this.frenzyAura = this.add
+      .image(0, 0, TEX_GLOW)
+      .setVisible(false)
+      .setDepth(DEPTH_FRENZY_AURA)
+      .setBlendMode(Phaser.BlendModes.ADD);
+
+    // Compteur UNIQUE qui suit la grenade : un popup par coup s'empilait en
+    // un tas illisible, puisque la grenade est presque immobile en frénésie.
+    this.frenzyCounter = this.add
+      .text(0, 0, '', {
+        fontFamily: '"Trebuchet MS", sans-serif',
+        fontSize: '64px',
+        fontStyle: 'bold',
+        color: '#ffd166',
+        stroke: '#7a1020',
+        strokeThickness: 8,
+      })
+      .setOrigin(0.5, 1)
+      .setDepth(50)
+      .setVisible(false);
+
+    this.rings = this.add.group({
+      classType: Phaser.GameObjects.Image,
+      defaultKey: TEX_RING,
+      maxSize: RING_POOL_SIZE,
+    });
+    for (let i = 0; i < RING_POOL_SIZE; i++) {
+      const ring = this.rings.create(0, 0, TEX_RING) as Phaser.GameObjects.Image;
+      ring.setActive(false).setVisible(false);
+    }
+  }
+
+  /**
+   * Colle le halo doré sur la grenade tant qu'elle est en scène. Un seul
+   * sprite réutilisé, repositionné chaque frame : aucune allocation.
+   */
+  private updateFrenzyAura(): void {
+    const grenade = this.frenzyGrenade;
+    if (grenade === null || !grenade.active) {
+      if (this.frenzyAura.visible) {
+        this.hideFrenzyVisuals();
+      }
+      return;
+    }
+    this.frenzyAura.setPosition(grenade.x, grenade.y);
+    this.frenzyCounter.setPosition(grenade.x, grenade.y - grenade.sliceRadius - 14);
+  }
+
+  /** Range halo et compteur (fin de frénésie, grenade manquée, fin de partie). */
+  private hideFrenzyVisuals(): void {
+    this.tweens.killTweensOf(this.frenzyAura);
+    this.tweens.killTweensOf(this.frenzyCounter);
+    this.frenzyAura.setVisible(false);
+    this.frenzyCounter.setVisible(false);
+    this.frenzyGrenade = null;
+  }
+
+  /**
+   * Onde de choc circulaire à un point donné : le vocabulaire visuel réservé
+   * à la grenade. Recyclée depuis un pool ; si le pool est vide on saute
+   * l'effet plutôt que d'allouer en pleine partie.
+   */
+  private spawnRing(x: number, y: number, toScale: number, tint: number, durationMs: number): void {
+    const ring = this.rings.get(x, y) as Phaser.GameObjects.Image | null;
+    if (ring === null) {
+      return;
+    }
+    ring
+      .setActive(true)
+      .setVisible(true)
+      .setPosition(x, y)
+      .setScale(0.15)
+      .setAlpha(0.6)
+      .setTint(tint)
+      .setDepth(DEPTH_JUICE)
+      .setBlendMode(Phaser.BlendModes.ADD);
+    this.tweens.add({
+      targets: ring,
+      scale: toScale,
+      alpha: 0,
+      duration: durationMs,
+      ease: 'Cubic.easeOut',
+      onComplete: () => {
+        ring.setActive(false).setVisible(false);
+      },
+    });
+  }
+
+  /**
+   * La grenade entre en scène : bandeau, halo qui la suit, onde de choc et
+   * pulsation. C'est cette mise en scène — plus que le fruit lui-même — qui
+   * dit au joueur « celui-ci n'est pas comme les autres ».
+   */
+  private onFrenzyIncoming(grenade: Fruit): void {
+    if (this.gameEnded) {
+      return;
+    }
+    this.frenzyGrenade = grenade;
+    this.frenzyAura
+      .setPosition(grenade.x, grenade.y)
+      .setDisplaySize(grenade.sliceRadius * FRENZY_AURA_SCALE, grenade.sliceRadius * FRENZY_AURA_SCALE)
+      .setVisible(true)
+      // Fusion additive : au-delà de ~0,3 le halo sature en blanc et efface
+      // la grenade elle-même, ce qui est exactement l'inverse du but.
+      .setAlpha(0.22);
+    // Le halo respire tant que la grenade est là (tween relancé à chaque
+    // apparition : une seule grenade à la fois, donc pas d'empilement)
+    this.tweens.killTweensOf(this.frenzyAura);
+    this.tweens.add({
+      targets: this.frenzyAura,
+      alpha: 0.44,
+      duration: 420,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+    this.spawnRing(grenade.x, grenade.y, 4.5, 0xffd166, 700);
+    this.showBigBanner('GRENADE !');
+    sfx.crit();
   }
 
   /** Fait crépiter la mèche de chaque bombe en vol (étincelles à son bout). */
@@ -457,6 +600,7 @@ export class GameScene extends Phaser.Scene {
     this.events.on('score-changed', this.onScoreChanged, this);
     this.events.on('lives-changed', this.onLivesChanged, this);
     this.events.on('life-gained', this.onLifeGained, this);
+    this.events.on('frenzy-incoming', this.onFrenzyIncoming, this);
     this.events.on('fruit-missed', this.onFruitMissed, this);
     this.events.on('game-over', this.onLivesDepleted, this);
 
@@ -466,6 +610,7 @@ export class GameScene extends Phaser.Scene {
       this.events.off('score-changed', this.onScoreChanged, this);
       this.events.off('lives-changed', this.onLivesChanged, this);
       this.events.off('life-gained', this.onLifeGained, this);
+      this.events.off('frenzy-incoming', this.onFrenzyIncoming, this);
       this.events.off('fruit-missed', this.onFruitMissed, this);
       this.events.off('game-over', this.onLivesDepleted, this);
     });
@@ -621,8 +766,11 @@ export class GameScene extends Phaser.Scene {
       grenade.startFrenzy(FRENZY_FLOAT_VELOCITY_Y);
       grenade.lastSlashAt = now;
       grenade.slashCount = 1;
-      this.showBigBanner('GRENADE !');
+      // Pas de bandeau ici : il masquerait la grenade au moment précis où le
+      // joueur doit la voir. Le compteur qui s'allume suffit à dire « vas-y ».
+      this.frenzyCounter.setText('x1').setVisible(true).setScale(1);
       sfx.crit();
+      this.spawnRing(grenade.x, grenade.y, 5, 0xffffff, 500);
       // Fin de frénésie programmée : un seul timer, quoi qu'il arrive
       this.time.delayedCall(FRENZY_DURATION_MS, () => this.explodeGrenade(grenade));
       return;
@@ -633,11 +781,33 @@ export class GameScene extends Phaser.Scene {
     grenade.lastSlashAt = now;
     grenade.slashCount += 1;
 
-    // Retour immédiat à chaque coup : jus, son et compteur qui grimpe
+    // Retour immédiat à chaque coup : jus, onde, sursaut et compteur qui grimpe
     this.juiceEmitter.setParticleTint(grenade.juiceColor);
     this.juiceEmitter.emitParticleAt(grenade.x, grenade.y, JUICE_PARTICLE_COUNT);
+    this.spawnRing(grenade.x, grenade.y, 2.6, 0xff8fa3, 320);
     sfx.slice();
-    this.showPopup(grenade.x, grenade.y - 30, `x${grenade.slashCount}`, '#ff5c78', 44);
+
+    // Sursaut du fruit : il encaisse visiblement. La pulsation permanente est
+    // un tween sur `scale`, donc on secoue l'ANGLE pour ne pas les faire
+    // lutter l'un contre l'autre.
+    this.tweens.add({
+      targets: grenade,
+      angle: grenade.angle + Phaser.Math.Between(-16, 16),
+      duration: 90,
+      yoyo: true,
+      ease: 'Sine.easeOut',
+    });
+    this.cameras.main.shake(70, 0.003);
+
+    // Le compteur enfle à chaque coup : la montée se voit sans encombrer
+    this.frenzyCounter.setText(`x${grenade.slashCount}`).setVisible(true).setScale(1.35);
+    this.tweens.killTweensOf(this.frenzyCounter);
+    this.tweens.add({
+      targets: this.frenzyCounter,
+      scale: 1,
+      duration: 130,
+      ease: 'Back.easeOut',
+    });
   }
 
   /**
@@ -663,9 +833,13 @@ export class GameScene extends Phaser.Scene {
     this.juiceEmitter.emitParticleAt(grenade.x, grenade.y, JUICE_PARTICLE_COUNT * 5);
     this.spawnSplat(grenade.x, grenade.y, grenade.juiceColor);
     this.cameras.main.shake(260, 0.008);
+    // Double onde : une rapide et serrée, une lente et large — le souffle
+    this.spawnRing(grenade.x, grenade.y, 6, 0xffffff, 380);
+    this.spawnRing(grenade.x, grenade.y, 12, 0xff5c78, 750);
     sfx.crit();
     this.showBigBanner(`${slashes} COUPS !\n+${awarded}`);
 
+    this.hideFrenzyVisuals();
     grenade.kill();
 
     // Souffle : tous les fruits en vol sont tranchés dans la foulée

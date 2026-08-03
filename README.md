@@ -120,12 +120,17 @@ Choix techniques notables :
   toutes les 10 → 5 salves de fruits — et jamais dans une grappe, qui est
   faite pour être coupée d'un seul geste. Mesuré : 0,8 → 2,4 fruits/s sur
   quatre minutes en Classique, montée plus vive en Chrono (sprint de 60 s).
-- **Grenade de frénésie** : à des paliers de score, une grenade se fige en l'air
-  à la première coupe ; chaque coup supplémentaire compte (borné par un temps
-  de garde) puis elle éclate, rapporte un point par coup et emporte tous les
-  fruits en vol. **Le spawn est suspendu tant qu'elle est en scène** : la
-  frénésie est un moment à elle. La suspension est déduite de la présence de la
-  grenade (et non d'un drapeau), donc elle se libère toute seule.
+- **Grenade de frénésie** : à des paliers de score, une grenade **entre par un
+  bord de l'écran** et le traverse en arc (~2 s) — une trajectoire à part qui la
+  signale avant même qu'on l'identifie. Elle se fige en l'air à la première
+  coupe ; chaque coup supplémentaire compte (borné par un temps de garde) puis
+  elle éclate, rapporte un point par coup et emporte tous les fruits en vol.
+  **Le spawn est suspendu tant qu'elle est en scène** : la frénésie est un
+  moment à elle. La suspension est déduite de la présence de la grenade (et non
+  d'un drapeau), donc elle se libère toute seule.
+  Mise en scène dédiée : halo qui respire et la suit, ondes de choc à chaque
+  coup (pool d'images recyclées), sursaut d'angle, et un compteur unique
+  au-dessus d'elle — un popup par coup s'empilait en un tas illisible.
 - **Vie regagnée par paliers de score** : une croix de strike s'efface tous les
   1000 points ; si les trois vies sont intactes, le palier rapporte des points.
 - **Feedback systématique** : particules de jus teintées, textes flottants

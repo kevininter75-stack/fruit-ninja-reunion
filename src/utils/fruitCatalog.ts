@@ -26,22 +26,22 @@ export interface FruitVariety {
 }
 
 export const FRUIT_VARIETIES: FruitVariety[] = [
-  { key: 'litchi', displayName: 'Letchi', radius: 50, skinColor: 0xd93b52, juiceColor: 0xf2b8c6, fleshColor: 0xfbe6d4, weight: 16 },
-  { key: 'ananas_victoria', displayName: 'Ananas Victoria', radius: 66, skinColor: 0xe8a417, juiceColor: 0xffd75e, fleshColor: 0xffe07a, weight: 10 },
-  { key: 'mangue_jose', displayName: 'Mangue José', radius: 64, skinColor: 0xf08a20, juiceColor: 0xffb347, fleshColor: 0xffc35e, weight: 12 },
-  { key: 'fruit_de_la_passion', displayName: 'Fruit de la passion', radius: 53, skinColor: 0x6b3576, juiceColor: 0xffc93c, fleshColor: 0xffc93c, weight: 12 },
-  { key: 'papaye', displayName: 'Papaye', radius: 66, skinColor: 0xf0a13c, juiceColor: 0xff8c42, fleshColor: 0xff8f4a, weight: 10 },
-  { key: 'corossol', displayName: 'Corossol', radius: 64, skinColor: 0x74a94e, juiceColor: 0xf5f0e6, fleshColor: 0xf7f3ea, weight: 8 },
-  { key: 'longane', displayName: 'Longane', radius: 44, skinColor: 0xc09262, juiceColor: 0xf0e6d2, fleshColor: 0xf5eedd, weight: 12 },
-  { key: 'jacque', displayName: 'Jacque', radius: 70, skinColor: 0xb0bf46, juiceColor: 0xffd75e, fleshColor: 0xf5cf4a, weight: 6 },
-  { key: 'carambole', displayName: 'Carambole', radius: 60, skinColor: 0xf2cf3f, juiceColor: 0xfdf0a0, fleshColor: 0xfdf6c9, weight: 12 },
+  { key: 'litchi', displayName: 'Letchi', radius: 60, skinColor: 0xd93b52, juiceColor: 0xf2b8c6, fleshColor: 0xfbe6d4, weight: 16 },
+  { key: 'ananas_victoria', displayName: 'Ananas Victoria', radius: 79, skinColor: 0xe8a417, juiceColor: 0xffd75e, fleshColor: 0xffe07a, weight: 10 },
+  { key: 'mangue_jose', displayName: 'Mangue José', radius: 77, skinColor: 0xf08a20, juiceColor: 0xffb347, fleshColor: 0xffc35e, weight: 12 },
+  { key: 'fruit_de_la_passion', displayName: 'Fruit de la passion', radius: 64, skinColor: 0x6b3576, juiceColor: 0xffc93c, fleshColor: 0xffc93c, weight: 12 },
+  { key: 'papaye', displayName: 'Papaye', radius: 79, skinColor: 0xf0a13c, juiceColor: 0xff8c42, fleshColor: 0xff8f4a, weight: 10 },
+  { key: 'corossol', displayName: 'Corossol', radius: 77, skinColor: 0x74a94e, juiceColor: 0xf5f0e6, fleshColor: 0xf7f3ea, weight: 8 },
+  { key: 'longane', displayName: 'Longane', radius: 53, skinColor: 0xc09262, juiceColor: 0xf0e6d2, fleshColor: 0xf5eedd, weight: 12 },
+  { key: 'jacque', displayName: 'Jacque', radius: 84, skinColor: 0xb0bf46, juiceColor: 0xffd75e, fleshColor: 0xf5cf4a, weight: 6 },
+  { key: 'carambole', displayName: 'Carambole', radius: 72, skinColor: 0xf2cf3f, juiceColor: 0xfdf0a0, fleshColor: 0xfdf6c9, weight: 12 },
 ];
 
 /** Fruit bonus : le combava doré déclenche un score x2 temporaire. */
 export const BONUS_VARIETY: FruitVariety = {
   key: 'combava_bonus',
   displayName: 'Combava doré',
-  radius: 55,
+  radius: 66,
   skinColor: 0xf5c518,
   juiceColor: 0xffe680,
   fleshColor: 0xfff2b3,
@@ -56,7 +56,7 @@ export const BONUS_VARIETY: FruitVariety = {
 export const FRENZY_VARIETY: FruitVariety = {
   key: 'grenade',
   displayName: 'Grenade',
-  radius: 58,
+  radius: 70,
   skinColor: 0xb5243b,
   juiceColor: 0xd63b52,
   fleshColor: 0xe8455f,

@@ -33,6 +33,8 @@ import {
   BONUS_SAFE_TIME_MS,
   FRENZY_SCORE_STEP,
   FRENZY_SAFE_TIME_MS,
+  FRENZY_APEX_FRACTION,
+  FRENZY_CROSS_FACTOR,
 } from '../utils/constants';
 import { pickRandomVariety, BONUS_VARIETY, FRENZY_VARIETY } from '../utils/fruitCatalog';
 
@@ -328,10 +330,31 @@ export class SpawnManager {
       return; // pool plein : on retentera à la salve suivante, palier conservé
     }
     this.nextFrenzyAt += FRENZY_SCORE_STEP;
-    const p = this.computeLaunch();
+    const p = this.computeSideLaunch();
     grenade.launchAs(FRENZY_VARIETY, false, p.x, p.y, p.velocityX, p.velocityY, true);
     sfx.launch();
-    this.scene.events.emit('frenzy-incoming');
+    this.scene.events.emit('frenzy-incoming', grenade);
+  }
+
+  /**
+   * Lancement latéral, réservé à la grenade : elle entre par un BORD de
+   * l'écran et le traverse en arc, au lieu de jaillir du bas comme tout le
+   * monde. Cette trajectoire à part est le premier signal que ce fruit n'est
+   * pas un fruit ordinaire — on la repère avant même de l'avoir identifiée.
+   */
+  private computeSideLaunch(): LaunchParams {
+    const width = this.scene.scale.width;
+    const height = this.scene.scale.height;
+    const p = this.launchParams;
+    const fromLeft = Math.random() < 0.5;
+
+    p.x = fromLeft ? -FRENZY_VARIETY.radius : width + FRENZY_VARIETY.radius;
+    p.y = height * Phaser.Math.FloatBetween(0.64, 0.78);
+    // Arc ample : elle monte franchement puis redescend, ce qui lui donne
+    // près de deux secondes de présence utile à l'écran.
+    p.velocityY = -Math.sqrt(2 * GRAVITY_Y * FRENZY_APEX_FRACTION * height);
+    p.velocityX = (fromLeft ? 1 : -1) * width * FRENZY_CROSS_FACTOR;
+    return p;
   }
 
   /** Vrai tant qu'une grenade de frénésie est en jeu (parcours du pool). */

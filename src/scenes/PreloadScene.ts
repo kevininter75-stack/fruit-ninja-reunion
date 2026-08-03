@@ -12,6 +12,7 @@ import {
   TEX_GLOW,
   TEX_CLOUD,
   TEX_VIGNETTE,
+  TEX_RING,
   SUN_FRAC_X,
   SUN_FRAC_Y,
 } from '../utils/constants';
@@ -56,7 +57,29 @@ export class PreloadScene extends Phaser.Scene {
     this.createGlowTexture();
     this.createCloudTexture();
     this.createVignetteTexture();
+    this.createRingTexture();
     this.scene.start('MenuScene');
+  }
+
+  /** Onde de choc : anneau clair à bord fondu, agrandi puis effacé en tween. */
+  private createRingTexture(): void {
+    const size = 256;
+    const c = size / 2;
+    const tex = this.textures.createCanvas(TEX_RING, size, size);
+    if (tex === null) {
+      return;
+    }
+    const ctx = tex.getContext();
+    // Dégradé radial resserré sur le bord : un trait net donnerait un cercle
+    // de géométrie, pas une onde.
+    const g = ctx.createRadialGradient(c, c, size * 0.3, c, c, size * 0.5);
+    g.addColorStop(0, 'rgba(255, 255, 255, 0)');
+    g.addColorStop(0.72, 'rgba(255, 255, 255, 0.85)');
+    g.addColorStop(0.86, 'rgba(255, 255, 255, 0.5)');
+    g.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
+    tex.refresh();
   }
 
   /** Vignettage : cadre radial sombre (transparent au centre, sombre aux bords). */

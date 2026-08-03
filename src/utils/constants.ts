@@ -74,7 +74,9 @@ export const BOMB_DOUBLE_INTENSITY = 0.8; // au-delà, une salve peut porter 2 b
 // design offert au joueur, plus un coup de chance. Jamais de bombe dedans :
 // une grappe invite au grand geste, y cacher une bombe serait un piège.
 export const CLUSTER_MIN_INTENSITY = 0.35;
-export const CLUSTER_SPREAD_PX = 96; // écart horizontal entre deux fruits de grappe
+// Écart supérieur au diamètre d'un gros fruit : sinon la grappe se chevauche
+// et ne se lit plus comme une rangée à trancher.
+export const CLUSTER_SPREAD_PX = 125; // écart horizontal entre deux fruits de grappe
 export const CLUSTER_STAGGER_MS = 45; // départs très rapprochés
 
 // Vie regagnée tous les N points (façon « extra life » de Fruit Ninja) :
@@ -96,6 +98,15 @@ export const FRENZY_DURATION_MS = 4000; // durée de la frénésie une fois amor
 export const FRENZY_HIT_COOLDOWN_MS = 70; // borne le compteur (~14 coups/s max)
 export const FRENZY_POINTS_PER_SLASH = 5;
 export const FRENZY_FLOAT_VELOCITY_Y = -40; // remontée lente pendant la frénésie
+// Entrée latérale : la grenade traverse l'écran depuis un bord, en arc.
+export const FRENZY_APEX_FRACTION = 0.55; // hauteur de l'arc, en fraction d'écran
+export const FRENZY_CROSS_FACTOR = 0.14; // vitesse de traversée, en fraction de largeur
+
+// Halo et ondes de choc : le vocabulaire visuel réservé à la grenade
+export const TEX_RING = 'ring';
+export const RING_POOL_SIZE = 8;
+export const DEPTH_FRENZY_AURA = 4; // sous les moitiés (5) et les fruits (6)
+export const FRENZY_AURA_SCALE = 2.8; // taille du halo, en multiples du rayon
 
 // Découpe
 export const SLICE_BUFFER_SIZE = 12; // nb max de points conservés pour la traînée
@@ -104,7 +115,7 @@ export const SLICE_MIN_SPEED = 0.35; // vitesse min du geste (px/ms) pour qu'une
 export const TRAIL_MAX_HALF_WIDTH = 9; // demi-largeur du ruban de lame à la pointe (px)
 
 // Fruits
-export const FRUIT_RADIUS = 52; // rayon du placeholder et du cercle de collision
+export const FRUIT_RADIUS = 62; // rayon du placeholder et du cercle de collision
 export const HALF_LIFETIME_MS = 1000; // durée avant disparition des moitiés coupées
 export const FRUIT_POOL_SIZE = 24;
 export const HALF_POOL_SIZE = 48;
@@ -131,7 +142,7 @@ export type GameOverReason = 'lives' | 'bomb' | 'time';
 
 // Bombes
 export const TEX_BOMB = 'bomb';
-export const BOMB_RADIUS = 54;
+export const BOMB_RADIUS = 64; // suit l'agrandissement des fruits (×1,2)
 export const BOMB_POOL_SIZE = 8;
 export const BOMB_SAFE_TIME_MS = 5000; // aucune bombe dans les premières secondes
 export const BOMB_GAMEOVER_DELAY_MS = 700; // durée du flash avant l'écran de fin
