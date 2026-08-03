@@ -20,6 +20,12 @@ import {
   STARTING_LIVES,
   FRENZY_ZONE_TOP,
   FRENZY_ZONE_BOTTOM,
+  FRENZY_ZOOM,
+  FRENZY_ZOOM_MS,
+  FRENZY_PAN_RATIO,
+  FRENZY_HIT_PUNCH,
+  COMBO_PUNCH_ZOOM,
+  COMBO_PUNCH_MS,
   FRENZY_SETTLE_MARGIN,
   FRENZY_BOB_PX,
   FRENZY_DURATION_MS,
@@ -123,6 +129,8 @@ export class GameScene extends Phaser.Scene {
   private lifeCrosses: Phaser.GameObjects.Text[] = []; // strikes (mode Classique)
   /** Nb de croix allumées au dernier rendu — sert à repérer celle qui change. */
   private filledCrosses = 0;
+  /** Éléments du HUD, estompés pendant la frénésie (cf. setHudDimmed). */
+  private hudElements: Array<Phaser.GameObjects.GameObject & { alpha: number }> = [];
   private multiplierBanner!: Phaser.GameObjects.Text;
   private multiplierTimer: Phaser.Time.TimerEvent | null = null;
   private popupPool: Phaser.GameObjects.Text[] = [];
@@ -343,6 +351,11 @@ export class GameScene extends Phaser.Scene {
     this.frenzyAura.setVisible(false);
     this.frenzyCounter.setVisible(false);
     this.frenzyGrenade = null;
+    // Surtout pas de dézoom si la partie s'achève : le drame de la bombe a
+    // son propre zoom, qu'on écraserait.
+    if (!this.gameEnded) {
+      this.exitFrenzyZoom();
+    }
   }
 
   /**
@@ -445,8 +458,13 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createUi(): void {
+    // Le HUD est collecté au fur et à mesure : il est collé aux bords, donc
+    // le moindre zoom caméra le rogne. On l'estompe pendant la frénésie
+    // (cf. setHudDimmed) — un HUD à moitié coupé passerait pour un défaut.
+    this.hudElements = [];
+
     // Cartouche + score (HUD "produit fini")
-    addHudPanel(this, 14, 12, 250, 54);
+    this.hudElements.push(addHudPanel(this, 14, 12, 250, 54));
     this.scoreText = this.add
       .text(34, 22, 'Score : 0', {
         fontFamily: '"Trebuchet MS", sans-serif',
@@ -457,6 +475,7 @@ export class GameScene extends Phaser.Scene {
         strokeThickness: 6,
       })
       .setDepth(50);
+    this.hudElements.push(this.scoreText);
 
     // Bannière x2 sous le score, cachée par défaut, clignote quand active
     this.multiplierBanner = this.add
@@ -480,10 +499,11 @@ export class GameScene extends Phaser.Scene {
 
     const w = this.scale.width;
     if (this.mode === 'classic') {
-      addHudPanel(this, w - 14 - 190, 12, 190, 54);
+      this.hudElements.push(addHudPanel(this, w - 14 - 190, 12, 190, 54));
       this.createLifeCrosses();
+      this.hudElements.push(...this.lifeCrosses);
     } else {
-      addHudPanel(this, w - 14 - 150, 12, 150, 54);
+      this.hudElements.push(addHudPanel(this, w - 14 - 150, 12, 150, 54));
       this.infoText = this.add
         .text(w - 32, 22, '60 s', {
           fontFamily: '"Trebuchet MS", sans-serif',
@@ -495,9 +515,39 @@ export class GameScene extends Phaser.Scene {
         })
         .setOrigin(1, 0)
         .setDepth(50);
+      this.hudElements.push(this.infoText);
     }
 
     createMuteButton(this, 52, this.scale.height - 52);
+  }
+
+  /**
+   * Estompe (ou rétablit) le HUD. Utilisé pendant la frénésie : la caméra
+   * zoome, or le HUD est ancré aux bords et se retrouverait tronqué. Le
+   * masquer est aussi cohérent côté jeu — plus aucun fruit n'apparaît
+   * pendant la frénésie, donc ni le score ni les vies n'y sont actionnables.
+   */
+  private setHudDimmed(dimmed: boolean): void {
+    for (const element of this.hudElements) {
+      this.tweens.killTweensOf(element);
+      this.tweens.add({
+        targets: element,
+        alpha: dimmed ? 0 : 1,
+        duration: 220,
+        ease: 'Sine.easeOut',
+        // Les croix éteintes ont leur propre opacité (0,5) : on la rétablit
+        // une fois le HUD revenu, sinon elles paraîtraient toutes allumées.
+        onComplete: dimmed ? undefined : () => this.syncLifeCrossStyles(),
+      });
+    }
+  }
+
+  /** Applique couleur et opacité des croix selon les vies restantes. */
+  private syncLifeCrossStyles(): void {
+    for (let i = 0; i < this.lifeCrosses.length; i++) {
+      const isFilled = i < this.filledCrosses;
+      this.lifeCrosses[i].setColor(isFilled ? '#ff3b3b' : '#55697a').setAlpha(isFilled ? 1 : 0.5);
+    }
   }
 
   /**
@@ -646,10 +696,13 @@ export class GameScene extends Phaser.Scene {
       gesture.pointerId = pointer.id;
       gesture.comboCount = 0; // nouveau geste : le combo par swipe repart de zéro
       gesture.trail.clear();
-      gesture.lastX = pointer.x;
-      gesture.lastY = pointer.y;
+      // worldX/worldY (et non x/y) : la caméra zoome pendant la frénésie et le
+      // drame de la bombe. En espace écran, le doigt ne coïnciderait plus avec
+      // les fruits dès que le zoom n'est pas à 1.
+      gesture.lastX = pointer.worldX;
+      gesture.lastY = pointer.worldY;
       gesture.lastTime = this.time.now;
-      gesture.trail.addPoint(pointer.x, pointer.y, this.time.now);
+      gesture.trail.addPoint(pointer.worldX, pointer.worldY, this.time.now);
     });
 
     this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
@@ -687,35 +740,39 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     const now = this.time.now;
-    const distance = Phaser.Math.Distance.Between(gesture.lastX, gesture.lastY, pointer.x, pointer.y);
+    // Tout le geste est raisonné en coordonnées MONDE : fruits, traînée et
+    // segment de coupe partagent ainsi le même repère, zoom caméra compris.
+    const px = pointer.worldX;
+    const py = pointer.worldY;
+    const distance = Phaser.Math.Distance.Between(gesture.lastX, gesture.lastY, px, py);
     const elapsed = Math.max(now - gesture.lastTime, 1);
     const speed = distance / elapsed; // px par ms
 
-    gesture.trail.addPoint(pointer.x, pointer.y, now);
+    gesture.trail.addPoint(px, py, now);
 
     if (speed >= SLICE_MIN_SPEED) {
       // Angle du geste : les moitiés s'écarteront perpendiculairement à lui
-      const sliceAngle = Math.atan2(pointer.y - gesture.lastY, pointer.x - gesture.lastX);
+      const sliceAngle = Math.atan2(py - gesture.lastY, px - gesture.lastX);
       this.sliceDetector.checkSegment<Fruit>(
         gesture.lastX,
         gesture.lastY,
-        pointer.x,
-        pointer.y,
+        px,
+        py,
         this.fruits,
         (fruit) => this.onFruitSliced(fruit, gesture, now, sliceAngle)
       );
       this.sliceDetector.checkSegment<Bomb>(
         gesture.lastX,
         gesture.lastY,
-        pointer.x,
-        pointer.y,
+        px,
+        py,
         this.bombs,
         (bomb) => this.onBombSliced(bomb)
       );
     }
 
-    gesture.lastX = pointer.x;
-    gesture.lastY = pointer.y;
+    gesture.lastX = px;
+    gesture.lastY = py;
     gesture.lastTime = now;
   }
 
@@ -780,6 +837,7 @@ export class GameScene extends Phaser.Scene {
     if (!grenade.frenzyActive) {
       grenade.startFrenzy();
       this.settleGrenade(grenade);
+      this.enterFrenzyZoom(grenade);
       grenade.lastSlashAt = now;
       grenade.slashCount = 1;
       // Pas de bandeau ici : il masquerait la grenade au moment précis où le
@@ -814,6 +872,9 @@ export class GameScene extends Phaser.Scene {
       ease: 'Sine.easeOut',
     });
     this.cameras.main.shake(70, 0.003);
+    // Respiration de caméra à chaque coup : le zoom « pompe » au rythme des
+    // frappes, ce qui donne son énergie à la séquence.
+    this.cameraPunch(FRENZY_HIT_PUNCH, 80);
 
     // Le compteur enfle à chaque coup : la montée se voit sans encombrer
     this.frenzyCounter.setText(`x${grenade.slashCount}`).setVisible(true).setScale(1.35);
@@ -823,6 +884,48 @@ export class GameScene extends Phaser.Scene {
       scale: 1,
       duration: 130,
       ease: 'Back.easeOut',
+    });
+  }
+
+  /**
+   * Resserre la caméra sur la grenade pour la durée de la frénésie.
+   *
+   * Le recentrage n'est que PARTIEL (FRENZY_PAN_RATIO) : viser la grenade en
+   * plein centre sortirait le HUD du cadre quand elle est près d'un bord.
+   * Le geste de coupe raisonne en coordonnées monde, donc le zoom ne décale
+   * pas le doigt (cf. handleSliceMove).
+   */
+  private enterFrenzyZoom(grenade: Fruit): void {
+    const cam = this.cameras.main;
+    const cibleX = this.scale.width / 2 + (grenade.x - this.scale.width / 2) * FRENZY_PAN_RATIO;
+    const cibleY = this.scale.height / 2 + (grenade.y - this.scale.height / 2) * FRENZY_PAN_RATIO;
+    cam.zoomTo(FRENZY_ZOOM, FRENZY_ZOOM_MS, 'Sine.easeOut');
+    cam.pan(cibleX, cibleY, FRENZY_ZOOM_MS, 'Sine.easeOut');
+    this.setHudDimmed(true);
+  }
+
+  /** Rend la caméra à son cadrage normal (fin de frénésie). */
+  private exitFrenzyZoom(): void {
+    const cam = this.cameras.main;
+    cam.zoomTo(1, FRENZY_ZOOM_MS, 'Sine.easeInOut');
+    cam.pan(this.scale.width / 2, this.scale.height / 2, FRENZY_ZOOM_MS, 'Sine.easeInOut');
+    this.setHudDimmed(false);
+  }
+
+  /**
+   * Brève pulsation de zoom : la caméra « respire » sur un temps fort, puis
+   * revient au zoom de référence — celui de la frénésie s'il est en cours,
+   * sinon 1. Sans cette lecture du contexte, un combo pendant la frénésie
+   * annulerait le resserrement.
+   */
+  private cameraPunch(force: number, dureeMs: number): void {
+    const cam = this.cameras.main;
+    const repos = this.frenzyGrenade !== null ? FRENZY_ZOOM : 1;
+    cam.zoomTo(repos * force, dureeMs, 'Sine.easeOut');
+    this.time.delayedCall(dureeMs, () => {
+      if (this.scene.isActive()) {
+        cam.zoomTo(repos, dureeMs * 1.6, 'Sine.easeInOut');
+      }
     });
   }
 
@@ -932,6 +1035,15 @@ export class GameScene extends Phaser.Scene {
     const awarded = this.scoreManager.addScore(n * GESTURE_COMBO_BONUS);
     this.showBigBanner(`COMBO x${n} !\n+${awarded}`);
     sfx.bigCombo(n);
+
+    // Ponctuation visuelle du combo : la caméra respire, une onde part du
+    // dernier fruit tranché, et la secousse monte avec la taille du combo.
+    this.cameraPunch(COMBO_PUNCH_ZOOM, COMBO_PUNCH_MS);
+    this.spawnRing(gesture.lastX, gesture.lastY, 5 + n, 0xffe066, 520);
+    this.cameras.main.shake(120, 0.002 + Math.min(n, 6) * 0.0008);
+    // Gerbe dorée le long du geste, proportionnée au nombre de fruits
+    this.juiceEmitter.setParticleTint(0xffe066);
+    this.juiceEmitter.emitParticleAt(gesture.lastX, gesture.lastY, JUICE_PARTICLE_COUNT * 2);
   }
 
   /** Bannière centrée éphémère (gros combo) : apparition en "pop" puis fondu. */
@@ -948,10 +1060,12 @@ export class GameScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
       .setDepth(70)
-      .setScale(0.3);
+      .setScale(0.3)
+      .setAngle(Phaser.Math.Between(-7, 7)); // léger décalage : moins figé
     this.tweens.add({
       targets: banner,
       scale: 1,
+      angle: 0,
       duration: 320,
       ease: 'Back.easeOut',
       onComplete: () => {
@@ -1104,15 +1218,11 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     const filled = STARTING_LIVES - Phaser.Math.Clamp(lives, 0, STARTING_LIVES);
-    for (let i = 0; i < this.lifeCrosses.length; i++) {
-      const cross = this.lifeCrosses[i];
-      const isFilled = i < filled;
-      cross.setColor(isFilled ? '#ff3b3b' : '#55697a').setAlpha(isFilled ? 1 : 0.5);
-    }
     // "Pop" sur la croix qui vient de changer d'état : la dernière allumée
     // quand on encaisse un strike, celle qui s'éteint quand on regagne une vie.
     const changedIndex = filled > this.filledCrosses ? filled - 1 : filled;
     this.filledCrosses = filled;
+    this.syncLifeCrossStyles();
     const target = this.lifeCrosses[changedIndex];
     if (target === undefined) {
       return;

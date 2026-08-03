@@ -55,8 +55,15 @@ interface LaunchParams {
  */
 type WaveShape = 'solo' | 'duo' | 'volley' | 'cluster';
 
-/** Poids de tirage des formes de salve, du calme au plein régime. */
-const SHAPE_WEIGHTS_CALM: Record<WaveShape, number> = { solo: 72, duo: 28, volley: 0, cluster: 0 };
+/**
+ * Poids de tirage des formes de salve, du calme au plein régime.
+ * Le profil calme n'est PAS « uniquement des solos » : un début composé d'un
+ * seul fruit répété devient monotone bien avant de devenir difficile. On y
+ * mêle donc des duos, quelques volées et des grappes — la grappe étant même
+ * plus facile qu'un duo (un seul swipe suffit), elle apporte de la variété
+ * sans coûter en difficulté.
+ */
+const SHAPE_WEIGHTS_CALM: Record<WaveShape, number> = { solo: 52, duo: 34, volley: 8, cluster: 6 };
 const SHAPE_WEIGHTS_INTENSE: Record<WaveShape, number> = {
   solo: 6,
   duo: 32,

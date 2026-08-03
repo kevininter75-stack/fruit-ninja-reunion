@@ -38,8 +38,8 @@ export const SPAWN_STAGGER_MIN_MS = 80;
 export const SPAWN_STAGGER_MAX_MS = 150;
 // Courbe d'introduction façon Fruit Ninja :
 // vagues 1-3 : un seul fruit • vagues 4-8 : 1 à 2 fruits • ensuite : salves
-export const SPAWN_GENTLE_WAVES = 3;
-export const SPAWN_WARMUP_WAVES = 8;
+export const SPAWN_GENTLE_WAVES = 2;
+export const SPAWN_WARMUP_WAVES = 5;
 export const BOMB_SAFE_WAVES = 8; // aucune bombe avant la 9e vague
 
 // ------------------------------------------------------------------
@@ -73,7 +73,10 @@ export const BOMB_DOUBLE_INTENSITY = 0.8; // au-delà, une salve peut porter 2 b
 // qu'UN seul swipe puisse tous les trancher. Le combo devient un objectif de
 // design offert au joueur, plus un coup de chance. Jamais de bombe dedans :
 // une grappe invite au grand geste, y cacher une bombe serait un piège.
-export const CLUSTER_MIN_INTENSITY = 0.35;
+// Seuil bas : la grappe est l'un des moments les plus satisfaisants du jeu
+// (un swipe, plusieurs fruits), et elle est plus FACILE qu'une volée. La
+// réserver au milieu de partie privait le début de sa meilleure variété.
+export const CLUSTER_MIN_INTENSITY = 0.08;
 // Écart supérieur au diamètre d'un gros fruit : sinon la grappe se chevauche
 // et ne se lit plus comme une rangée à trancher.
 export const CLUSTER_SPREAD_PX = 125; // écart horizontal entre deux fruits de grappe
@@ -103,6 +106,17 @@ export const FRENZY_ZONE_TOP = 0.28;
 export const FRENZY_ZONE_BOTTOM = 0.68;
 export const FRENZY_SETTLE_MARGIN = 24; // marge au bord, en plus du rayon
 export const FRENZY_BOB_PX = 12; // amplitude du flottement sur place
+// Zoom de frénésie : la caméra se resserre sur la grenade le temps du combo.
+// Volontairement modeste — au-delà, le HUD sort du cadre et on perd de vue
+// le reste de la scène. La caméra ne se recentre qu'à MOITIÉ sur la grenade
+// pour la même raison.
+export const FRENZY_ZOOM = 1.22;
+export const FRENZY_ZOOM_MS = 280;
+export const FRENZY_PAN_RATIO = 0.5;
+// Petites pulsations de caméra qui ponctuent l'action
+export const COMBO_PUNCH_ZOOM = 1.06; // à la célébration d'un combo de swipe
+export const COMBO_PUNCH_MS = 130;
+export const FRENZY_HIT_PUNCH = 1.03; // à chaque coup porté à la grenade
 // Entrée latérale : la grenade traverse l'écran depuis un bord, en arc.
 export const FRENZY_APEX_FRACTION = 0.55; // hauteur de l'arc, en fraction d'écran
 export const FRENZY_CROSS_FACTOR = 0.14; // vitesse de traversée, en fraction de largeur
