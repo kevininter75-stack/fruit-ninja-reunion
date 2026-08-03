@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>Planche de contrôle des fruits</title>
+    <style>
+      body {
+        margin: 0;
+        background: #14425c;
+        font-family: 'Trebuchet MS', sans-serif;
+        color: #fff;
+      }
+      #sheet { display: block; }
+    </style>
+  </head>
+  <body>
+    <canvas id="sheet"></canvas>
+    <script type="module">
+      import { FRUIT_VARIETIES, BONUS_VARIETY } from '/src/utils/fruitCatalog.ts';
+      import { paintWhole, paintCut } from '/src/utils/fruitArt.ts';
+
+      // Reproduit exactement ce que fait PreloadScene.createVarietyTextures
+      function renderVariant(variety, variant) {
+        const size = variety.radius * 2 + 64;
+        const cv = document.createElement('canvas');
+        cv.width = size;
+        cv.height = size;
+        const ctx = cv.getContext('2d');
+        ctx.save();
+        if (variant === 'left') {
+          ctx.beginPath();
+          ctx.rect(0, 0, size / 2, size);
+          ctx.clip();
+        } else if (variant === 'right') {
+          ctx.beginPath();
+          ctx.rect(size / 2, 0, size / 2, size);
+          ctx.clip();
+        }
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+        ctx.shadowBlur = 13;
+        paintWhole(ctx, variety, size);
+        if (variant !== 'whole') {
+          paintCut(ctx, variety, size, variant);
+        }
+        ctx.restore();
+        return cv;
+      }
+
+      const all = [...FRUIT_VARIETIES, BONUS_VARIETY];
+      const CELL = 210;
+      const ROW = CELL + 46;
+      const sheet = document.getElementById('sheet');
+      sheet.width = CELL * 3 + 40;
+      sheet.height = ROW * all.length + 20;
+      const ctx = sheet.getContext('2d');
+
+      // Fond assombri comme en partie, pour juger le contraste réel
+      ctx.fillStyle = '#123c52';
+      ctx.fillRect(0, 0, sheet.width, sheet.height);
+
+      all.forEach((variety, row) => {
+        const y = 20 + row * ROW;
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 22px "Trebuchet MS", sans-serif';
+        ctx.fillText(variety.displayName, 20, y + 8);
+        ['whole', 'left', 'right'].forEach((variant, col) => {
+          const cv = renderVariant(variety, variant);
+          const x = 20 + col * CELL + (CELL - cv.width) / 2;
+          ctx.drawImage(cv, x, y + 18);
+        });
+      });
+      document.title = 'PRET';
+    </script>
+  </body>
+</html>

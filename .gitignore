@@ -3,3 +3,6 @@ dist/
 *.log
 .DS_Store
 .vite/
+
+# fichier temporaire de message de commit
+.commitmsg.txt

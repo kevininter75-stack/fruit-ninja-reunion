@@ -15,6 +15,8 @@ export interface FruitVariety {
   displayName: string;
   /** Rayon du cercle de collision et base du dessin. */
   radius: number;
+  /** Couleur dominante de la peau (base du dégradé de volume). */
+  skinColor: number;
   /** Couleur des particules de jus. */
   juiceColor: number;
   /** Couleur de la chair visible sur la tranche des moitiés. */
@@ -24,15 +26,15 @@ export interface FruitVariety {
 }
 
 export const FRUIT_VARIETIES: FruitVariety[] = [
-  { key: 'litchi', displayName: 'Letchi', radius: 50, juiceColor: 0xf2b8c6, fleshColor: 0xfbe6d4, weight: 16 },
-  { key: 'ananas_victoria', displayName: 'Ananas Victoria', radius: 66, juiceColor: 0xffd75e, fleshColor: 0xfff0b3, weight: 10 },
-  { key: 'mangue_jose', displayName: 'Mangue José', radius: 64, juiceColor: 0xffb347, fleshColor: 0xffd08a, weight: 12 },
-  { key: 'fruit_de_la_passion', displayName: 'Fruit de la passion', radius: 53, juiceColor: 0xffc93c, fleshColor: 0xffc93c, weight: 12 },
-  { key: 'papaye', displayName: 'Papaye', radius: 66, juiceColor: 0xff8c42, fleshColor: 0xff9e5e, weight: 10 },
-  { key: 'corossol', displayName: 'Corossol', radius: 64, juiceColor: 0xf5f0e6, fleshColor: 0xf7f3ea, weight: 8 },
-  { key: 'longane', displayName: 'Longane', radius: 44, juiceColor: 0xf0e6d2, fleshColor: 0xf5eedd, weight: 12 },
-  { key: 'jacque', displayName: 'Jacque', radius: 70, juiceColor: 0xffd75e, fleshColor: 0xf7e08a, weight: 6 },
-  { key: 'carambole', displayName: 'Carambole', radius: 60, juiceColor: 0xfdf0a0, fleshColor: 0xfdf6c9, weight: 12 },
+  { key: 'litchi', displayName: 'Letchi', radius: 50, skinColor: 0xd93b52, juiceColor: 0xf2b8c6, fleshColor: 0xfbe6d4, weight: 16 },
+  { key: 'ananas_victoria', displayName: 'Ananas Victoria', radius: 66, skinColor: 0xe8a417, juiceColor: 0xffd75e, fleshColor: 0xffe07a, weight: 10 },
+  { key: 'mangue_jose', displayName: 'Mangue José', radius: 64, skinColor: 0xf08a20, juiceColor: 0xffb347, fleshColor: 0xffc35e, weight: 12 },
+  { key: 'fruit_de_la_passion', displayName: 'Fruit de la passion', radius: 53, skinColor: 0x6b3576, juiceColor: 0xffc93c, fleshColor: 0xffc93c, weight: 12 },
+  { key: 'papaye', displayName: 'Papaye', radius: 66, skinColor: 0xf0a13c, juiceColor: 0xff8c42, fleshColor: 0xff8f4a, weight: 10 },
+  { key: 'corossol', displayName: 'Corossol', radius: 64, skinColor: 0x74a94e, juiceColor: 0xf5f0e6, fleshColor: 0xf7f3ea, weight: 8 },
+  { key: 'longane', displayName: 'Longane', radius: 44, skinColor: 0xc09262, juiceColor: 0xf0e6d2, fleshColor: 0xf5eedd, weight: 12 },
+  { key: 'jacque', displayName: 'Jacque', radius: 70, skinColor: 0xb0bf46, juiceColor: 0xffd75e, fleshColor: 0xf5cf4a, weight: 6 },
+  { key: 'carambole', displayName: 'Carambole', radius: 60, skinColor: 0xf2cf3f, juiceColor: 0xfdf0a0, fleshColor: 0xfdf6c9, weight: 12 },
 ];
 
 /** Fruit bonus : le combava doré déclenche un score x2 temporaire. */
@@ -40,6 +42,7 @@ export const BONUS_VARIETY: FruitVariety = {
   key: 'combava_bonus',
   displayName: 'Combava doré',
   radius: 55,
+  skinColor: 0xf5c518,
   juiceColor: 0xffe680,
   fleshColor: 0xfff2b3,
   weight: 0, // jamais tiré au poids : spawn dédié dans le SpawnManager

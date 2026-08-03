@@ -22,52 +22,7 @@ import {
   wholeTextureKey,
   halfTextureKeys,
 } from '../utils/fruitCatalog';
-
-/** Convertit une couleur hex numérique en chaîne CSS (#rrggbb). */
-function hexToCss(color: number): string {
-  return `#${color.toString(16).padStart(6, '0')}`;
-}
-
-/** Éclaircit (amt > 0) ou assombrit (amt < 0, jusqu'à -1) une couleur hex. */
-function shade(color: number, amt: number): string {
-  const r = (color >> 16) & 0xff;
-  const g = (color >> 8) & 0xff;
-  const b = color & 0xff;
-  const f = (ch: number): number =>
-    Math.max(0, Math.min(255, Math.round(amt >= 0 ? ch + (255 - ch) * amt : ch * (1 + amt))));
-  return `rgb(${f(r)}, ${f(g)}, ${f(b)})`;
-}
-
-/**
- * Dégradé "sphère éclairée" : source lumineuse en haut-gauche, ombre au
- * bord opposé → donne du volume 3D à un aplat. base = couleur hex du fruit.
- */
-function sphereGradient(
-  ctx: CanvasRenderingContext2D,
-  cx: number,
-  cy: number,
-  r: number,
-  base: number
-): CanvasGradient {
-  const g = ctx.createRadialGradient(cx - r * 0.32, cy - r * 0.35, r * 0.1, cx, cy, r * 1.08);
-  g.addColorStop(0, shade(base, 0.5));
-  g.addColorStop(0.55, shade(base, 0.05));
-  g.addColorStop(1, shade(base, -0.42));
-  return g;
-}
-
-/** Reflet brillant (spéculaire) en haut-gauche, pour l'aspect verni. */
-function addGloss(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number): void {
-  const gx = cx - r * 0.34;
-  const gy = cy - r * 0.38;
-  const g = ctx.createRadialGradient(gx, gy, 0, gx, gy, r * 0.5);
-  g.addColorStop(0, 'rgba(255, 255, 255, 0.6)');
-  g.addColorStop(1, 'rgba(255, 255, 255, 0)');
-  ctx.fillStyle = g;
-  ctx.beginPath();
-  ctx.arc(gx, gy, r * 0.5, 0, Math.PI * 2);
-  ctx.fill();
-}
+import { paintWhole, paintCut } from '../utils/fruitArt';
 
 /**
  * Génération des assets placeholder.
@@ -303,9 +258,9 @@ export class PreloadScene extends Phaser.Scene {
   // ------------------------------------------------------------------
 
   private createVarietyTextures(variety: FruitVariety): void {
-    // Marge élargie : place pour feuilles/couronnes ET pour l'ombre portée
-    // douce (halo sombre) qui détache le fruit du décor assombri.
-    const size = variety.radius * 2 + 40;
+    // Marge élargie : place pour feuilles/couronnes/halo ET pour l'ombre
+    // portée douce qui détache le fruit du décor assombri.
+    const size = variety.radius * 2 + 64;
     const variants: Array<'whole' | 'left' | 'right'> = ['whole', 'left', 'right'];
     const halves = halfTextureKeys(variety);
 
@@ -319,6 +274,9 @@ export class PreloadScene extends Phaser.Scene {
       const ctx = texture.getContext();
 
       ctx.save();
+      // Les moitiés sont le MÊME dessin que l'entier, clippé au fil du
+      // couteau : silhouette et motifs restent donc parfaitement cohérents
+      // entre le fruit en vol et ses deux moitiés.
       if (variant === 'left') {
         ctx.beginPath();
         ctx.rect(0, 0, size / 2, size);
@@ -330,286 +288,19 @@ export class PreloadScene extends Phaser.Scene {
       }
       // Ombre portée symétrique (offset 0) : un halo sombre entoure toute la
       // silhouette pour la faire ressortir. Offset nul → l'ombre reste
-      // correcte même quand le sprite tourne en vol. Le gros aplat du corps
-      // du fruit domine le halo ; les détails internes, dessinés par-dessus
-      // leur propre ombre, restent nets.
+      // correcte même quand le sprite tourne en vol. paintWhole la coupe
+      // dès le corps peint, pour que les détails internes restent nets.
       ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
       ctx.shadowBlur = 13;
-      this.drawFruit(ctx, variety, size);
-      ctx.restore();
+      paintWhole(ctx, variety, size);
 
+      // La chair est peinte DANS le clip de la moitié : elle recouvre
+      // l'intérieur de la peau et laisse une bande d'écorce sur le pourtour.
       if (variant !== 'whole') {
-        this.drawCutFace(ctx, variety, size, variant);
+        paintCut(ctx, variety, size, variant);
       }
+      ctx.restore();
       texture.refresh();
-    }
-  }
-
-  /** Chair visible le long de la coupe (+ graines pour passion/papaye). */
-  private drawCutFace(
-    ctx: CanvasRenderingContext2D,
-    variety: FruitVariety,
-    size: number,
-    side: 'left' | 'right'
-  ): void {
-    const stripWidth = 7;
-    const x = side === 'left' ? size / 2 - stripWidth : size / 2;
-    const c = size / 2;
-    const h = (variety.radius - 10) * 2; // un peu plus court que la silhouette
-
-    ctx.fillStyle = hexToCss(variety.fleshColor);
-    ctx.fillRect(x, c - h / 2, stripWidth, h);
-
-    if (variety.key === 'fruit_de_la_passion' || variety.key === 'papaye') {
-      ctx.fillStyle = '#3a2a1e';
-      for (let i = 0; i < 4; i++) {
-        ctx.beginPath();
-        ctx.arc(x + stripWidth / 2, c - h / 2 + (h / 5) * (i + 1), 2.6, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-  }
-
-  /** Dispatch du dessin par variété — chaque fruit a sa silhouette propre. */
-  private drawFruit(ctx: CanvasRenderingContext2D, variety: FruitVariety, size: number): void {
-    const c = size / 2;
-    const r = variety.radius;
-
-    switch (variety.key) {
-      case 'litchi': {
-        // Coque rose-rouge granuleuse, avec volume et reflet verni
-        ctx.fillStyle = sphereGradient(ctx, c, c, r, 0xe0455a);
-        ctx.beginPath();
-        ctx.arc(c, c, r, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = shade(0xe0455a, -0.28);
-        for (let i = 0; i < 12; i++) {
-          const angle = (i / 12) * Math.PI * 2;
-          const rr = r * (i % 2 === 0 ? 0.62 : 0.32);
-          ctx.beginPath();
-          ctx.arc(c + Math.cos(angle) * rr, c + Math.sin(angle) * rr, 3.2, 0, Math.PI * 2);
-          ctx.fill();
-        }
-        addGloss(ctx, c, c, r);
-        break;
-      }
-      case 'ananas_victoria': {
-        // Corps doré quadrillé + couronne verte
-        const ry = r * 0.9;
-        const cy = c + 5;
-        ctx.fillStyle = sphereGradient(ctx, c, cy, ry, 0xf0b429);
-        ctx.beginPath();
-        ctx.ellipse(c, cy, r * 0.72, ry, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.save();
-        ctx.beginPath();
-        ctx.ellipse(c, cy, r * 0.72, ry, 0, 0, Math.PI * 2);
-        ctx.clip();
-        ctx.strokeStyle = 'rgba(150, 105, 20, 0.5)';
-        ctx.lineWidth = 2;
-        for (let d = -size; d < size * 2; d += 15) {
-          ctx.beginPath();
-          ctx.moveTo(d, 0);
-          ctx.lineTo(d + size, size);
-          ctx.stroke();
-          ctx.beginPath();
-          ctx.moveTo(d + size, 0);
-          ctx.lineTo(d, size);
-          ctx.stroke();
-        }
-        ctx.restore();
-        addGloss(ctx, c, cy, ry);
-        // Couronne
-        ctx.fillStyle = '#2e7d4f';
-        const crownBase = cy - ry + 4;
-        for (const [dx, tipDx, tipDy] of [
-          [-18, -26, -16],
-          [-6, -6, -20],
-          [6, 8, -19],
-          [18, 28, -14],
-        ]) {
-          ctx.beginPath();
-          ctx.moveTo(c + dx - 6, crownBase);
-          ctx.lineTo(c + tipDx, crownBase + tipDy);
-          ctx.lineTo(c + dx + 6, crownBase);
-          ctx.closePath();
-          ctx.fill();
-        }
-        break;
-      }
-      case 'mangue_jose': {
-        // Ovale incliné orange avec joue rouge
-        ctx.save();
-        ctx.translate(c, c);
-        ctx.rotate(-0.35);
-        ctx.fillStyle = sphereGradient(ctx, 0, 0, r * 0.8, 0xf28c28);
-        ctx.beginPath();
-        ctx.ellipse(0, 0, r * 0.92, r * 0.68, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.clip();
-        ctx.globalAlpha = 0.7;
-        ctx.fillStyle = '#d94f35';
-        ctx.beginPath();
-        ctx.arc(-r * 0.35, -r * 0.28, r * 0.62, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.globalAlpha = 1;
-        addGloss(ctx, 0, 0, r * 0.8);
-        ctx.restore();
-        break;
-      }
-      case 'fruit_de_la_passion': {
-        // Sphère violette mouchetée, volume + reflet
-        ctx.fillStyle = sphereGradient(ctx, c, c, r, 0x5d3277);
-        ctx.beginPath();
-        ctx.arc(c, c, r, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = shade(0x5d3277, 0.28);
-        for (let i = 0; i < 9; i++) {
-          const angle = (i / 9) * Math.PI * 2 + 0.4;
-          const rr = r * (i % 3 === 0 ? 0.55 : 0.75);
-          ctx.beginPath();
-          ctx.arc(c + Math.cos(angle) * rr, c + Math.sin(angle) * rr, 2.4, 0, Math.PI * 2);
-          ctx.fill();
-        }
-        addGloss(ctx, c, c, r);
-        break;
-      }
-      case 'papaye': {
-        // Grand ovale vertical jaune-orangé strié, avec volume
-        ctx.fillStyle = sphereGradient(ctx, c, c, r * 0.85, 0xffa552);
-        ctx.beginPath();
-        ctx.ellipse(c, c, r * 0.62, r * 0.95, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(240, 192, 74, 0.6)';
-        ctx.lineWidth = 5;
-        for (const dx of [-r * 0.3, 0, r * 0.3]) {
-          ctx.beginPath();
-          ctx.ellipse(c + dx * 0.5, c, Math.max(r * 0.62 - Math.abs(dx), 6), r * 0.9, 0, -0.5, 0.5);
-          ctx.stroke();
-        }
-        addGloss(ctx, c, c, r * 0.85);
-        break;
-      }
-      case 'corossol': {
-        // Ovoïde vert hérissé de picots sombres, avec volume
-        ctx.fillStyle = sphereGradient(ctx, c, c, r * 0.87, 0x6faa4f);
-        ctx.beginPath();
-        ctx.ellipse(c, c, r * 0.8, r * 0.94, 0.2, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.save();
-        ctx.beginPath();
-        ctx.ellipse(c, c, r * 0.8, r * 0.94, 0.2, 0, Math.PI * 2);
-        ctx.clip();
-        ctx.fillStyle = '#4d7d36';
-        for (let row = 0; row < 7; row++) {
-          for (let col = 0; col < 6; col++) {
-            const px = c - r * 0.7 + col * (r * 0.28) + (row % 2) * (r * 0.14);
-            const py = c - r * 0.8 + row * (r * 0.27);
-            ctx.beginPath();
-            ctx.moveTo(px, py);
-            ctx.lineTo(px - 4, py + 8);
-            ctx.lineTo(px + 4, py + 8);
-            ctx.closePath();
-            ctx.fill();
-          }
-        }
-        ctx.restore();
-        break;
-      }
-      case 'longane': {
-        // Petite sphère brun sable, volume + reflet
-        ctx.fillStyle = sphereGradient(ctx, c, c, r, 0xc49a6c);
-        ctx.beginPath();
-        ctx.arc(c, c, r, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = shade(0xc49a6c, -0.22);
-        for (let i = 0; i < 8; i++) {
-          const angle = (i / 8) * Math.PI * 2 + 0.2;
-          ctx.beginPath();
-          ctx.arc(c + Math.cos(angle) * r * 0.55, c + Math.sin(angle) * r * 0.55, 2.6, 0, Math.PI * 2);
-          ctx.fill();
-        }
-        addGloss(ctx, c, c, r);
-        break;
-      }
-      case 'jacque': {
-        // Gros ovoïde vert-jaune à picots denses, avec volume
-        ctx.fillStyle = sphereGradient(ctx, c, c, r * 0.88, 0xa8b545);
-        ctx.beginPath();
-        ctx.ellipse(c, c, r * 0.82, r * 0.95, -0.15, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.save();
-        ctx.beginPath();
-        ctx.ellipse(c, c, r * 0.82, r * 0.95, -0.15, 0, Math.PI * 2);
-        ctx.clip();
-        ctx.fillStyle = '#7f8f2e';
-        for (let row = 0; row < 9; row++) {
-          for (let col = 0; col < 8; col++) {
-            const px = c - r * 0.8 + col * (r * 0.24) + (row % 2) * (r * 0.12);
-            const py = c - r * 0.9 + row * (r * 0.24);
-            ctx.beginPath();
-            ctx.arc(px, py, 2.8, 0, Math.PI * 2);
-            ctx.fill();
-          }
-        }
-        ctx.restore();
-        break;
-      }
-      case 'carambole': {
-        // Étoile à 5 branches — le fruit étoile, avec volume
-        ctx.fillStyle = sphereGradient(ctx, c, c, r, 0xf5d442);
-        ctx.strokeStyle = '#c9a83a';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        for (let i = 0; i < 10; i++) {
-          const angle = (i / 10) * Math.PI * 2 - Math.PI / 2;
-          const rr = i % 2 === 0 ? r : r * 0.52;
-          const px = c + Math.cos(angle) * rr;
-          const py = c + Math.sin(angle) * rr;
-          if (i === 0) {
-            ctx.moveTo(px, py);
-          } else {
-            ctx.lineTo(px, py);
-          }
-        }
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-        addGloss(ctx, c, c, r * 0.7);
-        break;
-      }
-      case 'combava_bonus': {
-        // Combava doré : halo lumineux + peau dorée bosselée
-        const glow = ctx.createRadialGradient(c, c, r * 0.4, c, c, r + 4);
-        glow.addColorStop(0, 'rgba(255, 215, 0, 0.55)');
-        glow.addColorStop(1, 'rgba(255, 215, 0, 0)');
-        ctx.fillStyle = glow;
-        ctx.beginPath();
-        ctx.arc(c, c, r + 4, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = sphereGradient(ctx, c, c, r - 7, 0xffd700);
-        ctx.beginPath();
-        ctx.arc(c, c, r - 7, 0, Math.PI * 2);
-        ctx.fill();
-        // Bosses caractéristiques du combava
-        ctx.fillStyle = '#e6b800';
-        for (let i = 0; i < 10; i++) {
-          const angle = (i / 10) * Math.PI * 2 + 0.3;
-          const rr = (r - 7) * (i % 2 === 0 ? 0.6 : 0.35);
-          ctx.beginPath();
-          ctx.arc(c + Math.cos(angle) * rr, c + Math.sin(angle) * rr, 3.4, 0, Math.PI * 2);
-          ctx.fill();
-        }
-        addGloss(ctx, c, c, r - 7);
-        break;
-      }
-      default: {
-        // Variété inconnue : disque neutre pour ne jamais bloquer
-        ctx.fillStyle = hexToCss(variety.juiceColor);
-        ctx.beginPath();
-        ctx.arc(c, c, r, 0, Math.PI * 2);
-        ctx.fill();
-      }
     }
   }
 

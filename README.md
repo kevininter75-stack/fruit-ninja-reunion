@@ -101,9 +101,17 @@ Choix techniques notables :
   (`systems/MusicManager.ts`) avec ordonnanceur à anticipation. Bouton 🔊/🔇
   persistant.
 - **Catalogue de fruits data-driven** (`utils/fruitCatalog.ts`) : chaque
-  variété définit rayon, couleurs de jus/chair et poids de spawn ; les trois
-  textures par fruit (entier + 2 moitiés) sont dessinées en canvas 2D avec
-  découpe par clipping.
+  variété définit rayon, couleurs de peau/jus/chair et poids de spawn ; les
+  trois textures par fruit (entier + 2 moitiés) sont dessinées en canvas 2D
+  avec découpe par clipping.
+- **Moteur de dessin des fruits** (`utils/fruitArt.ts`) : chaque variété a une
+  silhouette propre (tracé bézier ou contour ondulé), un contour sombre façon
+  dessin animé, des motifs de peau et une **chair détaillée à la coupe**
+  (pépins du fruit de la passion, noyau de la mangue, quartiers du combava).
+  La même fonction de tracé sert au corps, au clipping des motifs, au contour
+  et — rétrécie — à la chair : entier et moitiés ne peuvent pas diverger.
+  Planche de contrôle : `http://localhost:3010/fruits-preview.html` affiche
+  les 10 fruits (entier + 2 moitiés) à taille réelle sur fond de partie.
 - **Feedback systématique** : particules de jus teintées, textes flottants
   (+points, combos) recyclés depuis un pool, flash + secousse caméra sur
   bombe, records persistés en localStorage.
