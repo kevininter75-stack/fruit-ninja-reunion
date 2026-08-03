@@ -118,12 +118,14 @@ Choix techniques notables :
   forme de la salve (`solo` / `duo` / `volley` / `cluster`) et le budget de
   bombes. Les bombes suivent un compteur déterministe façon Fruit Ninja — une
   toutes les 10 → 5 salves de fruits — et jamais dans une grappe, qui est
-  faite pour être coupée d'un seul geste. Mesuré : 0,8 → 2,7 fruits/s sur
-  trois minutes en Classique, plus rapide en Chrono.
+  faite pour être coupée d'un seul geste. Mesuré : 0,8 → 2,4 fruits/s sur
+  quatre minutes en Classique, montée plus vive en Chrono (sprint de 60 s).
 - **Grenade de frénésie** : à des paliers de score, une grenade se fige en l'air
   à la première coupe ; chaque coup supplémentaire compte (borné par un temps
   de garde) puis elle éclate, rapporte un point par coup et emporte tous les
-  fruits en vol.
+  fruits en vol. **Le spawn est suspendu tant qu'elle est en scène** : la
+  frénésie est un moment à elle. La suspension est déduite de la présence de la
+  grenade (et non d'un drapeau), donc elle se libère toute seule.
 - **Vie regagnée par paliers de score** : une croix de strike s'efface tous les
   1000 points ; si les trois vies sont intactes, le palier rapporte des points.
 - **Feedback systématique** : particules de jus teintées, textes flottants

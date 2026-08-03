@@ -13,8 +13,10 @@ export const LANDSCAPE_WIDTH = 1280;
 export const LANDSCAPE_HEIGHT = 720;
 
 // Physique — gravité douce pour un vrai temps de suspension à l'apex
-// (façon Fruit Ninja : le fruit "flotte" un instant, fenêtre de tir confortable)
-export const GRAVITY_Y = 1000;
+// (façon Fruit Ninja : le fruit "flotte" un instant, fenêtre de tir confortable).
+// Pour une hauteur d'apex donnée, la durée de vol varie en 1/√g : baisser la
+// gravité ralentit les fruits SANS changer la hauteur qu'ils atteignent.
+export const GRAVITY_Y = 820;
 
 // Lancement des fruits : la vélocité verticale est calculée à chaque spawn pour
 // que l'apex atteigne cette fraction de la HAUTEUR COURANTE — les arcs s'adaptent
@@ -22,7 +24,7 @@ export const GRAVITY_Y = 1000;
 export const APEX_FRACTION_MIN = 0.72;
 export const APEX_FRACTION_MAX = 0.9;
 // Vélocité horizontale max = cette fraction de la LARGEUR courante (vers le centre).
-export const LAUNCH_VX_FACTOR = 0.23;
+export const LAUNCH_VX_FACTOR = 0.2;
 
 // Spawn
 export const SPAWN_INTERVAL_START_MS = 1400; // intervalle entre deux salves au début
@@ -49,9 +51,9 @@ export const BOMB_SAFE_WAVES = 8; // aucune bombe avant la 9e vague
 // marque peu) et le SCORE (un bon joueur accélère lui-même la montée).
 // L'ancien système par paliers de score sautait d'un cran entier sur un seul
 // coup critique : l'accélération paraissait arbitraire.
-export const INTENSITY_RAMP_MS = 150_000; // Classique : plein régime vers 2 min 30
-export const INTENSITY_RAMP_CHRONO_MS = 40_000; // Chrono (60 s) : montée bien plus vive
-export const INTENSITY_RAMP_SCORE = 2600; // score suffisant pour saturer l'intensité
+export const INTENSITY_RAMP_MS = 260_000; // Classique : plein régime vers 4 min 20
+export const INTENSITY_RAMP_CHRONO_MS = 55_000; // Chrono (60 s) : montée plus vive
+export const INTENSITY_RAMP_SCORE = 4200; // score suffisant pour saturer l'intensité
 
 // Intervalle bruité de ±18 % : sans ça le spawn est un métronome, et l'oreille
 // comme l'œil s'y habituent — le jeu perd toute tension.

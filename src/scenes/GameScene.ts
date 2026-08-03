@@ -646,8 +646,14 @@ export class GameScene extends Phaser.Scene {
    * Les bombes ne sont pas touchées — l'explosion ne doit pas tuer le joueur.
    */
   private explodeGrenade(grenade: Fruit): void {
-    if (this.gameEnded || !grenade.active || !grenade.frenzyActive) {
-      return; // partie finie ou grenade déjà rendue au pool
+    if (!grenade.active || !grenade.frenzyActive) {
+      return; // grenade déjà rendue au pool (manquée, ou partie relancée)
+    }
+    if (this.gameEnded) {
+      // Partie finie pendant la frénésie : on rend la grenade au pool sans
+      // fanfare, sinon elle resterait en scène et gèlerait le spawn.
+      grenade.kill();
+      return;
     }
     const slashes = grenade.slashCount;
     const awarded = this.scoreManager.addScore(slashes * FRENZY_POINTS_PER_SLASH);

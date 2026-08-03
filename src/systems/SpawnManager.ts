@@ -242,6 +242,14 @@ export class SpawnManager {
    * game over annule les lancers encore en attente.
    */
   private spawnWave(): void {
+    // Tant qu'une grenade est en scène, on suspend les lancers : la frénésie
+    // doit être un moment à elle. Continuer à envoyer des fruits par-dessus
+    // rendait la séquence illisible et injustement difficile.
+    // La condition s'auto-libère (grenade explosée ou tombée hors écran), donc
+    // aucun drapeau à réinitialiser : impossible de rester bloqué.
+    if (this.isFrenzyOnStage()) {
+      return;
+    }
     this.waveIndex += 1;
     const shape = this.pickShape();
     const size = this.getWaveSize(shape);
@@ -312,12 +320,8 @@ export class SpawnManager {
       return;
     }
     // Une seule grenade à la fois — deux frénésies simultanées seraient illisibles
-    const children = this.fruits.getChildren();
-    for (let i = 0; i < children.length; i++) {
-      const fruit = children[i] as Fruit;
-      if (fruit.active && fruit.isFrenzy) {
-        return;
-      }
+    if (this.isFrenzyOnStage()) {
+      return;
     }
     const grenade = this.fruits.get() as Fruit | null;
     if (grenade === null) {
@@ -328,6 +332,18 @@ export class SpawnManager {
     grenade.launchAs(FRENZY_VARIETY, false, p.x, p.y, p.velocityX, p.velocityY, true);
     sfx.launch();
     this.scene.events.emit('frenzy-incoming');
+  }
+
+  /** Vrai tant qu'une grenade de frénésie est en jeu (parcours du pool). */
+  private isFrenzyOnStage(): boolean {
+    const children = this.fruits.getChildren();
+    for (let i = 0; i < children.length; i++) {
+      const fruit = children[i] as Fruit;
+      if (fruit.active && fruit.isFrenzy) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private spawnOne(isBomb: boolean, clusterBaseX: number, offsetX: number): void {
