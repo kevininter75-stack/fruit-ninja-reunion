@@ -29,7 +29,6 @@ export class Fruit extends Phaser.Physics.Arcade.Sprite {
   public lastSlashAt = 0;
 
   private variety: FruitVariety | null = null;
-  private pulseTween: Phaser.Tweens.Tween | null = null;
 
   getVariety(): FruitVariety | null {
     return this.variety;
@@ -60,6 +59,11 @@ export class Fruit extends Phaser.Physics.Arcade.Sprite {
     this.setDepth(DEPTH_FRUIT); // au-dessus des taches de jus persistantes
 
     this.enableBody(true, x, y, true, true);
+    // Ceinture et bretelles : un fruit sortant du pool doit toujours retrouver
+    // une physique normale, même si la frénésie précédente s'est mal terminée.
+    const freshBody = this.body as Phaser.Physics.Arcade.Body;
+    freshBody.setAllowGravity(true);
+    freshBody.moves = true;
     this.setVelocity(velocityX, velocityY);
     // Petite rotation continue pour donner de la vie au sprite
     this.setAngularVelocity(Phaser.Math.Between(-160, 160));
@@ -70,7 +74,7 @@ export class Fruit extends Phaser.Physics.Arcade.Sprite {
     // Le combava doré et la grenade pulsent pour attirer l'œil (une allocation
     // par spawn spécial — événement rare, pas de pression GC)
     if (isBonus || isFrenzy) {
-      this.pulseTween = this.scene.tweens.add({
+      this.scene.tweens.add({
         targets: this,
         scale: 1.15,
         duration: 280,
@@ -82,31 +86,42 @@ export class Fruit extends Phaser.Physics.Arcade.Sprite {
   }
 
   /**
-   * Amorce la frénésie de la grenade : elle cesse de retomber et flotte
-   * doucement, le temps que le joueur l'écharpe autant qu'il peut.
-   * La gravité est annulée sur ce corps uniquement (pas sur le monde), donc
-   * les autres fruits continuent leur course normalement.
+   * Amorce la frénésie de la grenade : elle sort de la simulation physique
+   * pour que la scène puisse la placer et la maintenir à un endroit
+   * atteignable pendant toute la frénésie.
+   *
+   * `body.moves = false` est le point clé : sans cela le corps Arcade
+   * continuerait d'intégrer sa vitesse et d'écraser la position à chaque
+   * frame, ce qui rendait la grenade incontrôlable — elle dérivait vers le
+   * haut jusqu'à sortir de l'écran, combo impossible à terminer.
+   * La détection de coupe lit la position du SPRITE (cf. SliceDetector), donc
+   * elle reste parfaitement tranchable une fois le corps figé.
    */
-  startFrenzy(floatVelocityY: number): void {
+  startFrenzy(): void {
     this.frenzyActive = true;
     this.slashCount = 0;
     const body = this.body as Phaser.Physics.Arcade.Body;
     body.setAllowGravity(false);
-    this.setVelocity(0, floatVelocityY);
-    this.setAngularVelocity(90);
+    body.moves = false;
+    this.setVelocity(0, 0);
+    this.setAngularVelocity(0);
+    this.setRotation(0);
   }
 
   /** Désactive le fruit et le rend au pool. */
   kill(): void {
-    if (this.pulseTween !== null) {
-      this.pulseTween.stop();
-      this.pulseTween = null;
-      this.setScale(1);
-    }
-    // La gravité est réactivée pour le prochain occupant du pool
+    // Purge de TOUS les tweens visant ce sprite (pulsation, recadrage et
+    // flottement de la grenade) : un tween survivant continuerait de déplacer
+    // ou de redimensionner le prochain fruit tiré du pool.
+    this.scene.tweens.killTweensOf(this);
+    this.setScale(1);
+    this.setAngle(0);
+    // Gravité ET intégration physique réactivées pour le prochain occupant du
+    // pool : sans ce rétablissement, le fruit suivant resterait figé en l'air.
     const body = this.body as Phaser.Physics.Arcade.Body | null;
     if (body !== null) {
       body.setAllowGravity(true);
+      body.moves = true;
     }
     this.frenzyActive = false;
     this.disableBody(true, true);
@@ -121,6 +136,9 @@ export class Fruit extends Phaser.Physics.Arcade.Sprite {
    */
   preUpdate(time: number, delta: number): void {
     super.preUpdate(time, delta);
+    if (this.frenzyActive) {
+      return; // grenade figée en frénésie : elle ne tombe pas, donc rien à manquer
+    }
     const body = this.body as Phaser.Physics.Arcade.Body;
     if (this.active && body.velocity.y > 0 && this.y > this.scene.scale.height + this.sliceRadius * 2) {
       this.scene.events.emit('fruit-missed', this);

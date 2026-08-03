@@ -97,7 +97,12 @@ export const FRENZY_SAFE_TIME_MS = 15_000; // jamais en tout début de partie
 export const FRENZY_DURATION_MS = 4000; // durée de la frénésie une fois amorcée
 export const FRENZY_HIT_COOLDOWN_MS = 70; // borne le compteur (~14 coups/s max)
 export const FRENZY_POINTS_PER_SLASH = 5;
-export const FRENZY_FLOAT_VELOCITY_Y = -40; // remontée lente pendant la frénésie
+// Zone où la grenade vient se caler à la première coupe, en fraction de la
+// hauteur : assez haut pour ne pas gêner le HUD, assez bas pour rester à portée.
+export const FRENZY_ZONE_TOP = 0.28;
+export const FRENZY_ZONE_BOTTOM = 0.68;
+export const FRENZY_SETTLE_MARGIN = 24; // marge au bord, en plus du rayon
+export const FRENZY_BOB_PX = 12; // amplitude du flottement sur place
 // Entrée latérale : la grenade traverse l'écran depuis un bord, en arc.
 export const FRENZY_APEX_FRACTION = 0.55; // hauteur de l'arc, en fraction d'écran
 export const FRENZY_CROSS_FACTOR = 0.14; // vitesse de traversée, en fraction de largeur

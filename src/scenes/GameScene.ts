@@ -18,7 +18,10 @@ import {
   SCORE_PER_FRUIT,
   SLICE_MIN_SPEED,
   STARTING_LIVES,
-  FRENZY_FLOAT_VELOCITY_Y,
+  FRENZY_ZONE_TOP,
+  FRENZY_ZONE_BOTTOM,
+  FRENZY_SETTLE_MARGIN,
+  FRENZY_BOB_PX,
   FRENZY_DURATION_MS,
   FRENZY_HIT_COOLDOWN_MS,
   FRENZY_POINTS_PER_SLASH,
@@ -316,6 +319,18 @@ export class GameScene extends Phaser.Scene {
         this.hideFrenzyVisuals();
       }
       return;
+    }
+    // Filet de sécurité indépendant des animations : une grenade en frénésie
+    // ne peut JAMAIS sortir de l'écran, quoi qu'il arrive à ses tweens. C'est
+    // la garantie que le combo reste toujours terminable — le bug d'origine
+    // était une grenade qui dérivait hors champ, spawn gelé, combo perdu.
+    if (grenade.frenzyActive) {
+      const marge = grenade.sliceRadius + FRENZY_SETTLE_MARGIN;
+      const x = Phaser.Math.Clamp(grenade.x, marge, this.scale.width - marge);
+      const y = Phaser.Math.Clamp(grenade.y, marge, this.scale.height - marge);
+      if (x !== grenade.x || y !== grenade.y) {
+        grenade.setPosition(x, y);
+      }
     }
     this.frenzyAura.setPosition(grenade.x, grenade.y);
     this.frenzyCounter.setPosition(grenade.x, grenade.y - grenade.sliceRadius - 14);
@@ -763,7 +778,8 @@ export class GameScene extends Phaser.Scene {
    */
   private onGrenadeHit(grenade: Fruit, now: number): void {
     if (!grenade.frenzyActive) {
-      grenade.startFrenzy(FRENZY_FLOAT_VELOCITY_Y);
+      grenade.startFrenzy();
+      this.settleGrenade(grenade);
       grenade.lastSlashAt = now;
       grenade.slashCount = 1;
       // Pas de bandeau ici : il masquerait la grenade au moment précis où le
@@ -807,6 +823,51 @@ export class GameScene extends Phaser.Scene {
       scale: 1,
       duration: 130,
       ease: 'Back.easeOut',
+    });
+  }
+
+  /**
+   * La grenade « s'installe » : elle glisse vers une position confortable puis
+   * y flotte doucement jusqu'à l'explosion.
+   *
+   * Sans ce recadrage, une grenade frappée près du sommet de son arc restait
+   * collée au bord haut de l'écran (voire en sortait), et le combo devenait
+   * impossible à terminer. La zone est bornée en x ET en y pour qu'elle soit
+   * toujours entièrement visible et à portée du doigt.
+   */
+  private settleGrenade(grenade: Fruit): void {
+    const w = this.scale.width;
+    const h = this.scale.height;
+    const marge = grenade.sliceRadius + FRENZY_SETTLE_MARGIN;
+    const cibleX = Phaser.Math.Clamp(grenade.x, marge, w - marge);
+    const cibleY = Phaser.Math.Clamp(
+      grenade.y,
+      Math.max(marge, h * FRENZY_ZONE_TOP),
+      h * FRENZY_ZONE_BOTTOM
+    );
+
+    // On ne purge pas les tweens du sprite : la pulsation d'échelle lancée au
+    // spawn doit continuer, et elle ne touche pas aux mêmes propriétés.
+    this.tweens.add({
+      targets: grenade,
+      x: cibleX,
+      y: cibleY,
+      duration: 280,
+      ease: 'Back.easeOut', // arrivée franche : on sent qu'elle se cale
+      onComplete: () => {
+        if (!grenade.active || !grenade.frenzyActive) {
+          return;
+        }
+        // Léger flottement sur place : vivant, mais elle ne s'échappe plus
+        this.tweens.add({
+          targets: grenade,
+          y: cibleY - FRENZY_BOB_PX,
+          duration: 900,
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.easeInOut',
+        });
+      },
     });
   }
 
