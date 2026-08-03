@@ -48,6 +48,21 @@ export const BONUS_VARIETY: FruitVariety = {
   weight: 0, // jamais tiré au poids : spawn dédié dans le SpawnManager
 };
 
+/**
+ * Grenade : fruit rare de « frénésie ». Elle ne se coupe pas en deux du
+ * premier coup — on la tranche en boucle pendant quelques secondes avant
+ * qu'elle n'éclate (cf. FRENZY_* dans constants.ts).
+ */
+export const FRENZY_VARIETY: FruitVariety = {
+  key: 'grenade',
+  displayName: 'Grenade',
+  radius: 58,
+  skinColor: 0xb5243b,
+  juiceColor: 0xd63b52,
+  fleshColor: 0xe8455f,
+  weight: 0, // jamais tirée au poids : spawn dédié dans le SpawnManager
+};
+
 export function wholeTextureKey(variety: FruitVariety): string {
   return `${variety.key}_whole`;
 }

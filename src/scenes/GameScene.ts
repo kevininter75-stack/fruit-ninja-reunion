@@ -18,6 +18,10 @@ import {
   SCORE_PER_FRUIT,
   SLICE_MIN_SPEED,
   STARTING_LIVES,
+  FRENZY_FLOAT_VELOCITY_Y,
+  FRENZY_DURATION_MS,
+  FRENZY_HIT_COOLDOWN_MS,
+  FRENZY_POINTS_PER_SLASH,
   TEX_BOMB,
   TEX_JUICE,
   BOMB_POOL_SIZE,
@@ -101,6 +105,8 @@ export class GameScene extends Phaser.Scene {
   private scoreText!: Phaser.GameObjects.Text;
   private infoText!: Phaser.GameObjects.Text; // compte à rebours (mode Chrono uniquement)
   private lifeCrosses: Phaser.GameObjects.Text[] = []; // strikes (mode Classique)
+  /** Nb de croix allumées au dernier rendu — sert à repérer celle qui change. */
+  private filledCrosses = 0;
   private multiplierBanner!: Phaser.GameObjects.Text;
   private multiplierTimer: Phaser.Time.TimerEvent | null = null;
   private popupPool: Phaser.GameObjects.Text[] = [];
@@ -171,7 +177,7 @@ export class GameScene extends Phaser.Scene {
     this.scoreManager = new ScoreManager(this);
     this.comboManager = new ComboManager();
     this.sliceDetector = new SliceDetector();
-    this.spawnManager = new SpawnManager(this, this.fruits, this.bombs, this.scoreManager);
+    this.spawnManager = new SpawnManager(this, this.fruits, this.bombs, this.scoreManager, this.mode);
 
     // Slots de gestes multi-touch : traînées et états pré-alloués,
     // aucune allocation quand un doigt se pose en pleine partie.
@@ -343,6 +349,7 @@ export class GameScene extends Phaser.Scene {
    */
   private createLifeCrosses(): void {
     this.lifeCrosses = [];
+    this.filledCrosses = 0;
     const gap = 50;
     const rightEdge = this.scale.width - 36;
     for (let i = 0; i < STARTING_LIVES; i++) {
@@ -449,6 +456,7 @@ export class GameScene extends Phaser.Scene {
   private registerGameEvents(): void {
     this.events.on('score-changed', this.onScoreChanged, this);
     this.events.on('lives-changed', this.onLivesChanged, this);
+    this.events.on('life-gained', this.onLifeGained, this);
     this.events.on('fruit-missed', this.onFruitMissed, this);
     this.events.on('game-over', this.onLivesDepleted, this);
 
@@ -457,6 +465,7 @@ export class GameScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.events.off('score-changed', this.onScoreChanged, this);
       this.events.off('lives-changed', this.onLivesChanged, this);
+      this.events.off('life-gained', this.onLifeGained, this);
       this.events.off('fruit-missed', this.onFruitMissed, this);
       this.events.off('game-over', this.onLivesDepleted, this);
     });
@@ -556,6 +565,12 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
+    // La grenade ne se coupe pas : elle encaisse et s'emballe (cf. onGrenadeHit)
+    if (fruit.isFrenzy) {
+      this.onGrenadeHit(fruit, now);
+      return;
+    }
+
     // Suivi du combo par geste et des statistiques de fin
     gesture.comboCount++;
     this.fruitsSliced++;
@@ -593,6 +608,74 @@ export class GameScene extends Phaser.Scene {
     sfx.slice();
     this.spawnHalves(fruit, sliceAngle);
     fruit.kill();
+  }
+
+  /**
+   * Coup porté à la grenade. Le premier amorce la frénésie (elle se fige en
+   * l'air et un compte à rebours démarre) ; les suivants incrémentent le
+   * compteur, borné par un temps de garde pour qu'un doigt traînant dessus
+   * ne mitraille pas le score à 60 coups/seconde.
+   */
+  private onGrenadeHit(grenade: Fruit, now: number): void {
+    if (!grenade.frenzyActive) {
+      grenade.startFrenzy(FRENZY_FLOAT_VELOCITY_Y);
+      grenade.lastSlashAt = now;
+      grenade.slashCount = 1;
+      this.showBigBanner('GRENADE !');
+      sfx.crit();
+      // Fin de frénésie programmée : un seul timer, quoi qu'il arrive
+      this.time.delayedCall(FRENZY_DURATION_MS, () => this.explodeGrenade(grenade));
+      return;
+    }
+    if (now - grenade.lastSlashAt < FRENZY_HIT_COOLDOWN_MS) {
+      return;
+    }
+    grenade.lastSlashAt = now;
+    grenade.slashCount += 1;
+
+    // Retour immédiat à chaque coup : jus, son et compteur qui grimpe
+    this.juiceEmitter.setParticleTint(grenade.juiceColor);
+    this.juiceEmitter.emitParticleAt(grenade.x, grenade.y, JUICE_PARTICLE_COUNT);
+    sfx.slice();
+    this.showPopup(grenade.x, grenade.y - 30, `x${grenade.slashCount}`, '#ff5c78', 44);
+  }
+
+  /**
+   * Fin de la frénésie : la grenade éclate, rapporte ses points et emporte
+   * tous les fruits encore en vol (qui marquent normalement, eux aussi).
+   * Les bombes ne sont pas touchées — l'explosion ne doit pas tuer le joueur.
+   */
+  private explodeGrenade(grenade: Fruit): void {
+    if (this.gameEnded || !grenade.active || !grenade.frenzyActive) {
+      return; // partie finie ou grenade déjà rendue au pool
+    }
+    const slashes = grenade.slashCount;
+    const awarded = this.scoreManager.addScore(slashes * FRENZY_POINTS_PER_SLASH);
+
+    // Gerbe généreuse au point d'explosion
+    this.juiceEmitter.setParticleTint(grenade.juiceColor);
+    this.juiceEmitter.emitParticleAt(grenade.x, grenade.y, JUICE_PARTICLE_COUNT * 5);
+    this.spawnSplat(grenade.x, grenade.y, grenade.juiceColor);
+    this.cameras.main.shake(260, 0.008);
+    sfx.crit();
+    this.showBigBanner(`${slashes} COUPS !\n+${awarded}`);
+
+    grenade.kill();
+
+    // Souffle : tous les fruits en vol sont tranchés dans la foulée
+    const children = this.fruits.getChildren();
+    for (let i = 0; i < children.length; i++) {
+      const other = children[i] as Fruit;
+      if (!other.active || other === grenade) {
+        continue;
+      }
+      this.fruitsSliced++;
+      this.scoreManager.addScore(SCORE_PER_FRUIT);
+      this.juiceEmitter.setParticleTint(other.juiceColor);
+      this.juiceEmitter.emitParticleAt(other.x, other.y, JUICE_PARTICLE_COUNT);
+      this.spawnHalves(other, Phaser.Math.FloatBetween(0, Math.PI));
+      other.kill();
+    }
   }
 
   /**
@@ -769,29 +852,52 @@ export class GameScene extends Phaser.Scene {
     this.scoreText.setText(`Score : ${score}`);
   }
 
+  /**
+   * Synchronise les croix de strike sur le nombre de vies. Le rendu est
+   * recalculé intégralement (et non incrémenté) car les vies remontent
+   * désormais aux paliers de score : une croix peut aussi bien s'allumer
+   * que s'éteindre.
+   */
   private onLivesChanged(lives: number): void {
     if (this.mode !== 'classic') {
       return;
     }
-    // Allume la croix correspondant au strike qui vient de tomber
-    const filled = STARTING_LIVES - Math.max(lives, 0);
-    const cross = this.lifeCrosses[filled - 1];
-    if (cross === undefined) {
+    const filled = STARTING_LIVES - Phaser.Math.Clamp(lives, 0, STARTING_LIVES);
+    for (let i = 0; i < this.lifeCrosses.length; i++) {
+      const cross = this.lifeCrosses[i];
+      const isFilled = i < filled;
+      cross.setColor(isFilled ? '#ff3b3b' : '#55697a').setAlpha(isFilled ? 1 : 0.5);
+    }
+    // "Pop" sur la croix qui vient de changer d'état : la dernière allumée
+    // quand on encaisse un strike, celle qui s'éteint quand on regagne une vie.
+    const changedIndex = filled > this.filledCrosses ? filled - 1 : filled;
+    this.filledCrosses = filled;
+    const target = this.lifeCrosses[changedIndex];
+    if (target === undefined) {
       return;
     }
-    cross.setColor('#ff3b3b').setAlpha(1).setScale(1.8);
+    target.setScale(1.8);
     this.tweens.add({
-      targets: cross,
+      targets: target,
       scale: 1,
       duration: 350,
       ease: 'Back.easeOut', // rebond franc : le strike "claque"
     });
   }
 
+  /** Palier de score franchi : une croix de strike s'efface. */
+  private onLifeGained(): void {
+    if (this.gameEnded) {
+      return;
+    }
+    sfx.crit();
+    this.showBigBanner('VIE REGAGNÉE !');
+  }
+
   private onFruitMissed(fruit: Fruit): void {
-    // En mode Chrono, un fruit manqué est sans conséquence ;
-    // un combava manqué non plus (c'était un cadeau, pas une obligation).
-    if (this.gameEnded || this.mode === 'chrono' || fruit.isBonus) {
+    // En mode Chrono, un fruit manqué est sans conséquence ; un combava ou une
+    // grenade manqués non plus (c'étaient des cadeaux, pas des obligations).
+    if (this.gameEnded || this.mode === 'chrono' || fruit.isBonus || fruit.isFrenzy) {
       return;
     }
     sfx.lifeLost();

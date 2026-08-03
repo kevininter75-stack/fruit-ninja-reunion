@@ -112,6 +112,20 @@ Choix techniques notables :
   et — rétrécie — à la chair : entier et moitiés ne peuvent pas diverger.
   Planche de contrôle : `http://localhost:3010/fruits-preview.html` affiche
   les 10 fruits (entier + 2 moitiés) à taille réelle sur fond de partie.
+- **Rythme de partie piloté par une intensité continue** (`systems/SpawnManager.ts`) :
+  une valeur 0 → 1 qui monte avec le temps ET le score commande l'intervalle
+  entre salves (bruité, avec une respiration après chaque salve dense), la
+  forme de la salve (`solo` / `duo` / `volley` / `cluster`) et le budget de
+  bombes. Les bombes suivent un compteur déterministe façon Fruit Ninja — une
+  toutes les 10 → 5 salves de fruits — et jamais dans une grappe, qui est
+  faite pour être coupée d'un seul geste. Mesuré : 0,8 → 2,7 fruits/s sur
+  trois minutes en Classique, plus rapide en Chrono.
+- **Grenade de frénésie** : à des paliers de score, une grenade se fige en l'air
+  à la première coupe ; chaque coup supplémentaire compte (borné par un temps
+  de garde) puis elle éclate, rapporte un point par coup et emporte tous les
+  fruits en vol.
+- **Vie regagnée par paliers de score** : une croix de strike s'efface tous les
+  1000 points ; si les trois vies sont intactes, le palier rapporte des points.
 - **Feedback systématique** : particules de jus teintées, textes flottants
   (+points, combos) recyclés depuis un pool, flash + secousse caméra sur
   bombe, records persistés en localStorage.

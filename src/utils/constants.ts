@@ -26,10 +26,11 @@ export const LAUNCH_VX_FACTOR = 0.23;
 
 // Spawn
 export const SPAWN_INTERVAL_START_MS = 1400; // intervalle entre deux salves au début
-export const SPAWN_INTERVAL_MIN_MS = 550; // intervalle plancher (difficulté max)
-export const SPAWN_SCORE_STEP = 500; // palier de score qui augmente la difficulté
-export const SPAWN_INTERVAL_DECREMENT_MS = 150; // réduction d'intervalle par palier
-export const SPAWN_MAX_FRUITS_PER_WAVE_CAP = 4;
+// Plancher volontairement haut : depuis que les salves sont des volées et des
+// grappes (et non plus 2-4 fruits tirés au hasard), un intervalle court
+// produisait des pics à 4 fruits/seconde — injouable en Classique où chaque
+// fruit manqué coûte une vie.
+export const SPAWN_INTERVAL_MIN_MS = 750; // intervalle plancher (difficulté max)
 // Échelonnement des lancers d'une même salve (jamais simultanés)
 export const SPAWN_STAGGER_MIN_MS = 80;
 export const SPAWN_STAGGER_MAX_MS = 150;
@@ -38,6 +39,61 @@ export const SPAWN_STAGGER_MAX_MS = 150;
 export const SPAWN_GENTLE_WAVES = 3;
 export const SPAWN_WARMUP_WAVES = 8;
 export const BOMB_SAFE_WAVES = 8; // aucune bombe avant la 9e vague
+
+// ------------------------------------------------------------------
+// Rythme de partie : courbe de difficulté CONTINUE
+// ------------------------------------------------------------------
+// Une « intensité » de 0 à 1 pilote tout : intervalle entre salves,
+// composition des salves et fréquence des bombes. Deux moteurs, on garde le
+// plus avancé des deux — le TEMPS (la partie s'emballe même si le joueur
+// marque peu) et le SCORE (un bon joueur accélère lui-même la montée).
+// L'ancien système par paliers de score sautait d'un cran entier sur un seul
+// coup critique : l'accélération paraissait arbitraire.
+export const INTENSITY_RAMP_MS = 150_000; // Classique : plein régime vers 2 min 30
+export const INTENSITY_RAMP_CHRONO_MS = 40_000; // Chrono (60 s) : montée bien plus vive
+export const INTENSITY_RAMP_SCORE = 2600; // score suffisant pour saturer l'intensité
+
+// Intervalle bruité de ±18 % : sans ça le spawn est un métronome, et l'oreille
+// comme l'œil s'y habituent — le jeu perd toute tension.
+export const SPAWN_INTERVAL_JITTER = 0.18;
+// Respiration : après une salve dense, la suivante se fait attendre.
+// C'est l'alternance tension/relâchement qui crée un rythme.
+export const SPAWN_BREATHER_FACTOR = 1.55;
+
+// Bombes : budget DÉTERMINISTE façon Fruit Ninja (une bombe toutes les N
+// fruits lancés) au lieu d'un dé par fruit. Le hasard pur produisait des
+// séquences injustes (trois bombes coup sur coup) ou des parties sans menace.
+export const BOMB_EVERY_FRUITS_EASY = 10; // début de partie
+export const BOMB_EVERY_FRUITS_HARD = 5; // intensité maximale
+export const BOMB_DOUBLE_INTENSITY = 0.8; // au-delà, une salve peut porter 2 bombes
+
+// Grappes : plusieurs fruits lancés côte à côte et quasi simultanément, pour
+// qu'UN seul swipe puisse tous les trancher. Le combo devient un objectif de
+// design offert au joueur, plus un coup de chance. Jamais de bombe dedans :
+// une grappe invite au grand geste, y cacher une bombe serait un piège.
+export const CLUSTER_MIN_INTENSITY = 0.35;
+export const CLUSTER_SPREAD_PX = 96; // écart horizontal entre deux fruits de grappe
+export const CLUSTER_STAGGER_MS = 45; // départs très rapprochés
+
+// Vie regagnée tous les N points (façon « extra life » de Fruit Ninja) :
+// une croix de strike s'efface. Si les 3 vies sont intactes, le palier
+// rapporte des points à la place — un bonus ne doit jamais tomber à plat.
+export const EXTRA_LIFE_SCORE_STEP = 1000;
+export const EXTRA_LIFE_FALLBACK_POINTS = 50;
+
+// ------------------------------------------------------------------
+// La grenade : le fruit rare qui déclenche un gros combo
+// ------------------------------------------------------------------
+// Reprise du « pomegranate » de Fruit Ninja. Elle apparaît à des paliers de
+// score, se fige en l'air à la première coupe, puis on la tranche autant de
+// fois que possible pendant quelques secondes avant qu'elle n'éclate : chaque
+// coup rapporte, et l'explosion emporte tous les fruits à l'écran.
+export const FRENZY_SCORE_STEP = 700; // un palier de score = une grenade
+export const FRENZY_SAFE_TIME_MS = 15_000; // jamais en tout début de partie
+export const FRENZY_DURATION_MS = 4000; // durée de la frénésie une fois amorcée
+export const FRENZY_HIT_COOLDOWN_MS = 70; // borne le compteur (~14 coups/s max)
+export const FRENZY_POINTS_PER_SLASH = 5;
+export const FRENZY_FLOAT_VELOCITY_Y = -40; // remontée lente pendant la frénésie
 
 // Découpe
 export const SLICE_BUFFER_SIZE = 12; // nb max de points conservés pour la traînée
@@ -75,9 +131,6 @@ export type GameOverReason = 'lives' | 'bomb' | 'time';
 export const TEX_BOMB = 'bomb';
 export const BOMB_RADIUS = 54;
 export const BOMB_POOL_SIZE = 8;
-export const BOMB_CHANCE_BASE = 0.07; // probabilité qu'un spawn soit une bombe (début de partie)
-export const BOMB_CHANCE_PER_TIER = 0.015; // augmentation par palier de difficulté
-export const BOMB_CHANCE_CAP = 0.16; // plafond : la bombe ne doit jamais devenir injuste
 export const BOMB_SAFE_TIME_MS = 5000; // aucune bombe dans les premières secondes
 export const BOMB_GAMEOVER_DELAY_MS = 700; // durée du flash avant l'écran de fin
 

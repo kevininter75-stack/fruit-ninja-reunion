@@ -16,7 +16,7 @@
   <body>
     <canvas id="sheet"></canvas>
     <script type="module">
-      import { FRUIT_VARIETIES, BONUS_VARIETY } from '/src/utils/fruitCatalog.ts';
+      import { FRUIT_VARIETIES, BONUS_VARIETY, FRENZY_VARIETY } from '/src/utils/fruitCatalog.ts';
       import { paintWhole, paintCut } from '/src/utils/fruitArt.ts';
 
       // Reproduit exactement ce que fait PreloadScene.createVarietyTextures
@@ -46,7 +46,7 @@
         return cv;
       }
 
-      const all = [...FRUIT_VARIETIES, BONUS_VARIETY];
+      const all = [...FRUIT_VARIETIES, BONUS_VARIETY, FRENZY_VARIETY];
       const CELL = 210;
       const ROW = CELL + 46;
       const sheet = document.getElementById('sheet');

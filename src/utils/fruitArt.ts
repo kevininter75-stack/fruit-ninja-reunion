@@ -252,6 +252,10 @@ function traceSilhouette(ctx: CanvasRenderingContext2D, variety: FruitVariety, s
     case 'carambole':
       traceStar(ctx, c, c, r, r * 0.44);
       break;
+    case 'grenade':
+      // Sphère légèrement aplatie et un peu anguleuse, comme une vraie grenade
+      traceLobed(ctx, c, c, r * 0.97, r * 0.94, 6, 0.025);
+      break;
     default:
       traceLobed(ctx, c, c, r, r, 1, 0);
   }
@@ -755,6 +759,44 @@ export function paintWhole(
       break;
     }
 
+    case 'grenade': {
+      paintBody(ctx, variety, size, skin, () => {
+        // Peau bicolore rouge/ocre et quelques méplats : la grenade n'est
+        // jamais uniforme, c'est ce qui l'empêche de passer pour une pomme.
+        const patina = ctx.createLinearGradient(c - r, c - r, c + r, c + r);
+        patina.addColorStop(0, 'rgba(228, 128, 60, 0.45)');
+        patina.addColorStop(0.5, 'rgba(190, 40, 55, 0)');
+        patina.addColorStop(1, 'rgba(120, 18, 40, 0.5)');
+        ctx.fillStyle = patina;
+        ctx.fillRect(0, 0, size, size);
+        speckle(ctx, c, r * 0.8, 26, shadeAlpha(skin, -0.35, 0.3), 2.4);
+      });
+      // Couronne (calice) : les sépales pointus au sommet, signature absolue
+      // de la grenade — sans eux, c'est une pomme rouge.
+      ctx.fillStyle = shade(skin, -0.3);
+      ctx.strokeStyle = shade(skin, -0.62);
+      ctx.lineWidth = 3;
+      ctx.lineJoin = 'round';
+      const crownY = c - r * 0.86;
+      ctx.beginPath();
+      ctx.moveTo(c - r * 0.2, crownY + r * 0.12);
+      for (const [dx, dy] of [
+        [-0.16, -0.28],
+        [-0.07, -0.12],
+        [0, -0.34],
+        [0.08, -0.12],
+        [0.17, -0.3],
+        [0.21, -0.05],
+      ] as const) {
+        ctx.lineTo(c + dx * r, crownY + dy * r);
+      }
+      ctx.lineTo(c + r * 0.2, crownY + r * 0.12);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      break;
+    }
+
     default: {
       paintBody(ctx, variety, size, skin);
     }
@@ -1015,6 +1057,43 @@ function paintFleshDetails(
           ctx.lineTo(c + Math.cos(a) * r * 0.78, c + Math.sin(a) * r * 0.78);
           ctx.stroke();
         }
+      }
+      break;
+    }
+
+    case 'grenade': {
+      // Arilles : les centaines de grains rubis serrés dans leurs loges
+      // blanches — la coupe la plus spectaculaire du catalogue.
+      ctx.fillStyle = '#f7ead8';
+      ctx.beginPath();
+      ctx.arc(c, c, r * 0.92, 0, TAU);
+      ctx.fill();
+      // Cloisons membraneuses qui délimitent les loges
+      ctx.strokeStyle = 'rgba(246, 232, 210, 0.95)';
+      ctx.lineWidth = 5;
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * TAU + 0.25;
+        ctx.beginPath();
+        ctx.moveTo(c, c);
+        ctx.lineTo(c + Math.cos(a) * r * 0.9, c + Math.sin(a) * r * 0.9);
+        ctx.stroke();
+      }
+      // Grains disposés en spirale de Vogel : dense et sans amas visible
+      const golden = Math.PI * (3 - Math.sqrt(5));
+      for (let i = 0; i < 78; i++) {
+        const rad = r * 0.82 * Math.sqrt((i + 0.5) / 78);
+        const a = i * golden;
+        const px = c + Math.cos(a) * rad;
+        const py = c + Math.sin(a) * rad;
+        const grain = r * 0.085;
+        ctx.fillStyle = i % 4 === 0 ? '#e8143c' : '#c8102e';
+        ctx.beginPath();
+        ctx.ellipse(px, py, grain, grain * 0.82, a, 0, TAU);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(255, 190, 200, 0.55)';
+        ctx.beginPath();
+        ctx.arc(px - grain * 0.28, py - grain * 0.3, grain * 0.3, 0, TAU);
+        ctx.fill();
       }
       break;
     }

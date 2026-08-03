@@ -19,6 +19,15 @@ export class Fruit extends Phaser.Physics.Arcade.Sprite {
   /** Vrai pour le combava doré (déclenche le score x2 à la coupe). */
   public isBonus = false;
 
+  /** Vrai pour la grenade : elle survit à la première coupe et s'emballe. */
+  public isFrenzy = false;
+  /** Frénésie amorcée : la grenade flotte et compte les coups reçus. */
+  public frenzyActive = false;
+  /** Nombre de coups encaissés pendant la frénésie. */
+  public slashCount = 0;
+  /** Horodatage du dernier coup compté (anti-rafale, cf. FRENZY_HIT_COOLDOWN_MS). */
+  public lastSlashAt = 0;
+
   private variety: FruitVariety | null = null;
   private pulseTween: Phaser.Tweens.Tween | null = null;
 
@@ -36,10 +45,15 @@ export class Fruit extends Phaser.Physics.Arcade.Sprite {
     x: number,
     y: number,
     velocityX: number,
-    velocityY: number
+    velocityY: number,
+    isFrenzy = false
   ): void {
     this.variety = variety;
     this.isBonus = isBonus;
+    this.isFrenzy = isFrenzy;
+    this.frenzyActive = false;
+    this.slashCount = 0;
+    this.lastSlashAt = 0;
     this.sliceRadius = variety.radius;
     this.juiceColor = variety.juiceColor;
     this.setTexture(wholeTextureKey(variety));
@@ -53,9 +67,9 @@ export class Fruit extends Phaser.Physics.Arcade.Sprite {
     // Cercle de collision centré sur le sprite (les fruits sont ~ronds)
     body.setCircle(this.sliceRadius, this.width / 2 - this.sliceRadius, this.height / 2 - this.sliceRadius);
 
-    // Le combava doré pulse pour attirer l'œil (une allocation par spawn
-    // bonus — événement rare, pas de pression GC)
-    if (isBonus) {
+    // Le combava doré et la grenade pulsent pour attirer l'œil (une allocation
+    // par spawn spécial — événement rare, pas de pression GC)
+    if (isBonus || isFrenzy) {
       this.pulseTween = this.scene.tweens.add({
         targets: this,
         scale: 1.15,
@@ -67,6 +81,21 @@ export class Fruit extends Phaser.Physics.Arcade.Sprite {
     }
   }
 
+  /**
+   * Amorce la frénésie de la grenade : elle cesse de retomber et flotte
+   * doucement, le temps que le joueur l'écharpe autant qu'il peut.
+   * La gravité est annulée sur ce corps uniquement (pas sur le monde), donc
+   * les autres fruits continuent leur course normalement.
+   */
+  startFrenzy(floatVelocityY: number): void {
+    this.frenzyActive = true;
+    this.slashCount = 0;
+    const body = this.body as Phaser.Physics.Arcade.Body;
+    body.setAllowGravity(false);
+    this.setVelocity(0, floatVelocityY);
+    this.setAngularVelocity(90);
+  }
+
   /** Désactive le fruit et le rend au pool. */
   kill(): void {
     if (this.pulseTween !== null) {
@@ -74,6 +103,12 @@ export class Fruit extends Phaser.Physics.Arcade.Sprite {
       this.pulseTween = null;
       this.setScale(1);
     }
+    // La gravité est réactivée pour le prochain occupant du pool
+    const body = this.body as Phaser.Physics.Arcade.Body | null;
+    if (body !== null) {
+      body.setAllowGravity(true);
+    }
+    this.frenzyActive = false;
     this.disableBody(true, true);
   }
 

@@ -18,6 +18,7 @@ import {
 import {
   FRUIT_VARIETIES,
   BONUS_VARIETY,
+  FRENZY_VARIETY,
   type FruitVariety,
   wholeTextureKey,
   halfTextureKeys,
@@ -48,6 +49,7 @@ export class PreloadScene extends Phaser.Scene {
       this.createVarietyTextures(variety);
     }
     this.createVarietyTextures(BONUS_VARIETY);
+    this.createVarietyTextures(FRENZY_VARIETY);
     this.createBombTexture();
     this.createJuiceTexture();
     this.createSplatTextures();
