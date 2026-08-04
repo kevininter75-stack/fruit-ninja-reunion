@@ -151,6 +151,22 @@ Choix techniques notables :
   180×180 non masqué car iOS ignore le manifest.
   Régénération : `http://localhost:3010/icon-gen.html?size=512&safe=0.8`
   capturé en Chrome headless (`--screenshot`).
+- **Game feel** : **hit-stop** (micro-gel de la physique ET des tweens à
+  l'impact — c'est cette pause qui fait qu'un coup claque), durées
+  proportionnées au coup (critique 45 ms, combo 70, grenade 95, bombe 130) ;
+  **squash & stretch** des moitiés, qui jaillissent étirées dans l'axe de la
+  coupe ; ruban de lame en quatre passes du bleuté au blanc chaud.
+  L'horloge de la scène n'est jamais ralentie : le minuteur de reprise doit
+  pouvoir se déclencher, et le chrono ne doit pas dériver.
+- **Fondus entre scènes** avec filet de sécurité : si un fondu est déjà en
+  cours sur la caméra, le nouveau est ignoré par Phaser et l'événement de fin
+  ne viendrait jamais — un minuteur bascule alors quand même. Un écran figé
+  serait bien pire qu'une coupe sèche.
+- **Écran de fin mis en scène** : apparition échelonnée des éléments, score
+  qui défile jusqu'à son total, médaille (bronze/argent/or, seuils par mode)
+  qui arrive en tournant, confettis sur un nouveau record. Disposition
+  explicite par orientation — en paysage la médaille passe à CÔTÉ du score,
+  faute de hauteur pour l'empiler.
 - **Feedback systématique** : particules de jus teintées, textes flottants
   (+points, combos) recyclés depuis un pool, flash + secousse caméra sur
   bombe, records persistés en localStorage.

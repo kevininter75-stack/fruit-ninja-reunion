@@ -6,6 +6,7 @@ import {
   DEPTH_VIGNETTE,
   HUD_PANEL_COLOR,
   HUD_PANEL_ALPHA,
+  SCENE_FADE_MS,
 } from './constants';
 
 /**
@@ -68,6 +69,40 @@ export function addHudPanel(
   g.strokePath();
 
   return g;
+}
+
+/**
+ * Ouverture en fondu au début d'une scène. Appelée par chaque scène juste
+ * après sa construction : une coupure sèche entre écrans fait « page web qui
+ * change », un fondu fait « jeu ».
+ */
+export function fadeIn(scene: Phaser.Scene): void {
+  scene.cameras.main.fadeIn(SCENE_FADE_MS, 0, 0, 0);
+}
+
+/**
+ * Fermeture en fondu puis changement de scène. Le passage de relais n'a lieu
+ * qu'une fois le fondu terminé, sinon la nouvelle scène démarrerait sous un
+ * voile noir en train de s'effacer.
+ */
+export function fadeToScene(scene: Phaser.Scene, key: string, data?: object): void {
+  const cam = scene.cameras.main;
+  let switched = false;
+  const go = (): void => {
+    if (switched) {
+      return;
+    }
+    switched = true;
+    scene.scene.start(key, data);
+  };
+
+  cam.fadeOut(SCENE_FADE_MS, 0, 0, 0);
+  cam.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, go);
+
+  // Filet de sécurité : un fondu déjà en cours sur cette caméra fait ignorer
+  // le nouveau, et l'événement de fin ne viendrait jamais — le joueur
+  // resterait coincé sur l'écran. Une coupe sèche vaut mieux qu'un blocage.
+  scene.time.delayedCall(SCENE_FADE_MS + 150, go);
 }
 
 /**

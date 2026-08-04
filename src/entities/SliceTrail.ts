@@ -3,7 +3,9 @@ import {
   SLICE_BUFFER_SIZE,
   SLICE_POINT_MAX_AGE_MS,
   TRAIL_MAX_HALF_WIDTH,
-  COLOR_TRAIL,
+  COLOR_TRAIL_GLOW,
+  COLOR_TRAIL_CORE,
+  COLOR_TRAIL_SPARK,
 } from '../utils/constants';
 
 /** Point de traînée réutilisable (jamais réalloué → pas de pression GC). */
@@ -93,10 +95,13 @@ export class SliceTrail {
     const m = this.resampleCurve(n);
     this.computeWidthsAndNormals(n, m);
 
-    // Trois passes : halo doux, cœur de lame, éclat central
-    this.drawRibbon(m, 2.3, COLOR_TRAIL, 0.14);
-    this.drawRibbon(m, 1.0, COLOR_TRAIL, 0.85);
-    this.drawRibbon(m, 0.42, 0xfffbe8, 1);
+    // Quatre passes, du plus large au plus fin, et du plus froid au plus
+    // chaud : le dégradé de température donne l'éclat d'une lame chauffée à
+    // blanc en son centre, là où un ruban uniformément blanc restait plat.
+    this.drawRibbon(m, 3.1, COLOR_TRAIL_GLOW, 0.1);
+    this.drawRibbon(m, 2.1, COLOR_TRAIL_GLOW, 0.18);
+    this.drawRibbon(m, 1.0, COLOR_TRAIL_CORE, 0.88);
+    this.drawRibbon(m, 0.38, COLOR_TRAIL_SPARK, 1);
   }
 
   /**

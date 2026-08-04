@@ -9,7 +9,7 @@ import { SpawnManager } from '../systems/SpawnManager';
 import { sfx } from '../systems/SfxManager';
 import { music } from '../systems/MusicManager';
 import { FRUIT_VARIETIES, halfTextureKeys, wholeTextureKey } from '../utils/fruitCatalog';
-import { createMuteButton, addHudPanel, addVignette } from '../utils/ui';
+import { createMuteButton, addHudPanel, addVignette, fadeIn, fadeToScene } from '../utils/ui';
 import { AnimatedBackground } from '../entities/AnimatedBackground';
 import {
   FRUIT_POOL_SIZE,
@@ -29,6 +29,13 @@ import {
   GAME_FONT,
   FONT_DIGITS,
   TEX_CROSS,
+  HITSTOP_CRIT_MS,
+  HITSTOP_COMBO_MS,
+  HITSTOP_GRENADE_MS,
+  HITSTOP_BOMB_MS,
+  HALF_SQUASH_X,
+  HALF_SQUASH_Y,
+  HALF_SQUASH_MS,
   CROSS_COLOR_LIT,
   CROSS_COLOR_DIM,
   FRENZY_SETTLE_MARGIN,
@@ -139,6 +146,8 @@ export class GameScene extends Phaser.Scene {
   private readonly scoreCounter = { value: 0 };
   /** Nb de croix allumées au dernier rendu — sert à repérer celle qui change. */
   private filledCrosses = 0;
+  /** Vrai pendant un hit-stop : empêche d'empiler les gels. */
+  private hitStopActive = false;
   /** Éléments du HUD, estompés pendant la frénésie (cf. setHudDimmed). */
   private hudElements: Array<Phaser.GameObjects.GameObject & { alpha: number }> = [];
   private multiplierBanner!: Phaser.GameObjects.Text;
@@ -178,9 +187,13 @@ export class GameScene extends Phaser.Scene {
   }
 
   create(): void {
-    // Normalise le temps physique au cas où un ralenti de bombe traînerait
-    // d'une partie précédente (le reset au shutdown planterait : world null).
+    // Normalise le temps au cas où un ralenti de bombe ou un hit-stop
+    // traînerait d'une partie précédente (le reset au shutdown planterait :
+    // world null, et le minuteur de reprise du gel meurt avec la scène).
     this.physics.world.timeScale = 1;
+    this.physics.resume();
+    this.tweens.timeScale = 1;
+    this.hitStopActive = false;
 
     new AnimatedBackground(this);
     // Voile sombre : atténue le décor pendant la partie pour que les fruits
@@ -274,6 +287,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.spawnManager.start();
+    fadeIn(this);
   }
 
   update(): void {
@@ -851,6 +865,7 @@ export class GameScene extends Phaser.Scene {
       // Coup critique : popup doré, double jet de jus et son dédié
       this.juiceEmitter.emitParticleAt(fruit.x, fruit.y, JUICE_PARTICLE_COUNT);
       this.showPopup(fruit.x, fruit.y - 20, `CRITIQUE ! +${awarded}`, '#ffd700', 46);
+      this.hitStop(HITSTOP_CRIT_MS);
       sfx.crit();
     } else {
       this.showPopup(fruit.x, fruit.y - 20, `+${awarded}`, '#ffffff', 40);
@@ -947,6 +962,34 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
+   * Hit-stop : micro-gel du jeu à l'impact, puis reprise.
+   *
+   * C'est la technique de « juice » la plus efficace — c'est cette pause
+   * infime qui fait qu'un coup CLAQUE au lieu de simplement se produire.
+   * On fige la physique ET les tweens ; l'horloge de la scène, elle, continue
+   * de tourner, ce qui permet au minuteur de reprise de se déclencher (et
+   * n'altère ni le chrono ni la minuterie d'explosion de la grenade).
+   *
+   * Un gel en cours n'est jamais empilé : deux coups rapprochés donneraient
+   * un blocage cumulé, perçu comme une saccade et non comme une frappe.
+   */
+  private hitStop(durationMs: number): void {
+    if (this.hitStopActive) {
+      return;
+    }
+    this.hitStopActive = true;
+    this.physics.pause();
+    this.tweens.timeScale = 0;
+    this.time.delayedCall(durationMs, () => {
+      this.hitStopActive = false;
+      this.tweens.timeScale = 1;
+      // Toujours relancer la physique : même une fin de partie en a besoin,
+      // c'est elle qui joue le ralenti dramatique de la bombe.
+      this.physics.resume();
+    });
+  }
+
+  /**
    * Brève pulsation de zoom : la caméra « respire » sur un temps fort, puis
    * revient au zoom de référence — celui de la frénésie s'il est en cours,
    * sinon 1. Sans cette lecture du contexte, un combo pendant la frénésie
@@ -1034,6 +1077,7 @@ export class GameScene extends Phaser.Scene {
     // Double onde : une rapide et serrée, une lente et large — le souffle
     this.spawnRing(grenade.x, grenade.y, 6, 0xffffff, 380);
     this.spawnRing(grenade.x, grenade.y, 12, 0xff5c78, 750);
+    this.hitStop(HITSTOP_GRENADE_MS);
     sfx.crit();
     this.showBigBanner(`${slashes} COUPS !\n+${awarded}`);
 
@@ -1070,8 +1114,9 @@ export class GameScene extends Phaser.Scene {
     this.showBigBanner(`COMBO x${n} !\n+${awarded}`);
     sfx.bigCombo(n);
 
-    // Ponctuation visuelle du combo : la caméra respire, une onde part du
-    // dernier fruit tranché, et la secousse monte avec la taille du combo.
+    // Ponctuation visuelle du combo : gel bref, caméra qui respire, onde
+    // partant du dernier fruit tranché, secousse croissante avec le combo.
+    this.hitStop(HITSTOP_COMBO_MS);
     this.cameraPunch(COMBO_PUNCH_ZOOM, COMBO_PUNCH_MS);
     this.spawnRing(gesture.lastX, gesture.lastY, 5 + n, 0xffe066, 520);
     this.cameras.main.shake(120, 0.002 + Math.min(n, 6) * 0.0008);
@@ -1158,6 +1203,9 @@ export class GameScene extends Phaser.Scene {
     }
 
     sfx.explosion();
+    // Le gel le plus long du jeu : la bombe mérite qu'on encaisse le choc
+    // avant que le ralenti ne prenne le relais.
+    this.hitStop(HITSTOP_BOMB_MS);
 
     // Gerbe au point d'impact : fumée sombre + pluie d'étincelles
     this.juiceEmitter.setParticleTint(0x2a2a33);
@@ -1223,6 +1271,20 @@ export class GameScene extends Phaser.Scene {
         fruitBody.velocity.y * 0.35 + side.direction * normalY * separation - Phaser.Math.Between(20, 80)
       );
       half.setAngularVelocity(side.direction * Phaser.Math.Between(140, 300));
+
+      // Squash & stretch : la moitié jaillit étirée dans l'axe de la coupe
+      // puis reprend sa forme. Le sprite étant tourné pour aligner sa face de
+      // coupe sur le geste, son axe X LOCAL est déjà celui de la séparation —
+      // étirer scaleX étire donc bien dans la bonne direction, quel que soit
+      // l'angle du swipe.
+      half.setScale(HALF_SQUASH_X, HALF_SQUASH_Y);
+      this.tweens.add({
+        targets: half,
+        scaleX: 1,
+        scaleY: 1,
+        duration: HALF_SQUASH_MS,
+        ease: 'Back.easeOut',
+      });
 
       // Le tween (une allocation par coupe, pas par frame) gère le fondu
       // puis rend la moitié au pool.
@@ -1335,7 +1397,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private endGame(reason: GameOverReason): void {
-    this.scene.start('GameOverScene', {
+    fadeToScene(this, 'GameOverScene', {
       score: this.scoreManager.getScore(),
       mode: this.mode,
       reason,

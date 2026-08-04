@@ -146,8 +146,50 @@ export const STARTING_LIVES = 3;
 // Fenêtre de combo (Phase 2) : délai max entre deux coupes pour chaîner un combo
 export const COMBO_WINDOW_MS = 300;
 
-// Couleur de la traînée de coupe
+// Traînée de coupe : trois passes concentriques, du halo froid au cœur chaud.
+// Un ruban entièrement blanc paraissait plat ; le dégradé de température lui
+// donne l'éclat d'une vraie lame.
 export const COLOR_TRAIL = 0xffffff;
+export const COLOR_TRAIL_GLOW = 0x7fd4ff; // halo extérieur, bleuté
+export const COLOR_TRAIL_CORE = 0xffffff; // corps du ruban
+export const COLOR_TRAIL_SPARK = 0xfff3c4; // éclat central, chaud
+
+// ------------------------------------------------------------------
+// Game feel
+// ------------------------------------------------------------------
+// Hit-stop : micro-gel du jeu à l'impact. C'est la technique de « juice »
+// la plus efficace — c'est cette pause qui fait qu'un coup CLAQUE au lieu
+// de simplement se produire. Durées proportionnées à l'importance du coup.
+export const HITSTOP_CRIT_MS = 45;
+export const HITSTOP_COMBO_MS = 70;
+export const HITSTOP_GRENADE_MS = 95;
+export const HITSTOP_BOMB_MS = 130;
+
+// Squash & stretch : les moitiés jaillissent étirées dans l'axe de la coupe
+// puis reprennent leur forme. « La technique qui fait le plus pour la
+// vivacité » — et elle ne coûte qu'un tween.
+export const HALF_SQUASH_X = 1.34;
+export const HALF_SQUASH_Y = 0.7;
+export const HALF_SQUASH_MS = 210;
+
+// Fondus entre scènes : une coupure sèche fait « page web qui change »
+export const SCENE_FADE_MS = 260;
+
+// ------------------------------------------------------------------
+// Écran de fin
+// ------------------------------------------------------------------
+// Médailles : paliers de score par mode. Le Chrono dure 60 s alors qu'une
+// partie Classique peut s'éterniser, ses seuils sont donc plus bas.
+export const MEDAL_THRESHOLDS: Record<GameMode, readonly [number, number, number]> = {
+  classic: [400, 1200, 2500],
+  chrono: [300, 800, 1600],
+};
+export const MEDAL_COLORS = [0xcd7f32, 0xc0c8d0, 0xffcf40] as const; // bronze, argent, or
+export const MEDAL_LABELS = ['BRONZE', 'ARGENT', 'OR'] as const;
+// Le score se dévoile en défilant : un total qui s'affiche d'un coup ne se
+// savoure pas. Durée fixe, indépendante du score, pour ne pas faire attendre.
+export const GAMEOVER_COUNT_MS = 900;
+export const GAMEOVER_STEP_MS = 130; // décalage entre deux éléments révélés
 
 // ------------------------------------------------------------------
 // Typographie

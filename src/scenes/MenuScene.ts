@@ -14,7 +14,7 @@ import { music } from '../systems/MusicManager';
 import { FRUIT_VARIETIES, wholeTextureKey, type FruitVariety } from '../utils/fruitCatalog';
 import { SliceTrail } from '../entities/SliceTrail';
 import { AnimatedBackground } from '../entities/AnimatedBackground';
-import { createMuteButton, addVignette } from '../utils/ui';
+import { createMuteButton, addVignette, fadeIn, fadeToScene } from '../utils/ui';
 
 /** Un emblème-fruit tranchable qui lance un mode de jeu. */
 interface ModeEmblem {
@@ -57,7 +57,7 @@ export class MenuScene extends Phaser.Scene {
     this.slicing = false;
     this.emblems = [];
 
-    new AnimatedBackground(this);
+    new AnimatedBackground(this, true);
     music.ensureRunning();
 
     const title = this.add
@@ -111,6 +111,7 @@ export class MenuScene extends Phaser.Scene {
     this.registerPointerEvents();
     addVignette(this);
     createMuteButton(this, w - 52, h - 52);
+    fadeIn(this);
   }
 
   update(): void {
@@ -259,6 +260,7 @@ export class MenuScene extends Phaser.Scene {
       duration: 220,
       ease: 'Cubic.easeOut',
     });
-    this.time.delayedCall(240, () => this.scene.start('GameScene', { mode }));
+    // On laisse l'emblème finir d'exploser avant d'enchaîner le fondu
+    this.time.delayedCall(240, () => fadeToScene(this, 'GameScene', { mode }));
   }
 }

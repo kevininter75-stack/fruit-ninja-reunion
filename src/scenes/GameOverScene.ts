@@ -1,9 +1,21 @@
 import Phaser from 'phaser';
-import { type GameMode, type GameOverReason, GAME_FONT } from '../utils/constants';
+import {
+  type GameMode,
+  type GameOverReason,
+  GAME_FONT,
+  FONT_DIGITS,
+  MEDAL_THRESHOLDS,
+  MEDAL_COLORS,
+  MEDAL_LABELS,
+  GAMEOVER_COUNT_MS,
+  GAMEOVER_STEP_MS,
+  TEX_RING,
+  TEX_JUICE,
+} from '../utils/constants';
 import { getBestScore, saveBestScore } from '../utils/bestScore';
 import { sfx } from '../systems/SfxManager';
 import { AnimatedBackground } from '../entities/AnimatedBackground';
-import { addVignette } from '../utils/ui';
+import { addVignette, fadeIn, fadeToScene } from '../utils/ui';
 
 /** Données passées par la GameScene à la fin d'une partie. */
 interface GameOverData {
@@ -22,8 +34,13 @@ const REASON_DISPLAY: Record<GameOverReason, { title: string; subtitle: string; 
 };
 
 /**
- * Écran de fin : score final, record persistant (localStorage),
- * relance dans le même mode ou retour au menu.
+ * Écran de fin.
+ *
+ * Il ne se contente pas d'afficher des chiffres : il les MET EN SCÈNE. Les
+ * éléments se révèlent l'un après l'autre, le score défile jusqu'à son total,
+ * et une médaille récompense le palier atteint. Un écran de fin qui s'affiche
+ * d'un bloc se lit comme un formulaire ; échelonné, il se lit comme un bilan.
+ *
  * Responsive : boutons empilés en portrait, côte à côte en paysage.
  */
 export class GameOverScene extends Phaser.Scene {
@@ -32,6 +49,11 @@ export class GameOverScene extends Phaser.Scene {
   private reason: GameOverReason = 'lives';
   private fruitsSliced = 0;
   private bestCombo = 0;
+
+  /** Cible du tween de défilement du score. */
+  private readonly counter = { value: 0 };
+  private scoreValue!: Phaser.GameObjects.BitmapText;
+  private shownScore = 0;
 
   constructor() {
     super('GameOverScene');
@@ -43,101 +65,284 @@ export class GameOverScene extends Phaser.Scene {
     this.reason = data.reason ?? 'lives';
     this.fruitsSliced = data.fruitsSliced ?? 0;
     this.bestCombo = data.bestCombo ?? 0;
+    // La scène est réutilisée : le compteur doit repartir de zéro
+    this.counter.value = 0;
+    this.shownScore = 0;
   }
 
   create(): void {
     const w = this.scale.width;
     const h = this.scale.height;
+    const portrait = h > w;
 
-    new AnimatedBackground(this);
-    this.add.rectangle(0, 0, w, h, 0x0b2a3a, 0.55).setOrigin(0);
+    new AnimatedBackground(this, true);
+    this.add.rectangle(0, 0, w, h, 0x0b2a3a, 0.62).setOrigin(0);
 
     const display = REASON_DISPLAY[this.reason];
+    // Le record est calculé AVANT tout affichage : la célébration dépend de lui
+    const isNewRecord = saveBestScore(this.mode, this.finalScore);
+    const medal = this.medalIndex();
 
-    this.add
-      .text(w / 2, h * 0.2, display.title, {
+    // Disposition explicite par orientation. Le paysage ne fait que 720 px de
+    // haut : empiler titre + score + médaille + record + stats + boutons y
+    // provoquait des chevauchements. La médaille passe donc SUR LE CÔTÉ du
+    // score en paysage, et reste dessous en portrait où la place ne manque pas.
+    const L = portrait
+      ? { title: 0.14, sub: 0.21, scoreLabel: 0.3, score: 0.33, scoreSize: 76,
+          medalX: w / 2, medalY: h * 0.47, record: 0.6, stats: 0.66 }
+      : { title: 0.12, sub: 0.19, scoreLabel: 0.29, score: 0.32, scoreSize: 68,
+          medalX: w / 2 - 300, medalY: h * 0.37, record: 0.53, stats: 0.62 };
+
+    // --- Titre et cause, révélés en premier ---
+    const title = this.add
+      .text(w / 2, h * L.title, display.title, {
         fontFamily: GAME_FONT,
-        fontSize: '84px',
-        fontStyle: 'bold',
+        fontSize: portrait ? '78px' : '80px',
+        fontStyle: '700',
         color: display.color,
-        stroke: '#2d3a4a',
+        stroke: '#1d2731',
         strokeThickness: 10,
       })
       .setOrigin(0.5);
+    this.reveal(title, 0, true);
 
-    this.add
-      .text(w / 2, h * 0.33, display.subtitle, {
+    const subtitle = this.add
+      .text(w / 2, h * L.sub, display.subtitle, {
         fontFamily: GAME_FONT,
-        fontSize: '32px',
+        fontSize: '30px',
         color: '#fff3e0',
       })
       .setOrigin(0.5);
+    this.reveal(subtitle, 1);
 
-    this.add
-      .text(w / 2, h * 0.47, `Score : ${this.finalScore}`, {
+    // --- Score en gros chiffres, qui défile jusqu'au total ---
+    const label = this.add
+      .text(w / 2, h * L.scoreLabel, 'SCORE', {
         fontFamily: GAME_FONT,
-        fontSize: '60px',
-        fontStyle: 'bold',
-        color: '#ffffff',
+        fontSize: '26px',
+        fontStyle: '600',
+        color: '#9fd0e6',
       })
       .setOrigin(0.5);
+    this.reveal(label, 2);
 
-    this.createRecordText();
-    this.createStatsText();
+    this.scoreValue = this.add
+      .bitmapText(w / 2, h * L.score, FONT_DIGITS, '0', L.scoreSize)
+      .setOrigin(0.5, 0);
+    this.reveal(this.scoreValue, 2);
+    this.countScoreUp();
+
+    // --- Médaille (si palier atteint) ---
+    if (medal >= 0) {
+      this.createMedal(L.medalX, L.medalY, medal);
+    }
+
+    // --- Record ---
+    this.createRecordLine(h * L.record, isNewRecord);
+
+    // --- Statistiques ---
+    const stats = this.add
+      .text(w / 2, h * L.stats, this.statsLine(), {
+        fontFamily: GAME_FONT,
+        fontSize: '27px',
+        color: '#cfe6f0',
+      })
+      .setOrigin(0.5);
+    this.reveal(stats, 6);
+
     this.createButtons();
     addVignette(this);
+    fadeIn(this);
   }
 
-  /** Ligne de statistiques : fruits tranchés et meilleur combo d'un geste. */
-  private createStatsText(): void {
+  /**
+   * Apparition échelonnée : chaque élément monte en place avec un léger
+   * retard sur le précédent. C'est ce décalage qui transforme une liste
+   * statique en révélation.
+   */
+  private reveal(
+    target: Phaser.GameObjects.Text | Phaser.GameObjects.BitmapText | Phaser.GameObjects.Container,
+    step: number,
+    big = false
+  ): void {
+    target.setAlpha(0);
+    const baseY = target.y;
+    target.setY(baseY + 26);
+    this.tweens.add({
+      targets: target,
+      alpha: 1,
+      y: baseY,
+      duration: big ? 420 : 300,
+      delay: step * GAMEOVER_STEP_MS,
+      ease: 'Back.easeOut',
+    });
+  }
+
+  /** Fait défiler le score de 0 à son total, avec un « clic » à l'arrivée. */
+  private countScoreUp(): void {
+    if (this.finalScore <= 0) {
+      this.scoreValue.setText('0');
+      return;
+    }
+    this.tweens.add({
+      targets: this.counter,
+      value: this.finalScore,
+      duration: GAMEOVER_COUNT_MS,
+      delay: GAMEOVER_STEP_MS * 3,
+      ease: 'Cubic.easeOut',
+      onUpdate: () => {
+        const shown = Math.round(this.counter.value);
+        if (shown !== this.shownScore) {
+          this.shownScore = shown;
+          this.scoreValue.setText(String(shown));
+        }
+      },
+      onComplete: () => {
+        // Petite poussée finale : le total « se pose »
+        this.scoreValue.setText(String(this.finalScore));
+        this.tweens.add({
+          targets: this.scoreValue,
+          scale: 1.14,
+          duration: 140,
+          yoyo: true,
+          ease: 'Sine.easeOut',
+        });
+      },
+    });
+  }
+
+  /** Palier de médaille atteint : -1 si aucun, sinon 0=bronze, 1=argent, 2=or. */
+  private medalIndex(): number {
+    const thresholds = MEDAL_THRESHOLDS[this.mode];
+    let index = -1;
+    for (let i = 0; i < thresholds.length; i++) {
+      if (this.finalScore >= thresholds[i]) {
+        index = i;
+      }
+    }
+    return index;
+  }
+
+  /**
+   * Médaille : un disque coloré avec liseré et libellé, qui arrive en
+   * tournant. Assemblée dans un Container pour être animée d'un bloc.
+   */
+  private createMedal(x: number, y: number, medal: number): void {
+    const color = MEDAL_COLORS[medal];
+    const container = this.add.container(x, y);
+
+    const halo = this.add
+      .image(0, 0, TEX_RING)
+      .setDisplaySize(190, 190)
+      .setTint(color)
+      .setAlpha(0.5)
+      .setBlendMode(Phaser.BlendModes.ADD);
+    container.add(halo);
+
+    const disc = this.add.graphics();
+    disc.fillStyle(color, 1);
+    disc.fillCircle(0, 0, 40);
+    disc.fillStyle(0xffffff, 0.28);
+    disc.fillCircle(-12, -14, 18); // reflet
+    disc.lineStyle(4, 0xffffff, 0.75);
+    disc.strokeCircle(0, 0, 40);
+    container.add(disc);
+
+    const label = this.add
+      .text(0, 68, MEDAL_LABELS[medal], {
+        fontFamily: GAME_FONT,
+        fontSize: '24px',
+        fontStyle: '700',
+        color: '#ffffff',
+        stroke: '#1d2731',
+        strokeThickness: 5,
+      })
+      .setOrigin(0.5);
+    container.add(label);
+
+    // Arrivée en rotation : la médaille « tombe » sur l'écran
+    container.setAlpha(0).setScale(0.2).setAngle(-140);
+    this.tweens.add({
+      targets: container,
+      alpha: 1,
+      scale: 1,
+      angle: 0,
+      duration: 520,
+      delay: GAMEOVER_STEP_MS * 3 + GAMEOVER_COUNT_MS * 0.7,
+      ease: 'Back.easeOut',
+    });
+    // Le halo respire une fois posée
+    this.tweens.add({
+      targets: halo,
+      alpha: 0.8,
+      duration: 900,
+      delay: GAMEOVER_STEP_MS * 3 + GAMEOVER_COUNT_MS,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+  }
+
+  /** « Nouveau record ! » célébré, ou rappel du record courant du mode. */
+  private createRecordLine(y: number, isNewRecord: boolean): void {
     const w = this.scale.width;
-    const h = this.scale.height;
+    if (!isNewRecord) {
+      const line = this.add
+        .text(w / 2, y, `Record : ${getBestScore(this.mode)}`, {
+          fontFamily: GAME_FONT,
+          fontSize: '30px',
+          color: '#fff3e0',
+        })
+        .setOrigin(0.5);
+      this.reveal(line, 5);
+      return;
+    }
+
+    const record = this.add
+      .text(w / 2, y, '★ NOUVEAU RECORD ! ★', {
+        fontFamily: GAME_FONT,
+        fontSize: '40px',
+        fontStyle: '700',
+        color: '#ffe066',
+        stroke: '#1d2731',
+        strokeThickness: 6,
+      })
+      .setOrigin(0.5);
+    this.reveal(record, 5);
+    this.tweens.add({
+      targets: record,
+      scale: 1.1,
+      duration: 520,
+      delay: GAMEOVER_STEP_MS * 5 + 400,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+
+    // Gerbe de confettis à l'annonce : le record se fête
+    const confetti = this.add
+      .particles(w / 2, y, TEX_JUICE, {
+        speed: { min: 180, max: 460 },
+        angle: { min: 200, max: 340 },
+        scale: { start: 0.9, end: 0 },
+        lifespan: { min: 700, max: 1300 },
+        gravityY: 620,
+        tint: [0xffe066, 0xff6b6b, 0x7fd4f0, 0x9be36f],
+        emitting: false,
+      })
+      .setDepth(60);
+    this.time.delayedCall(GAMEOVER_STEP_MS * 5 + 250, () => {
+      confetti.emitParticleAt(w / 2, y, 40);
+      sfx.bonus();
+    });
+  }
+
+  private statsLine(): string {
     let text = `${this.fruitsSliced} fruits tranchés`;
     if (this.bestCombo >= 2) {
       text += `   ·   Meilleur combo : x${this.bestCombo}`;
     }
-    this.add
-      .text(w / 2, h * 0.66, text, {
-        fontFamily: GAME_FONT,
-        fontSize: '28px',
-        color: '#cfe6f0',
-      })
-      .setOrigin(0.5);
-  }
-
-  /** Affiche « Nouveau record ! » (animé) ou le record courant du mode. */
-  private createRecordText(): void {
-    const w = this.scale.width;
-    const h = this.scale.height;
-    const isNewRecord = saveBestScore(this.mode, this.finalScore);
-    if (isNewRecord) {
-      const record = this.add
-        .text(w / 2, h * 0.58, '★ Nouveau record ! ★', {
-          fontFamily: GAME_FONT,
-          fontSize: '40px',
-          fontStyle: 'bold',
-          color: '#ffe066',
-          stroke: '#2d3a4a',
-          strokeThickness: 6,
-        })
-        .setOrigin(0.5);
-      this.tweens.add({
-        targets: record,
-        scale: 1.12,
-        duration: 500,
-        yoyo: true,
-        repeat: -1,
-        ease: 'Sine.easeInOut',
-      });
-    } else {
-      this.add
-        .text(w / 2, h * 0.58, `Record : ${getBestScore(this.mode)}`, {
-          fontFamily: GAME_FONT,
-          fontSize: '32px',
-          color: '#fff3e0',
-        })
-        .setOrigin(0.5);
-    }
+    return text;
   }
 
   private createButtons(): void {
@@ -147,21 +352,24 @@ export class GameOverScene extends Phaser.Scene {
 
     // Portrait : boutons empilés ; paysage : côte à côte
     const replayX = portrait ? w / 2 : w / 2 - 150;
-    const replayY = portrait ? h * 0.71 : h * 0.78;
+    const replayY = portrait ? h * 0.78 : h * 0.83;
     const menuX = portrait ? w / 2 : w / 2 + 150;
-    const menuY = portrait ? h * 0.81 : h * 0.78;
+    const menuY = portrait ? h * 0.88 : h * 0.83;
 
-    this.makeButton(replayX, replayY, 264, 78, 'Rejouer', 0xe0455a, () => {
+    this.makeButton(replayX, replayY, 264, 78, 'Rejouer', 0xe0455a, 7, () => {
       sfx.click();
-      this.scene.start('GameScene', { mode: this.mode });
+      fadeToScene(this, 'GameScene', { mode: this.mode });
     });
-    this.makeButton(menuX, menuY, 224, 70, 'Menu', 0x2d3a4a, () => {
+    this.makeButton(menuX, menuY, 224, 70, 'Menu', 0x2d3a4a, 8, () => {
       sfx.click();
-      this.scene.start('MenuScene');
+      fadeToScene(this, 'MenuScene');
     });
   }
 
-  /** Bouton arrondi : cartouche plein + liseré clair + libellé + zone tactile. */
+  /**
+   * Bouton arrondi assemblé dans un Container (fond + libellé) pour que
+   * l'apparition échelonnée et l'effet d'appui portent sur l'ensemble.
+   */
   private makeButton(
     x: number,
     y: number,
@@ -169,24 +377,49 @@ export class GameOverScene extends Phaser.Scene {
     height: number,
     label: string,
     fill: number,
+    step: number,
     onClick: () => void
   ): void {
+    const container = this.add.container(x, y);
+
     const g = this.add.graphics();
+    g.fillStyle(0x000000, 0.3);
+    g.fillRoundedRect(-width / 2, -height / 2 + 5, width, height, height / 2);
     g.fillStyle(fill, 1);
-    g.fillRoundedRect(x - width / 2, y - height / 2, width, height, height / 2);
+    g.fillRoundedRect(-width / 2, -height / 2, width, height, height / 2);
     g.lineStyle(3, 0xffffff, 0.85);
-    g.strokeRoundedRect(x - width / 2, y - height / 2, width, height, height / 2);
-    this.add
-      .text(x, y, label, {
-        fontFamily: GAME_FONT,
-        fontSize: '40px',
-        fontStyle: 'bold',
-        color: '#ffffff',
-      })
-      .setOrigin(0.5);
+    g.strokeRoundedRect(-width / 2, -height / 2, width, height, height / 2);
+    container.add(g);
+
+    container.add(
+      this.add
+        .text(0, 0, label, {
+          fontFamily: GAME_FONT,
+          fontSize: '40px',
+          fontStyle: '700',
+          color: '#ffffff',
+        })
+        .setOrigin(0.5)
+    );
+
+    // La zone tactile reste un objet de scène (hors container) : un container
+    // n'a pas de taille propre, le rendre interactif demanderait de la fixer
+    // à la main — inutile ici.
     this.add
       .zone(x, y, width, height)
       .setInteractive({ useHandCursor: true })
-      .on('pointerdown', onClick);
+      .on('pointerdown', () => {
+        // Effet d'appui : le bouton s'enfonce avant d'agir
+        this.tweens.add({
+          targets: container,
+          scale: 0.94,
+          duration: 90,
+          yoyo: true,
+          ease: 'Sine.easeOut',
+        });
+        onClick();
+      });
+
+    this.reveal(container, step);
   }
 }

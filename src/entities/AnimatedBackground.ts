@@ -27,12 +27,17 @@ import {
  * (et donc à chaque rotation), il lit la taille courante de l'écran.
  */
 export class AnimatedBackground {
-  constructor(scene: Phaser.Scene) {
+  /**
+   * @param parallax Active la dérive en parallaxe des plans du décor. Réservé
+   * aux écrans hors-jeu (menu, fin de partie) : en pleine partie, un décor qui
+   * bouge sous des fruits qui volent brouille la lecture de l'action.
+   */
+  constructor(scene: Phaser.Scene, parallax = false) {
     const w = scene.scale.width;
     const h = scene.scale.height;
 
     // Décor de base (adapté à l'orientation)
-    scene.add.image(0, 0, backgroundKey(scene)).setOrigin(0).setDepth(DEPTH_BG_BASE);
+    const base = scene.add.image(0, 0, backgroundKey(scene)).setOrigin(0).setDepth(DEPTH_BG_BASE);
 
     // Halo de soleil qui respire, en fusion additive pour un vrai rayonnement
     const glow = scene.add
@@ -40,6 +45,10 @@ export class AnimatedBackground {
       .setDepth(DEPTH_BG_GLOW)
       .setBlendMode(Phaser.BlendModes.ADD)
       .setAlpha(0.55);
+
+    if (parallax) {
+      this.addParallaxDrift(scene, base, glow, w, h);
+    }
     scene.tweens.add({
       targets: glow,
       scale: 1.14,
@@ -74,6 +83,56 @@ export class AnimatedBackground {
    * On les répartit dès le départ avec seek() (position aléatoire dans le
    * cycle) pour éviter qu'ils entrent tous en même temps.
    */
+  /**
+   * Dérive en parallaxe : les plans du décor oscillent lentement, d'autant
+   * plus que l'on est près de l'observateur. Le décor gagne de la profondeur
+   * sans qu'aucune scène n'ait à calculer quoi que ce soit par frame.
+   *
+   * Le fond est légèrement AGRANDI avant d'être déplacé : à taille exacte,
+   * le moindre décalage découvrirait le bord de l'écran.
+   *
+   * Les périodes X et Y sont volontairement différentes (et non multiples) :
+   * la trajectoire ne se referme jamais sur elle-même, le mouvement ne
+   * paraît donc pas cyclique.
+   */
+  private addParallaxDrift(
+    scene: Phaser.Scene,
+    base: Phaser.GameObjects.Image,
+    glow: Phaser.GameObjects.Image,
+    w: number,
+    h: number
+  ): void {
+    const amplitude = w * 0.016;
+    base.setDisplaySize(w * 1.05, h * 1.05).setPosition(-w * 0.025, -h * 0.025);
+
+    scene.tweens.add({
+      targets: base,
+      x: base.x + amplitude,
+      duration: 9000,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+    scene.tweens.add({
+      targets: base,
+      y: base.y + amplitude * 0.6,
+      duration: 7000, // période différente de X : trajectoire jamais bouclée
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+
+    // Le soleil est le plan le plus lointain : il bouge deux fois moins
+    scene.tweens.add({
+      targets: glow,
+      x: glow.x - amplitude * 0.45,
+      duration: 9000,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+  }
+
   private createDriftingClouds(scene: Phaser.Scene, w: number, h: number): void {
     for (let i = 0; i < BG_CLOUD_COUNT; i++) {
       const y = h * Phaser.Math.FloatBetween(0.05, 0.3);
