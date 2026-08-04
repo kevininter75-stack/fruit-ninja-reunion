@@ -13,6 +13,13 @@ import {
   TEX_CLOUD,
   TEX_VIGNETTE,
   TEX_RING,
+  TEX_CROSS,
+  FONT_DIGITS,
+  DIGIT_CHARS,
+  DIGIT_CELL_W,
+  DIGIT_CELL_H,
+  DIGIT_FONT_SIZE,
+  GAME_FONT,
   SUN_FRAC_X,
   SUN_FRAC_Y,
 } from '../utils/constants';
@@ -58,7 +65,138 @@ export class PreloadScene extends Phaser.Scene {
     this.createCloudTexture();
     this.createVignetteTexture();
     this.createRingTexture();
+    this.createCrossTexture();
+    this.createDigitFont();
     this.scene.start('MenuScene');
+  }
+
+  /**
+   * Croix de vie « peinte » : deux coups de pinceau croisés aux bords
+   * irréguliers, plus quelques gouttelettes. Générée en blanc et teintée à
+   * l'affichage (rouge = strike encaissé, gris-bleu = vie disponible).
+   * Le caractère ✕ d'une police faisait « page web » ; un tracé peint parle
+   * le même langage visuel que les éclaboussures de jus du jeu.
+   */
+  private createCrossTexture(): void {
+    const size = 128;
+    const tex = this.textures.createCanvas(TEX_CROSS, size, size);
+    if (tex === null) {
+      return;
+    }
+    const ctx = tex.getContext();
+    ctx.fillStyle = '#ffffff';
+
+    // Un trait effilé aux extrémités : on assemble deux courbes de Bézier
+    // qui s'écartent au centre, ce qui donne le renflement du pinceau.
+    const stroke = (x1: number, y1: number, x2: number, y2: number, w: number): void => {
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const len = Math.hypot(dx, dy);
+      const nx = -dy / len; // normale unitaire au trait
+      const ny = dx / len;
+      const mx = (x1 + x2) / 2;
+      const my = (y1 + y2) / 2;
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.quadraticCurveTo(mx + nx * w, my + ny * w, x2, y2);
+      ctx.quadraticCurveTo(mx - nx * w * 0.82, my - ny * w * 0.82, x1, y1);
+      ctx.closePath();
+      ctx.fill();
+    };
+
+    const m = 24; // marge : le trait ne doit pas toucher le bord du canvas
+    stroke(m, m, size - m, size - m, 13);
+    stroke(size - m, m + 4, m + 4, size - m, 12);
+
+    // Éclaboussures : ce sont elles qui font « peint » plutôt que « dessiné »
+    for (const [cx, cy, r] of [
+      [size - m + 6, m - 6, 5],
+      [m - 8, size - m + 8, 4],
+      [size * 0.5 + 26, size * 0.5 - 30, 3.5],
+      [size * 0.5 - 30, size * 0.5 + 24, 3],
+      [size - m + 12, size * 0.5 + 6, 2.5],
+    ]) {
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    tex.refresh();
+  }
+
+  /**
+   * Planche de chiffres du HUD : les dix chiffres tracés dans la police du
+   * jeu, avec dégradé, contour sombre et reflet — puis déclarée à Phaser
+   * comme police bitmap à chasse fixe (RetroFont).
+   *
+   * Double bénéfice : un rendu de chiffres bien plus riche qu'un simple
+   * objet Text, et surtout aucune reconstruction de texture quand le score
+   * change (un Text refait son canvas et le renvoie au GPU à chaque appel).
+   */
+  private createDigitFont(): void {
+    const w = DIGIT_CELL_W;
+    const h = DIGIT_CELL_H;
+    const count = DIGIT_CHARS.length;
+    const tex = this.textures.createCanvas(FONT_DIGITS, w * count, h);
+    if (tex === null) {
+      return;
+    }
+    const ctx = tex.getContext();
+    ctx.font = `700 ${DIGIT_FONT_SIZE}px ${GAME_FONT}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineJoin = 'round';
+
+    for (let i = 0; i < count; i++) {
+      const cx = i * w + w / 2;
+      const cy = h / 2 + 2;
+      const char = DIGIT_CHARS[i];
+
+      // Ombre portée douce : détache le chiffre du décor sans le salir
+      ctx.save();
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.55)';
+      ctx.shadowBlur = 10;
+      ctx.shadowOffsetY = 3;
+      ctx.strokeStyle = '#26313d';
+      ctx.lineWidth = 11;
+      ctx.strokeText(char, cx, cy);
+      ctx.restore();
+
+      // Corps : dégradé vertical crème → or, comme la chair d'un fruit mûr
+      const grad = ctx.createLinearGradient(0, cy - DIGIT_FONT_SIZE * 0.5, 0, cy + DIGIT_FONT_SIZE * 0.5);
+      grad.addColorStop(0, '#ffffff');
+      grad.addColorStop(0.5, '#ffe9a8');
+      grad.addColorStop(1, '#f7b733');
+      ctx.fillStyle = grad;
+      ctx.fillText(char, cx, cy);
+
+      // Reflet sur la moitié haute : donne le relief bombé
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(i * w, 0, w, h * 0.42);
+      ctx.clip();
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
+      ctx.fillText(char, cx, cy);
+      ctx.restore();
+    }
+    tex.refresh();
+
+    // Déclaration en police bitmap à chasse fixe : les chiffres partagent la
+    // même largeur, la planche est donc régulière et se découpe simplement.
+    this.cache.bitmapFont.add(
+      FONT_DIGITS,
+      Phaser.GameObjects.RetroFont.Parse(this, {
+        image: FONT_DIGITS,
+        width: w,
+        height: h,
+        chars: DIGIT_CHARS,
+        charsPerRow: count,
+        'offset.x': 0,
+        'offset.y': 0,
+        'spacing.x': 0,
+        'spacing.y': 0,
+        lineSpacing: 0,
+      })
+    );
   }
 
   /** Onde de choc : anneau clair à bord fondu, agrandi puis effacé en tween. */

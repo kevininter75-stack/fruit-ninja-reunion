@@ -14,14 +14,20 @@
  * immédiatement ; le client se recharge alors une fois (voir main.ts,
  * écouteur 'controllerchange'). Incrémenter CACHE_NAME purge l'ancien cache.
  */
-const CACHE_NAME = 'fnr-v2';
+const CACHE_NAME = 'fnr-v3';
 const PRECACHE = [
   '.',
   'index.html',
   'manifest.webmanifest',
+  // La police est préchargée explicitement : son URL n'est pas hachée et le
+  // jeu ATTEND son chargement pour démarrer (cf. main.ts). Sans elle en
+  // cache, la première partie hors-ligne resterait bloquée sur l'attente.
+  'fonts/fredoka-latin.woff2',
   'icons/icon-192.png',
   'icons/icon-512.png',
+  'icons/icon-192-maskable.png',
   'icons/icon-512-maskable.png',
+  'icons/icon-180.png',
 ];
 
 self.addEventListener('install', (event) => {

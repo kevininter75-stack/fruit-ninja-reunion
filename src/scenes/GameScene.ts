@@ -26,6 +26,11 @@ import {
   FRENZY_HIT_PUNCH,
   COMBO_PUNCH_ZOOM,
   COMBO_PUNCH_MS,
+  GAME_FONT,
+  FONT_DIGITS,
+  TEX_CROSS,
+  CROSS_COLOR_LIT,
+  CROSS_COLOR_DIM,
   FRENZY_SETTLE_MARGIN,
   FRENZY_BOB_PX,
   FRENZY_DURATION_MS,
@@ -116,7 +121,6 @@ export class GameScene extends Phaser.Scene {
   private readonly fuseTip = new Phaser.Math.Vector2(); // réutilisé (pas d'alloc/frame)
   private frameCount = 0;
   private flashRect!: Phaser.GameObjects.Rectangle;
-  private scoreText!: Phaser.GameObjects.Text;
   private infoText!: Phaser.GameObjects.Text; // compte à rebours (mode Chrono uniquement)
   /** Halo doré collé à la grenade tant qu'elle est en scène. */
   private frenzyAura!: Phaser.GameObjects.Image;
@@ -126,7 +130,13 @@ export class GameScene extends Phaser.Scene {
   private frenzyGrenade: Fruit | null = null;
   /** Pool d'ondes de choc (effets de la grenade). */
   private rings!: Phaser.GameObjects.Group;
-  private lifeCrosses: Phaser.GameObjects.Text[] = []; // strikes (mode Classique)
+  private lifeCrosses: Phaser.GameObjects.Image[] = []; // strikes peints (mode Classique)
+  /** Nombre du score, en chiffres bitmap (aucune texture reconstruite). */
+  private scoreValue!: Phaser.GameObjects.BitmapText;
+  /** Valeur actuellement affichée — évite de réécrire le texte pour rien. */
+  private displayedScore = 0;
+  /** Cible du tween de défilement du score. */
+  private readonly scoreCounter = { value: 0 };
   /** Nb de croix allumées au dernier rendu — sert à repérer celle qui change. */
   private filledCrosses = 0;
   /** Éléments du HUD, estompés pendant la frénésie (cf. setHudDimmed). */
@@ -294,7 +304,7 @@ export class GameScene extends Phaser.Scene {
     // un tas illisible, puisque la grenade est presque immobile en frénésie.
     this.frenzyCounter = this.add
       .text(0, 0, '', {
-        fontFamily: '"Trebuchet MS", sans-serif',
+        fontFamily: GAME_FONT,
         fontSize: '64px',
         fontStyle: 'bold',
         color: '#ffd166',
@@ -463,26 +473,37 @@ export class GameScene extends Phaser.Scene {
     // (cf. setHudDimmed) — un HUD à moitié coupé passerait pour un défaut.
     this.hudElements = [];
 
-    // Cartouche + score (HUD "produit fini")
-    this.hudElements.push(addHudPanel(this, 14, 12, 250, 54));
-    this.scoreText = this.add
-      .text(34, 22, 'Score : 0', {
-        fontFamily: '"Trebuchet MS", sans-serif',
-        fontSize: '34px',
-        fontStyle: 'bold',
-        color: '#ffffff',
-        stroke: '#2d3a4a',
-        strokeThickness: 6,
-      })
+    // Cartouche + score. Le libellé « SCORE » est un texte figé (donc gratuit),
+    // le nombre est un BitmapText : il change à chaque fruit tranché et un
+    // objet Text reconstruirait sa texture à chaque fois.
+    this.hudElements.push(addHudPanel(this, 14, 12, 244, 84));
+    this.hudElements.push(
+      this.add
+        .text(36, 24, 'SCORE', {
+          fontFamily: GAME_FONT,
+          fontSize: '22px',
+          fontStyle: '600',
+          color: '#9fd0e6',
+        })
+        .setDepth(50)
+    );
+    this.scoreValue = this.add
+      .bitmapText(36, 44, FONT_DIGITS, '0', 44)
+      .setOrigin(0, 0)
       .setDepth(50);
-    this.hudElements.push(this.scoreText);
+    this.hudElements.push(this.scoreValue);
+    // La scène est réutilisée d'une partie à l'autre : le compteur de
+    // défilement doit repartir de zéro, sinon le score initial « descendrait »
+    // depuis celui de la partie précédente.
+    this.displayedScore = 0;
+    this.scoreCounter.value = 0;
 
     // Bannière x2 sous le score, cachée par défaut, clignote quand active
     this.multiplierBanner = this.add
-      .text(24, 78, `SCORE x${BONUS_X2_FACTOR} !`, {
-        fontFamily: '"Trebuchet MS", sans-serif',
-        fontSize: '34px',
-        fontStyle: 'bold',
+      .text(24, 106, `SCORE x${BONUS_X2_FACTOR} !`, {
+        fontFamily: GAME_FONT,
+        fontSize: '32px',
+        fontStyle: '700',
         color: '#ffd700',
         stroke: '#2d3a4a',
         strokeThickness: 6,
@@ -499,16 +520,29 @@ export class GameScene extends Phaser.Scene {
 
     const w = this.scale.width;
     if (this.mode === 'classic') {
-      this.hudElements.push(addHudPanel(this, w - 14 - 190, 12, 190, 54));
+      // Pas de libellé « VIES » : trois croix parlent d'elles-mêmes, et le
+      // texte entrait en collision avec les éclaboussures de la dernière.
+      this.hudElements.push(addHudPanel(this, w - 14 - 204, 12, 204, 84));
       this.createLifeCrosses();
       this.hudElements.push(...this.lifeCrosses);
     } else {
-      this.hudElements.push(addHudPanel(this, w - 14 - 150, 12, 150, 54));
+      this.hudElements.push(addHudPanel(this, w - 14 - 160, 12, 160, 84));
+      this.hudElements.push(
+        this.add
+          .text(w - 36, 20, 'TEMPS', {
+            fontFamily: GAME_FONT,
+            fontSize: '22px',
+            fontStyle: '600',
+            color: '#9fd0e6',
+          })
+          .setOrigin(1, 0)
+          .setDepth(50)
+      );
       this.infoText = this.add
-        .text(w - 32, 22, '60 s', {
-          fontFamily: '"Trebuchet MS", sans-serif',
-          fontSize: '38px',
-          fontStyle: 'bold',
+        .text(w - 36, 44, '60 s', {
+          fontFamily: GAME_FONT,
+          fontSize: '40px',
+          fontStyle: '700',
           color: '#ffffff',
           stroke: '#2d3a4a',
           strokeThickness: 6,
@@ -542,11 +576,13 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  /** Applique couleur et opacité des croix selon les vies restantes. */
+  /** Applique teinte et opacité des croix selon les vies restantes. */
   private syncLifeCrossStyles(): void {
     for (let i = 0; i < this.lifeCrosses.length; i++) {
       const isFilled = i < this.filledCrosses;
-      this.lifeCrosses[i].setColor(isFilled ? '#ff3b3b' : '#55697a').setAlpha(isFilled ? 1 : 0.5);
+      this.lifeCrosses[i]
+        .setTint(isFilled ? CROSS_COLOR_LIT : CROSS_COLOR_DIM)
+        .setAlpha(isFilled ? 1 : 0.55);
     }
   }
 
@@ -558,23 +594,21 @@ export class GameScene extends Phaser.Scene {
   private createLifeCrosses(): void {
     this.lifeCrosses = [];
     this.filledCrosses = 0;
-    const gap = 50;
-    const rightEdge = this.scale.width - 36;
+    // Croix centrées dans leur cartouche (panneau de 204 px collé au bord)
+    // Écart généreux : les éclaboussures débordent largement du corps de la
+    // croix, deux croix trop proches se lisaient comme une seule tache.
+    const gap = 64;
+    const panelCenterX = this.scale.width - 14 - 204 / 2;
     for (let i = 0; i < STARTING_LIVES; i++) {
       // i = 0 le plus à gauche : les croix s'allument de gauche à droite
-      const x = rightEdge - (STARTING_LIVES - 1 - i) * gap;
+      const x = panelCenterX + (i - (STARTING_LIVES - 1) / 2) * gap;
       const cross = this.add
-        .text(x, 24, '✕', {
-          fontFamily: '"Trebuchet MS", sans-serif',
-          fontSize: '40px',
-          fontStyle: 'bold',
-          color: '#55697a', // gris-bleu éteint : "vie encore disponible"
-          stroke: '#2d3a4a',
-          strokeThickness: 6,
-        })
-        .setOrigin(0.5, 0)
+        .image(x, 54, TEX_CROSS)
+        .setDisplaySize(40, 40)
+        .setOrigin(0.5)
         .setDepth(50)
-        .setAlpha(0.5);
+        .setTint(CROSS_COLOR_DIM)
+        .setAlpha(0.55);
       this.lifeCrosses.push(cross);
     }
   }
@@ -623,7 +657,7 @@ export class GameScene extends Phaser.Scene {
     for (let i = 0; i < POPUP_POOL_SIZE; i++) {
       const popup = this.add
         .text(0, 0, '', {
-          fontFamily: '"Trebuchet MS", sans-serif',
+          fontFamily: GAME_FONT,
           fontStyle: 'bold',
           color: '#ffffff',
           stroke: '#2d3a4a',
@@ -1050,7 +1084,7 @@ export class GameScene extends Phaser.Scene {
   private showBigBanner(message: string): void {
     const banner = this.add
       .text(this.scale.width / 2, this.scale.height * 0.34, message, {
-        fontFamily: '"Trebuchet MS", sans-serif',
+        fontFamily: GAME_FONT,
         fontSize: '76px',
         fontStyle: 'bold',
         color: '#ffe066',
@@ -1203,8 +1237,37 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * Le score ne saute pas d'un coup : il ROULE jusqu'à sa nouvelle valeur.
+   * Un compteur qui défile se lit comme une récompense, un nombre qui change
+   * instantanément se lit comme une donnée. Le tween porte sur un objet
+   * intermédiaire, et le BitmapText n'est réécrit que si l'entier a changé.
+   */
   private onScoreChanged(score: number): void {
-    this.scoreText.setText(`Score : ${score}`);
+    this.tweens.killTweensOf(this.scoreCounter);
+    this.tweens.add({
+      targets: this.scoreCounter,
+      value: score,
+      duration: 320,
+      ease: 'Cubic.easeOut',
+      onUpdate: () => {
+        const shown = Math.round(this.scoreCounter.value);
+        if (shown !== this.displayedScore) {
+          this.displayedScore = shown;
+          this.scoreValue.setText(String(shown));
+        }
+      },
+    });
+
+    // Petite poussée d'échelle à chaque gain : le score « respire »
+    this.tweens.killTweensOf(this.scoreValue);
+    this.scoreValue.setScale(1.18);
+    this.tweens.add({
+      targets: this.scoreValue,
+      scale: 1,
+      duration: 220,
+      ease: 'Back.easeOut',
+    });
   }
 
   /**
@@ -1227,13 +1290,18 @@ export class GameScene extends Phaser.Scene {
     if (target === undefined) {
       return;
     }
-    target.setScale(1.8);
+    // Coup de pinceau : la croix arrive en grand et de travers, puis se pose.
+    const baseScale = target.scaleX;
+    target.setScale(baseScale * 2.2).setAngle(Phaser.Math.Between(-35, 35));
     this.tweens.add({
       targets: target,
-      scale: 1,
-      duration: 350,
+      scaleX: baseScale,
+      scaleY: baseScale,
+      angle: Phaser.Math.Between(-8, 8), // légèrement de travers : c'est peint, pas imprimé
+      duration: 380,
       ease: 'Back.easeOut', // rebond franc : le strike "claque"
     });
+    this.cameras.main.shake(90, 0.004);
   }
 
   /** Palier de score franchi : une croix de strike s'efface. */

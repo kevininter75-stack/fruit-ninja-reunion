@@ -19,6 +19,18 @@
     <meta name="apple-mobile-web-app-title" content="FN Réunion" />
     <title>Fruit Ninja Réunion</title>
     <style>
+      /* Police d'affichage du jeu (SIL OFL, embarquée — cf. public/fonts/OFL.txt).
+         Chemin relatif pour l'hébergement en sous-chemin (GitHub Pages).
+         `font-display: block` : on préfère un bref texte invisible à un rendu
+         dans la police système qui basculerait ensuite — le jeu attend de
+         toute façon son chargement avant de démarrer (cf. main.ts). */
+      @font-face {
+        font-family: 'Fredoka';
+        src: url('fonts/fredoka-latin.woff2') format('woff2');
+        font-weight: 300 700;
+        font-style: normal;
+        font-display: block;
+      }
       /* Plein écran, pas de scroll, fond sombre pendant le chargement */
       html,
       body {

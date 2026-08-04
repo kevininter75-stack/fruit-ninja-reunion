@@ -133,6 +133,24 @@ Choix techniques notables :
   au-dessus d'elle — un popup par coup s'empilait en un tas illisible.
 - **Vie regagnée par paliers de score** : une croix de strike s'efface tous les
   1000 points ; si les trois vies sont intactes, le palier rapporte des points.
+- **Typographie** : police d'affichage Fredoka (SIL OFL, embarquée dans
+  `public/fonts/` avec sa licence), chargée AVANT la création du jeu — Phaser
+  ne précharge pas les webfonts, et la planche de chiffres du HUD serait sinon
+  gravée dans la police système. Un délai de garde de 3 s évite l'écran noir si
+  la police ne se charge pas ; le jeu bascule alors sur la pile de repli.
+- **Score en BitmapText** : les chiffres sont dessinés une fois dans une
+  planche (dégradé, contour, reflet) puis déclarés en police bitmap. Un objet
+  `Text` reconstruit sa texture canvas et la renvoie au GPU à *chaque*
+  changement — inacceptable pour un score qui bouge à chaque fruit tranché.
+  Le nombre défile jusqu'à sa nouvelle valeur au lieu de sauter.
+- **Icône PWA générée par le moteur du jeu** (`icon-gen.html`, outil de dev
+  absent du build) : le letchi est dessiné par `fruitArt.ts`, donc l'icône est
+  littéralement un morceau du jeu. Jeux séparés `any` et `maskable` — jamais
+  les deux `purpose` combinés, sinon Chrome force l'icône masquée avec ses
+  marges — contenu maskable ramené aux 80 % centraux, et `apple-touch-icon`
+  180×180 non masqué car iOS ignore le manifest.
+  Régénération : `http://localhost:3010/icon-gen.html?size=512&safe=0.8`
+  capturé en Chrome headless (`--screenshot`).
 - **Feedback systématique** : particules de jus teintées, textes flottants
   (+points, combos) recyclés depuis un pool, flash + secousse caméra sur
   bombe, records persistés en localStorage.

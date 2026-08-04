@@ -6,6 +6,7 @@ import {
   TEX_JUICE,
   DEPTH_JUICE,
   TEX_GLOW,
+  GAME_FONT,
 } from '../utils/constants';
 import { getBestScore } from '../utils/bestScore';
 import { sfx } from '../systems/SfxManager';
@@ -61,7 +62,7 @@ export class MenuScene extends Phaser.Scene {
 
     const title = this.add
       .text(w / 2, h * 0.15, portrait ? 'Fruit Ninja\nRéunion' : 'Fruit Ninja Réunion', {
-        fontFamily: '"Trebuchet MS", "Arial Rounded MT Bold", sans-serif',
+        fontFamily: GAME_FONT,
         fontSize: '76px',
         fontStyle: 'bold',
         color: '#ffffff',
@@ -75,7 +76,7 @@ export class MenuScene extends Phaser.Scene {
 
     this.add
       .text(w / 2, h * (portrait ? 0.26 : 0.28), 'Tranchez un fruit pour choisir !', {
-        fontFamily: '"Trebuchet MS", sans-serif',
+        fontFamily: GAME_FONT,
         fontSize: '34px',
         color: '#fff3e0',
         align: 'center',
@@ -166,7 +167,7 @@ export class MenuScene extends Phaser.Scene {
 
     this.add
       .text(x, y + radius + 16, label, {
-        fontFamily: '"Trebuchet MS", sans-serif',
+        fontFamily: GAME_FONT,
         fontSize: '46px',
         fontStyle: 'bold',
         color: '#ffffff',
@@ -176,7 +177,7 @@ export class MenuScene extends Phaser.Scene {
       .setOrigin(0.5, 0);
     this.add
       .text(x, y + radius + 68, subtitle, {
-        fontFamily: '"Trebuchet MS", sans-serif',
+        fontFamily: GAME_FONT,
         fontSize: '26px',
         color: '#fff3e0',
       })

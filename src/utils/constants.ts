@@ -150,6 +150,30 @@ export const COMBO_WINDOW_MS = 300;
 export const COLOR_TRAIL = 0xffffff;
 
 // ------------------------------------------------------------------
+// Typographie
+// ------------------------------------------------------------------
+// Police d'affichage du jeu (Fredoka, SIL OFL, embarquée dans public/fonts).
+// Ronde et généreuse, avec des chiffres très lisibles en petit — critère
+// décisif pour un score sur mobile. La pile de repli garantit un rendu
+// correct si la webfont ne se charge pas.
+export const GAME_FONT = '"Fredoka", "Trebuchet MS", sans-serif';
+
+// Planche de chiffres du HUD : générée une fois au préchargement puis
+// utilisée en BitmapText. Un objet Text Phaser reconstruit sa texture canvas
+// et la renvoie au GPU À CHAQUE changement — inacceptable pour un score qui
+// bouge à chaque fruit tranché.
+export const FONT_DIGITS = 'hud_digits';
+export const DIGIT_CHARS = '0123456789';
+export const DIGIT_CELL_W = 62; // largeur de cellule de la planche
+export const DIGIT_CELL_H = 86;
+export const DIGIT_FONT_SIZE = 72; // taille de tracé dans la planche
+
+// Croix de vie peintes (remplacent le glyphe ✕, qui faisait « page web »)
+export const TEX_CROSS = 'cross_splat';
+export const CROSS_COLOR_LIT = 0xff3b3b; // strike encaissé
+export const CROSS_COLOR_DIM = 0x6d8496; // vie encore disponible
+
+// ------------------------------------------------------------------
 // Phase 2 — Feel & polish
 // ------------------------------------------------------------------
 

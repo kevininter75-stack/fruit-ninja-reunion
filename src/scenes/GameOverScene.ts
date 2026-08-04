@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { type GameMode, type GameOverReason } from '../utils/constants';
+import { type GameMode, type GameOverReason, GAME_FONT } from '../utils/constants';
 import { getBestScore, saveBestScore } from '../utils/bestScore';
 import { sfx } from '../systems/SfxManager';
 import { AnimatedBackground } from '../entities/AnimatedBackground';
@@ -56,7 +56,7 @@ export class GameOverScene extends Phaser.Scene {
 
     this.add
       .text(w / 2, h * 0.2, display.title, {
-        fontFamily: '"Trebuchet MS", sans-serif',
+        fontFamily: GAME_FONT,
         fontSize: '84px',
         fontStyle: 'bold',
         color: display.color,
@@ -67,7 +67,7 @@ export class GameOverScene extends Phaser.Scene {
 
     this.add
       .text(w / 2, h * 0.33, display.subtitle, {
-        fontFamily: '"Trebuchet MS", sans-serif',
+        fontFamily: GAME_FONT,
         fontSize: '32px',
         color: '#fff3e0',
       })
@@ -75,7 +75,7 @@ export class GameOverScene extends Phaser.Scene {
 
     this.add
       .text(w / 2, h * 0.47, `Score : ${this.finalScore}`, {
-        fontFamily: '"Trebuchet MS", sans-serif',
+        fontFamily: GAME_FONT,
         fontSize: '60px',
         fontStyle: 'bold',
         color: '#ffffff',
@@ -98,7 +98,7 @@ export class GameOverScene extends Phaser.Scene {
     }
     this.add
       .text(w / 2, h * 0.66, text, {
-        fontFamily: '"Trebuchet MS", sans-serif',
+        fontFamily: GAME_FONT,
         fontSize: '28px',
         color: '#cfe6f0',
       })
@@ -113,7 +113,7 @@ export class GameOverScene extends Phaser.Scene {
     if (isNewRecord) {
       const record = this.add
         .text(w / 2, h * 0.58, '★ Nouveau record ! ★', {
-          fontFamily: '"Trebuchet MS", sans-serif',
+          fontFamily: GAME_FONT,
           fontSize: '40px',
           fontStyle: 'bold',
           color: '#ffe066',
@@ -132,7 +132,7 @@ export class GameOverScene extends Phaser.Scene {
     } else {
       this.add
         .text(w / 2, h * 0.58, `Record : ${getBestScore(this.mode)}`, {
-          fontFamily: '"Trebuchet MS", sans-serif',
+          fontFamily: GAME_FONT,
           fontSize: '32px',
           color: '#fff3e0',
         })
@@ -178,7 +178,7 @@ export class GameOverScene extends Phaser.Scene {
     g.strokeRoundedRect(x - width / 2, y - height / 2, width, height, height / 2);
     this.add
       .text(x, y, label, {
-        fontFamily: '"Trebuchet MS", sans-serif',
+        fontFamily: GAME_FONT,
         fontSize: '40px',
         fontStyle: 'bold',
         color: '#ffffff',

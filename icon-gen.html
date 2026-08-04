@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Générateur d'icône</title>
+    <style>
+      html, body { margin: 0; padding: 0; overflow: hidden; background: transparent; }
+      canvas { display: block; }
+    </style>
+  </head>
+  <body>
+    <canvas id="icon"></canvas>
+    <script type="module">
+      // Générateur d'icône PWA. Le rendu réutilise le moteur de dessin des
+      // fruits du jeu : l'icône est littéralement un morceau du jeu, pas un
+      // logo dessiné à part.
+      //
+      // Paramètres d'URL :
+      //   ?size=512        taille du canvas en pixels
+      //   &safe=0.8        fraction occupée par le contenu (0,8 = maskable :
+      //                    le contenu tient dans les 80 % centraux)
+      import { paintWhole, paintCut } from '/src/utils/fruitArt.ts';
+      import { FRUIT_VARIETIES } from '/src/utils/fruitCatalog.ts';
+
+      const params = new URLSearchParams(location.search);
+      const S = Number(params.get('size') ?? 512);
+      const safe = Number(params.get('safe') ?? 1);
+
+      const cv = document.getElementById('icon');
+      cv.width = S;
+      cv.height = S;
+      const ctx = cv.getContext('2d');
+
+      // --- Fond : couchant tropical, les couleurs du jeu ---
+      const sky = ctx.createLinearGradient(0, 0, S * 0.3, S);
+      sky.addColorStop(0, '#0e6f96');
+      sky.addColorStop(0.45, '#2f9ec0');
+      sky.addColorStop(0.75, '#f0a95c');
+      sky.addColorStop(1, '#dd5a3c');
+      ctx.fillStyle = sky;
+      ctx.fillRect(0, 0, S, S);
+
+      // Halo de soleil décalé, comme dans le décor
+      const halo = ctx.createRadialGradient(S * 0.74, S * 0.66, 0, S * 0.74, S * 0.66, S * 0.5);
+      halo.addColorStop(0, 'rgba(255, 231, 170, 0.55)');
+      halo.addColorStop(1, 'rgba(255, 231, 170, 0)');
+      ctx.fillStyle = halo;
+      ctx.fillRect(0, 0, S, S);
+
+      // Silhouette de volcan en bas : ancre l'icône dans La Réunion.
+      // Sombre et basse — plus claire, elle virait au brun et se lisait
+      // comme une tache plutôt que comme un relief.
+      ctx.fillStyle = 'rgba(18, 30, 42, 0.8)';
+      ctx.beginPath();
+      ctx.moveTo(0, S);
+      ctx.lineTo(0, S * 0.93);
+      ctx.lineTo(S * 0.3, S * 0.82);
+      ctx.lineTo(S * 0.46, S * 0.88);
+      ctx.lineTo(S * 0.68, S * 0.79);
+      ctx.lineTo(S, S * 0.89);
+      ctx.lineTo(S, S);
+      ctx.closePath();
+      ctx.fill();
+
+      // Vignettage discret : donne du volume au carré
+      const vig = ctx.createRadialGradient(S / 2, S / 2, S * 0.3, S / 2, S / 2, S * 0.72);
+      vig.addColorStop(0, 'rgba(0,0,0,0)');
+      vig.addColorStop(1, 'rgba(6, 20, 30, 0.45)');
+      ctx.fillStyle = vig;
+      ctx.fillRect(0, 0, S, S);
+
+      // --- Le letchi, emblème du jeu, dessiné par le moteur du jeu ---
+      // Un fruit ENTIER plutôt que tranché : à 48 px, deux moitiés écartées
+      // se lisent comme une forme confuse, alors qu'une silhouette pleine
+      // reste identifiable. La lame raconte la coupe à elle seule.
+      const litchi = FRUIT_VARIETIES.find((v) => v.key === 'litchi');
+      const texSize = litchi.radius * 2 + 64;
+
+      const fruitCanvas = document.createElement('canvas');
+      fruitCanvas.width = texSize;
+      fruitCanvas.height = texSize;
+      const fg = fruitCanvas.getContext('2d');
+      fg.shadowColor = 'rgba(0, 0, 0, 0.55)';
+      fg.shadowBlur = 14;
+      paintWhole(fg, litchi, texSize);
+
+      // Le fruit occupe ~62 % de la largeur ; ramené à 80 % pour le maskable
+      const fruitDiameter = litchi.radius * 2;
+      const contentScale = ((S * 0.56) / fruitDiameter) * safe;
+      ctx.save();
+      ctx.translate(S / 2, S / 2);
+      ctx.rotate(-0.18); // léger angle : dynamique, pas figé
+      ctx.scale(contentScale, contentScale);
+      ctx.drawImage(fruitCanvas, -texSize / 2, -texSize / 2);
+      ctx.restore();
+
+      // --- L'éclair de lame qui vient de trancher ---
+      // Tracé comme un ruban effilé (deux courbes qui s'écartent au centre)
+      // et non comme une ligne : une ligne d'épaisseur constante ressemble à
+      // un bâton posé sur le fruit.
+      function blade(len, width, alpha) {
+        ctx.save();
+        ctx.translate(S / 2, S / 2);
+        ctx.rotate(-0.62); // diagonale bas-gauche → haut-droite
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.moveTo(-len / 2, 0);
+        ctx.quadraticCurveTo(0, -width, len / 2, 0);
+        ctx.quadraticCurveTo(0, width, -len / 2, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+      blade(S * 1.02 * safe, S * 0.075 * safe, 0.35); // halo diffus
+      blade(S * 0.98 * safe, S * 0.032 * safe, 1); // fil net
+
+      // --- Gouttes de jus projetées le long de la coupe ---
+      // Peu nombreuses et alignées sur la diagonale de coupe : semées au
+      // hasard, elles se lisaient comme des poussières sans rapport.
+      ctx.fillStyle = 'rgba(248, 200, 212, 0.92)';
+      for (const [fx, fy, fr] of [
+        [0.2, 0.26, 0.019], [0.8, 0.74, 0.016], [0.28, 0.16, 0.011],
+        [0.86, 0.62, 0.0095],
+      ]) {
+        const cx = S / 2 + (fx - 0.5) * S * safe;
+        const cy = S / 2 + (fy - 0.5) * S * safe;
+        ctx.beginPath();
+        ctx.arc(cx, cy, S * fr, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      document.title = 'PRET';
+    </script>
+  </body>
+</html>

@@ -32,12 +32,41 @@ export function addHudPanel(
   width: number,
   height: number
 ): Phaser.GameObjects.Graphics {
-  const radius = height / 2;
+  const radius = Math.min(height / 2, 26);
   const g = scene.add.graphics().setDepth(49);
-  g.fillStyle(HUD_PANEL_COLOR, HUD_PANEL_ALPHA);
-  g.fillRoundedRect(x, y, width, height, radius);
-  g.lineStyle(2, 0xffffff, 0.25);
+
+  // Ombre portée : une plaque sombre décalée sous le cartouche. C'est elle
+  // qui donne l'impression d'un élément posé PAR-DESSUS la scène plutôt que
+  // d'un rectangle peint dedans.
+  g.fillStyle(0x000000, 0.28);
+  g.fillRoundedRect(x + 2, y + 4, width, height, radius);
+
+  // Corps : dégradé vertical (clair en haut, sombre en bas) obtenu par
+  // bandes horizontales — Graphics ne sait pas remplir avec un dégradé, mais
+  // à cette taille la transition reste invisible.
+  const bands = 14;
+  for (let i = 0; i < bands; i++) {
+    const t = i / (bands - 1);
+    const bandY = y + (height / bands) * i;
+    const bandH = height / bands + 1;
+    g.fillStyle(HUD_PANEL_COLOR, HUD_PANEL_ALPHA * (1.25 - t * 0.45));
+    if (i === 0 || i === bands - 1) {
+      // Bandes extrêmes arrondies pour respecter la forme du cartouche
+      g.fillRoundedRect(x, bandY, width, bandH, radius);
+    } else {
+      g.fillRect(x, bandY, width, bandH);
+    }
+  }
+
+  // Liseré clair en haut, plus discret en bas : lumière venant du ciel
+  g.lineStyle(2, 0xffffff, 0.32);
   g.strokeRoundedRect(x, y, width, height, radius);
+  g.lineStyle(2, 0xffffff, 0.16);
+  g.beginPath();
+  g.moveTo(x + radius, y + 2);
+  g.lineTo(x + width - radius, y + 2);
+  g.strokePath();
+
   return g;
 }
 
