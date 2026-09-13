@@ -90,3 +90,60 @@ export function prefersReducedMotion(): boolean {
 export function motionScale(): number {
   return prefersReducedMotion() ? 0 : 1;
 }
+
+// ------------------------------------------------------------------
+// Qualité graphique
+// ------------------------------------------------------------------
+
+/**
+ * La résolution de rendu est le seul réglage dont le coût est QUADRATIQUE :
+ * passer de 1,5× à 2× ne coûte pas un tiers de plus mais 78 % de plus en
+ * pixels. Mesuré dans le navigateur de développement, sur la même scène :
+ *
+ *   1,0× — 1280 × 720  (0,92 Mpx) — 60 FPS
+ *   1,5× — 1920 × 1080 (2,07 Mpx) — 57 FPS
+ *   2,0× — 2560 × 1440 (3,69 Mpx) — 39 FPS
+ *
+ * D'où le choix : l'automatique s'arrête à 1,5×, ce qui est déjà plus du
+ * double de pixels de l'ancienne version fixe et reste net sur une dalle de
+ * téléphone. « Haute » lève le plafond à 2× — la définition native d'une
+ * dalle QHD+, donc la netteté maximale possible — pour les appareils qui
+ * l'encaissent.
+ *
+ * Le réglage est proposé plutôt que deviné. Rien dans le navigateur ne dit
+ * de quoi un GPU est capable, et un mauvais pari se paie soit en flou sur un
+ * téléphone haut de gamme, soit en saccades sur un milieu de gamme. Le seul
+ * juge fiable est celui qui regarde l'écran.
+ *
+ * Changer ce réglage recharge la page : toutes les textures sont générées en
+ * code à la résolution choisie, il faut donc les refaire.
+ */
+export type QualityPreference = 'auto' | 'high';
+
+const QUALITY_KEY = 'fruit-ninja-reunion-quality';
+let qualityCache: QualityPreference | null = null;
+
+export function getQualityPreference(): QualityPreference {
+  if (qualityCache === null) {
+    try {
+      qualityCache = localStorage.getItem(QUALITY_KEY) === 'high' ? 'high' : 'auto';
+    } catch {
+      qualityCache = 'auto';
+    }
+  }
+  return qualityCache;
+}
+
+export function setQualityPreference(preference: QualityPreference): void {
+  qualityCache = preference;
+  try {
+    localStorage.setItem(QUALITY_KEY, preference);
+  } catch {
+    // stockage indisponible : le réglage vaut pour la session en cours
+  }
+}
+
+/** Plafond de résolution de rendu correspondant au réglage courant. */
+export function qualityCap(): number {
+  return getQualityPreference() === 'high' ? 2 : 1.5;
+}

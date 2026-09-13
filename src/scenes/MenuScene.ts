@@ -17,7 +17,7 @@ import { music } from '../systems/MusicManager';
 import { FRUIT_VARIETIES, wholeTextureKey, type FruitVariety } from '../utils/fruitCatalog';
 import { SliceTrail } from '../entities/SliceTrail';
 import { AnimatedBackground } from '../entities/AnimatedBackground';
-import { createMuteButton, addVignette, fadeIn, fadeToScene } from '../utils/ui';
+import { createMuteButton, createQualityButton, addVignette, fadeIn, fadeToScene } from '../utils/ui';
 import { getTodayResult, getStreak } from '../utils/dailyChallenge';
 
 /** Un emblème-fruit tranchable qui lance un mode de jeu. */
@@ -145,6 +145,9 @@ export class MenuScene extends Phaser.Scene {
     this.registerPointerEvents();
     addVignette(this);
     createMuteButton(this, w - px(52), h - px(52));
+    // À gauche du bouton de son, sur la même ligne : c'est le seul écran
+    // depuis lequel recharger la page ne coûte rien au joueur.
+    createQualityButton(this, w - px(104), h - px(52));
     fadeIn(this);
   }
 

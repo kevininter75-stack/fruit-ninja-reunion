@@ -1,3 +1,5 @@
+import { qualityCap } from './settings';
+
 // ------------------------------------------------------------------
 // Échelle de rendu
 // ------------------------------------------------------------------
@@ -17,9 +19,10 @@
  *
  * Le facteur se déduit de la taille PHYSIQUE de la fenêtre, pas du seul
  * devicePixelRatio : ce qui compte est le rapport entre les pixels réellement
- * disponibles et notre résolution logique. Plafonné à 2 — au-delà le gain
- * devient invisible alors que la surface à remplir continue de croître au
- * carré, ce qui se paierait sur les téléphones d'entrée de gamme.
+ * disponibles et notre résolution logique. Le plafond vient du réglage de
+ * qualité (1,5 par défaut, 2 en mode Haute) : le coût est quadratique, donc
+ * un demi-cran de plus se paie bien plus cher qu'il n'y paraît — les mesures
+ * sont dans settings.ts, au-dessus de qualityCap().
  *
  * Toutes les constantes exprimées en PIXELS passent par px() ci-dessous. Les
  * positions relatives (w * 0.5) et les durées n'ont évidemment rien à faire.
@@ -46,7 +49,7 @@ function computeRenderScale(): number {
 
   // 720 est le petit côté de la résolution logique de référence.
   const souhaite = petitCotePhysique / 720;
-  return Math.max(1, Math.min(2, Math.round(souhaite * 2) / 2));
+  return Math.max(1, Math.min(qualityCap(), Math.round(souhaite * 2) / 2));
 }
 
 /** Convertit une mesure en pixels de référence vers l'échelle de rendu. */

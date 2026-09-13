@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { BOMB_RADIUS, DEPTH_FRUIT } from '../utils/constants';
+import { SheenLayer } from './SheenLayer';
 
 /**
  * Bombe : la trancher provoque le game over immédiat (flash + explosion).
@@ -15,6 +16,13 @@ const FUSE_LOCAL_Y = 8 - BOMB_RADIUS;
 export class Bomb extends Phaser.Physics.Arcade.Sprite {
   /** Rayon utilisé pour la détection de coupe (cercle approximatif). */
   public readonly sliceRadius = BOMB_RADIUS;
+
+  /**
+   * Reflet fixe. C'est sur la bombe qu'il compte le plus : une sphère de
+   * métal poli est l'objet dont le reflet se remarque le plus, et sa
+   * silhouette est un vrai cercle, donc le calque épouse exactement sa forme.
+   */
+  private readonly sheen = new SheenLayer(this.scene);
 
   /**
    * Écrit dans `out` la position MONDE du bout de la mèche (là où crépitent
@@ -41,12 +49,14 @@ export class Bomb extends Phaser.Physics.Arcade.Sprite {
 
   /** Désactive la bombe et la rend au pool. */
   kill(): void {
+    this.sheen.hide();
     this.disableBody(true, true);
   }
 
   /** Une bombe sortie par le bas disparaît silencieusement (pas d'événement). */
   preUpdate(time: number, delta: number): void {
     super.preUpdate(time, delta);
+    this.sheen.sync(this, this.sliceRadius);
     const body = this.body as Phaser.Physics.Arcade.Body;
     if (this.active && body.velocity.y > 0 && this.y > this.scene.scale.height + this.sliceRadius * 2) {
       this.kill();

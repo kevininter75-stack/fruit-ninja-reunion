@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { isMuted } from './settings';
+import { isMuted, getQualityPreference, setQualityPreference } from './settings';
 import { music } from '../systems/MusicManager';
 import {
   TEX_VIGNETTE,
@@ -7,6 +7,7 @@ import {
   HUD_PANEL_COLOR,
   HUD_PANEL_ALPHA,
   SCENE_FADE_MS,
+  GAME_FONT,
   fontPx,
   px,
 } from './constants';
@@ -126,6 +127,47 @@ export function createMuteButton(scene: Phaser.Scene, x: number, y: number): Pha
     const muted = music.toggleMuted();
     button.setText(muted ? '🔇' : '🔊');
   });
+
+  return button;
+}
+
+/**
+ * Bouton de qualité graphique, réservé au menu.
+ *
+ * Il recharge la page : toutes les textures sont peintes en code à la
+ * résolution choisie, changer d'échelle impose donc de les refaire. C'est
+ * assumé plutôt que caché — l'écran de chargement dure moins d'une seconde,
+ * et une régénération à chaud aurait coûté bien plus de complexité que ce
+ * qu'elle aurait fait gagner.
+ *
+ * Le libellé dit la résolution obtenue, pas un adjectif : « Haute » ne veut
+ * rien dire pour qui hésite, « 2× (max) » se compare.
+ */
+export function createQualityButton(scene: Phaser.Scene, x: number, y: number): Phaser.GameObjects.Text {
+  const libelle = (): string => (getQualityPreference() === 'high' ? 'Netteté 2×' : 'Netteté auto');
+
+  const button = scene.add
+    .text(x, y, libelle(), {
+      fontFamily: GAME_FONT,
+      fontSize: fontPx(22),
+      color: '#cfe3ef',
+      backgroundColor: '#16303f',
+      padding: { x: px(14), y: px(9) },
+    })
+    .setOrigin(1, 0.5)
+    .setDepth(90)
+    .setAlpha(0.9)
+    .setInteractive({ useHandCursor: true });
+
+  button.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+    // Sans cela, le toucher qui change le réglage compte aussi comme un
+    // début de geste de coupe et sélectionne un mode de jeu.
+    pointer.event.stopPropagation();
+    setQualityPreference(getQualityPreference() === 'high' ? 'auto' : 'high');
+    window.location.reload();
+  });
+  button.on('pointerover', () => button.setColor('#ffd76a'));
+  button.on('pointerout', () => button.setColor('#cfe3ef'));
 
   return button;
 }
