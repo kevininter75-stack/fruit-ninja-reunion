@@ -50,6 +50,8 @@ export class MusicManager {
   private schedulerId: number | null = null;
   private nextStepTime = 0;
   private step = 0;
+  /** Vrai quand l'application est en arrière-plan (endormie, mais pas arrêtée). */
+  private dormante = false;
 
   /** Démarre la boucle (idempotent — appelé à chaque entrée de scène). */
   ensureRunning(): void {
@@ -68,7 +70,18 @@ export class MusicManager {
 
     this.startOcean(ctx);
 
-    // Ordonnanceur : toutes les 50 ms, programme les croches des 120 ms à venir
+    this.startScheduler(ctx);
+  }
+
+  /**
+   * Ordonnanceur : toutes les 50 ms, programme les croches des 120 ms à venir.
+   *
+   * C'est un setInterval, donc une horloge du NAVIGATEUR et non celle de
+   * Phaser. Phaser met sa boucle en pause quand la page se cache, mais ce
+   * minuteur-là ne le sait pas : c'est lui qui continuait à jouer du séga
+   * téléphone verrouillé.
+   */
+  private startScheduler(ctx: AudioContext): void {
     this.nextStepTime = ctx.currentTime + 0.1;
     this.schedulerId = window.setInterval(() => {
       while (this.nextStepTime < ctx.currentTime + 0.12) {
@@ -79,6 +92,38 @@ export class MusicManager {
     }, 50);
   }
 
+  /**
+   * Endort la musique quand l'application passe en arrière-plan.
+   *
+   * On ARRÊTE l'ordonnanceur, on ne se contente pas de suspendre le contexte.
+   * Sans cela le minuteur continuerait de tourner contre une horloge audio
+   * figée : à chaque tour il verrait `nextStepTime` en retard, programmerait
+   * des croches en rafale, et le joueur recevrait toute la musique de son
+   * absence d'un seul coup au retour.
+   */
+  suspend(): void {
+    if (this.schedulerId !== null) {
+      window.clearInterval(this.schedulerId);
+      this.schedulerId = null;
+    }
+    this.dormante = true;
+  }
+
+  /** Rend la musique au premier plan, en repartant de l'instant présent. */
+  wake(): void {
+    if (!this.dormante) {
+      return;
+    }
+    this.dormante = false;
+    if (!this.started || this.schedulerId !== null) {
+      return;
+    }
+    const ctx = getAudioContext();
+    if (ctx !== null) {
+      this.startScheduler(ctx);
+    }
+  }
+
   /** Arrête l'ordonnanceur (la boucle en cours s'éteint d'elle-même). */
   stop(): void {
     if (this.schedulerId !== null) {
@@ -86,6 +131,7 @@ export class MusicManager {
       this.schedulerId = null;
     }
     this.started = false;
+    this.dormante = false;
   }
 
   /** Coupe/rétablit toute la musique (persisté via settings). */

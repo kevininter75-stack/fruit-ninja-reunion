@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { gameConfig } from './config/gameConfig';
 import { computeViewport } from './utils/viewport';
 import { GAME_FONT } from './utils/constants';
+import { installAppLifecycle } from './systems/appLifecycle';
 
 /**
  * Attend que la police d'affichage soit réellement disponible.
@@ -43,6 +44,11 @@ async function waitForFont(): Promise<void> {
 async function boot(): Promise<void> {
   await waitForFont();
   const game = new Phaser.Game(gameConfig);
+
+  // Arrêt de tout ce qui doit s'arrêter quand le joueur quitte l'application.
+  // Phaser met sa boucle en pause tout seul ; la musique, elle, tourne sur une
+  // horloge du navigateur qui l'ignore.
+  installAppLifecycle();
 
   // Accès au jeu depuis la console, en DÉVELOPPEMENT UNIQUEMENT.
   // import.meta.env.DEV est remplacé par false au build et la branche entière
