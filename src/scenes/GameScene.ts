@@ -186,6 +186,8 @@ export class GameScene extends Phaser.Scene {
   // restart, donc TOUT l'état mutable doit être réinitialisé dans init().
   private gameEnded = false;
   private pause!: PauseController;
+  /** Retour de zoom en attente après un coup de caméra (cf. cameraPunch). */
+  private punchReturn: Phaser.Time.TimerEvent | null = null;
   private grading!: SceneGrading;
   private chronoEndTime = 0;
   private lastShownSecond = -1;
@@ -1150,6 +1152,7 @@ export class GameScene extends Phaser.Scene {
    * pas le doigt (cf. handleSliceMove).
    */
   private enterFrenzyZoom(grenade: Fruit): void {
+    this.cancelPunchReturn();
     const cibleX = this.scale.width / 2 + (grenade.x - this.scale.width / 2) * FRENZY_PAN_RATIO;
     const cibleY = this.scale.height / 2 + (grenade.y - this.scale.height / 2) * FRENZY_PAN_RATIO;
     this.grading.setMode('frenzy');
@@ -1160,6 +1163,7 @@ export class GameScene extends Phaser.Scene {
 
   /** Rend la caméra à son cadrage normal (fin de frénésie). */
   private exitFrenzyZoom(): void {
+    this.cancelPunchReturn();
     this.grading.setMode(this.filledCrosses >= STARTING_LIVES - 1 ? 'danger' : 'normal');
     this.zoomCamera(1, FRENZY_ZOOM_MS, 'Sine.easeInOut');
     this.panCamera(this.scale.width / 2, this.scale.height / 2, FRENZY_ZOOM_MS, 'Sine.easeInOut');
@@ -1217,19 +1221,29 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** Zoom de caméra ; en mouvement réduit, le cadrage reste fixe. */
+  /** Même raison que panCamera : le dernier ordre de zoom doit gagner. */
   private zoomCamera(cible: number, dureeMs: number, ease?: string): void {
     if (prefersReducedMotion()) {
       return;
     }
-    this.cameras.main.zoomTo(cible, dureeMs, ease);
+    this.cameras.main.zoomTo(cible, dureeMs, ease, true);
   }
 
   /** Panoramique de caméra ; supprimé en mouvement réduit. */
+  /**
+   * Le quatrième argument (`force`) n'est pas un détail : sans lui, Phaser
+   * IGNORE SILENCIEUSEMENT un nouveau recadrage tant que le précédent n'est
+   * pas terminé (Effects.Pan.start : `if (!force && this.isRunning) return`).
+   *
+   * Tous les appels du jeu supposent l'inverse — le dernier ordre doit
+   * gagner. Un dézoom demandé pendant un coup de caméra était purement et
+   * simplement perdu, et la caméra restait où le coup l'avait laissée.
+   */
   private panCamera(x: number, y: number, dureeMs: number, ease?: string): void {
     if (prefersReducedMotion()) {
       return;
     }
-    this.cameras.main.pan(x, y, dureeMs, ease);
+    this.cameras.main.pan(x, y, dureeMs, ease, true);
   }
 
   /**
@@ -1239,13 +1253,47 @@ export class GameScene extends Phaser.Scene {
    * annulerait le resserrement.
    */
   private cameraPunch(force: number, dureeMs: number): void {
-    const repos = this.frenzyGrenade !== null ? FRENZY_ZOOM : 1;
-    this.zoomCamera(repos * force, dureeMs, 'Sine.easeOut');
-    this.time.delayedCall(dureeMs, () => {
+    // Un seul retour en attente à la fois : deux coups rapprochés
+    // programmaient deux retours, et le second écrasait le premier en pleine
+    // course.
+    this.cancelPunchReturn();
+
+    this.zoomCamera(this.restingZoom() * force, dureeMs, 'Sine.easeOut');
+    this.punchReturn = this.time.delayedCall(dureeMs, () => {
+      this.punchReturn = null;
       if (this.scene.isActive()) {
-        this.zoomCamera(repos, dureeMs * 1.6, 'Sine.easeInOut');
+        // Le zoom de repos est relu MAINTENANT, et non au départ du coup.
+        //
+        // C'ÉTAIT LE BUG. Il était capturé à l'appel : un coup porté à la
+        // grenade capturait 1,22, et si la frénésie se terminait dans les
+        // 80 ms qui suivaient, ce retour périmé se déclenchait APRÈS le
+        // dézoom et ramenait la caméra à 1,22. Elle y restait jusqu'au combo
+        // suivant — d'où un dézoom qui échouait une fois sur deux, puis se
+        // réparait tout seul plus tard.
+        //
+        // Or un coup porté dans les 80 dernières millisecondes d'une frénésie
+        // n'a rien d'un cas rare : c'est le comportement NORMAL du joueur, qui
+        // frappe la grenade jusqu'à l'explosion.
+        this.zoomCamera(this.restingZoom(), dureeMs * 1.6, 'Sine.easeInOut');
       }
     });
+  }
+
+  /** Zoom auquel la caméra doit revenir une fois l'effet en cours terminé. */
+  private restingZoom(): number {
+    return this.frenzyGrenade !== null ? FRENZY_ZOOM : 1;
+  }
+
+  /**
+   * Annule un retour de coup en attente. Indispensable avant tout changement
+   * DURABLE de cadrage : sans cela, un retour périmé vient défaire le nouveau
+   * cadrage quelques dizaines de millisecondes plus tard.
+   */
+  private cancelPunchReturn(): void {
+    if (this.punchReturn !== null) {
+      this.punchReturn.remove();
+      this.punchReturn = null;
+    }
   }
 
   /**
@@ -1496,7 +1544,10 @@ export class GameScene extends Phaser.Scene {
     // Bullet-time : la physique ralentit, les fruits en vol figent le temps
     this.physics.world.timeScale = BOMB_PHYSICS_SLOWMO;
 
-    // Zoom caméra (centré → punch-in) + secousse + flash plein écran
+    // Zoom caméra (centré → punch-in) + secousse + flash plein écran.
+    // Le retour de coup en attente est annulé : il ramènerait la caméra à 1
+    // en plein drame de l'explosion.
+    this.cancelPunchReturn();
     this.shakeCamera(450, 0.022);
     this.zoomCamera(BOMB_ZOOM, BOMB_ZOOM_MS, 'Sine.easeInOut');
     this.flashRect.setVisible(true).setAlpha(1);
