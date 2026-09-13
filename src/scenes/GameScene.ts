@@ -11,6 +11,7 @@ import { music } from '../systems/MusicManager';
 import { FRUIT_VARIETIES, halfTextureKeys, wholeTextureKey } from '../utils/fruitCatalog';
 import { createMuteButton, addHudPanel, addVignette, fadeIn, fadeToScene } from '../utils/ui';
 import { AnimatedBackground } from '../entities/AnimatedBackground';
+import { prefersReducedMotion } from '../utils/settings';
 import {
   FRUIT_POOL_SIZE,
   HALF_POOL_SIZE,
@@ -951,7 +952,7 @@ export class GameScene extends Phaser.Scene {
       yoyo: true,
       ease: 'Sine.easeOut',
     });
-    this.cameras.main.shake(70, 0.003);
+    this.shakeCamera(70, 0.003);
     // Respiration de caméra à chaque coup : le zoom « pompe » au rythme des
     // frappes, ce qui donne son énergie à la séquence.
     this.cameraPunch(FRENZY_HIT_PUNCH, 80);
@@ -976,19 +977,17 @@ export class GameScene extends Phaser.Scene {
    * pas le doigt (cf. handleSliceMove).
    */
   private enterFrenzyZoom(grenade: Fruit): void {
-    const cam = this.cameras.main;
     const cibleX = this.scale.width / 2 + (grenade.x - this.scale.width / 2) * FRENZY_PAN_RATIO;
     const cibleY = this.scale.height / 2 + (grenade.y - this.scale.height / 2) * FRENZY_PAN_RATIO;
-    cam.zoomTo(FRENZY_ZOOM, FRENZY_ZOOM_MS, 'Sine.easeOut');
-    cam.pan(cibleX, cibleY, FRENZY_ZOOM_MS, 'Sine.easeOut');
+    this.zoomCamera(FRENZY_ZOOM, FRENZY_ZOOM_MS, 'Sine.easeOut');
+    this.panCamera(cibleX, cibleY, FRENZY_ZOOM_MS, 'Sine.easeOut');
     this.setHudDimmed(true);
   }
 
   /** Rend la caméra à son cadrage normal (fin de frénésie). */
   private exitFrenzyZoom(): void {
-    const cam = this.cameras.main;
-    cam.zoomTo(1, FRENZY_ZOOM_MS, 'Sine.easeInOut');
-    cam.pan(this.scale.width / 2, this.scale.height / 2, FRENZY_ZOOM_MS, 'Sine.easeInOut');
+    this.zoomCamera(1, FRENZY_ZOOM_MS, 'Sine.easeInOut');
+    this.panCamera(this.scale.width / 2, this.scale.height / 2, FRENZY_ZOOM_MS, 'Sine.easeInOut');
     this.setHudDimmed(false);
   }
 
@@ -1020,6 +1019,44 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  // ------------------------------------------------------------------
+  // Mouvement réduit
+  // ------------------------------------------------------------------
+  //
+  // Toutes les secousses, zooms et panoramiques passent par ces trois gardes.
+  // Un fruit-slicer secoue beaucoup : pour une personne sujette au mal des
+  // transports vestibulaire ou aux migraines, ces mouvements ne sont pas un
+  // détail de confort, ils rendent le jeu douloureux.
+  //
+  // On coupe l'AMPLITUDE, jamais la logique : les minuteries, les états et les
+  // rappels continuent de s'exécuter à l'identique. Court-circuiter un
+  // delayedCall parce que le joueur préfère peu de mouvement laisserait la
+  // frénésie coincée dans son état de zoom.
+
+  /** Secousse de caméra, supprimée si le joueur demande peu de mouvement. */
+  private shakeCamera(dureeMs: number, intensite: number): void {
+    if (prefersReducedMotion()) {
+      return;
+    }
+    this.cameras.main.shake(dureeMs, intensite);
+  }
+
+  /** Zoom de caméra ; en mouvement réduit, le cadrage reste fixe. */
+  private zoomCamera(cible: number, dureeMs: number, ease?: string): void {
+    if (prefersReducedMotion()) {
+      return;
+    }
+    this.cameras.main.zoomTo(cible, dureeMs, ease);
+  }
+
+  /** Panoramique de caméra ; supprimé en mouvement réduit. */
+  private panCamera(x: number, y: number, dureeMs: number, ease?: string): void {
+    if (prefersReducedMotion()) {
+      return;
+    }
+    this.cameras.main.pan(x, y, dureeMs, ease);
+  }
+
   /**
    * Brève pulsation de zoom : la caméra « respire » sur un temps fort, puis
    * revient au zoom de référence — celui de la frénésie s'il est en cours,
@@ -1027,12 +1064,11 @@ export class GameScene extends Phaser.Scene {
    * annulerait le resserrement.
    */
   private cameraPunch(force: number, dureeMs: number): void {
-    const cam = this.cameras.main;
     const repos = this.frenzyGrenade !== null ? FRENZY_ZOOM : 1;
-    cam.zoomTo(repos * force, dureeMs, 'Sine.easeOut');
+    this.zoomCamera(repos * force, dureeMs, 'Sine.easeOut');
     this.time.delayedCall(dureeMs, () => {
       if (this.scene.isActive()) {
-        cam.zoomTo(repos, dureeMs * 1.6, 'Sine.easeInOut');
+        this.zoomCamera(repos, dureeMs * 1.6, 'Sine.easeInOut');
       }
     });
   }
@@ -1104,7 +1140,7 @@ export class GameScene extends Phaser.Scene {
     this.juiceEmitter.setParticleTint(grenade.juiceColor);
     this.juiceEmitter.emitParticleAt(grenade.x, grenade.y, JUICE_PARTICLE_COUNT * 5);
     this.spawnSplat(grenade.x, grenade.y, grenade.juiceColor);
-    this.cameras.main.shake(260, 0.008);
+    this.shakeCamera(260, 0.008);
     // Double onde : une rapide et serrée, une lente et large — le souffle
     this.spawnRing(grenade.x, grenade.y, 6, 0xffffff, 380);
     this.spawnRing(grenade.x, grenade.y, 12, 0xff5c78, 750);
@@ -1150,7 +1186,7 @@ export class GameScene extends Phaser.Scene {
     this.hitStop(HITSTOP_COMBO_MS);
     this.cameraPunch(COMBO_PUNCH_ZOOM, COMBO_PUNCH_MS);
     this.spawnRing(gesture.lastX, gesture.lastY, 5 + n, 0xffe066, 520);
-    this.cameras.main.shake(120, 0.002 + Math.min(n, 6) * 0.0008);
+    this.shakeCamera(120, 0.002 + Math.min(n, 6) * 0.0008);
     // Gerbe dorée le long du geste, proportionnée au nombre de fruits
     this.juiceEmitter.setParticleTint(0xffe066);
     this.juiceEmitter.emitParticleAt(gesture.lastX, gesture.lastY, JUICE_PARTICLE_COUNT * 2);
@@ -1247,8 +1283,8 @@ export class GameScene extends Phaser.Scene {
     this.physics.world.timeScale = BOMB_PHYSICS_SLOWMO;
 
     // Zoom caméra (centré → punch-in) + secousse + flash plein écran
-    this.cameras.main.shake(450, 0.022);
-    this.cameras.main.zoomTo(BOMB_ZOOM, BOMB_ZOOM_MS, 'Sine.easeInOut');
+    this.shakeCamera(450, 0.022);
+    this.zoomCamera(BOMB_ZOOM, BOMB_ZOOM_MS, 'Sine.easeInOut');
     this.flashRect.setVisible(true).setAlpha(1);
     this.tweens.add({
       targets: this.flashRect,
@@ -1394,7 +1430,7 @@ export class GameScene extends Phaser.Scene {
       duration: 380,
       ease: 'Back.easeOut', // rebond franc : le strike "claque"
     });
-    this.cameras.main.shake(90, 0.004);
+    this.shakeCamera(90, 0.004);
   }
 
   /** Palier de score franchi : une croix de strike s'efface. */

@@ -16,6 +16,7 @@ import { getBestScore, saveBestScore } from '../utils/bestScore';
 import { sfx } from '../systems/SfxManager';
 import { AnimatedBackground } from '../entities/AnimatedBackground';
 import { addVignette, fadeIn, fadeToScene } from '../utils/ui';
+import { prefersReducedMotion } from '../utils/settings';
 
 /** Données passées par la GameScene à la fin d'une partie. */
 interface GameOverData {
@@ -332,7 +333,11 @@ export class GameOverScene extends Phaser.Scene {
       })
       .setDepth(60);
     this.time.delayedCall(GAMEOVER_STEP_MS * 5 + 250, () => {
-      confetti.emitParticleAt(w / 2, y, 40);
+      // Confettis supprimés en mouvement réduit : c'est le seul effet
+      // plein écran du jeu, et le plus agressif pour une sensibilité visuelle.
+      if (!prefersReducedMotion()) {
+        confetti.emitParticleAt(w / 2, y, 40);
+      }
       sfx.bonus();
     });
   }
