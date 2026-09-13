@@ -138,6 +138,17 @@ export class SpawnManager {
     this.scheduleNextWave();
   }
 
+  /**
+   * Antidate le début de partie, pour qu'une rotation d'écran ne remette pas
+   * la difficulté à zéro. Sans cela, tourner le téléphone à la cinquième
+   * minute ramènerait le joueur au rythme de la première.
+   */
+  resumeFrom(elapsedMs: number, fruitsSliced: number): void {
+    this.startTime = this.scene.time.now - elapsedMs;
+    // Les vagues scriptées du début ne doivent pas se rejouer.
+    this.waveIndex = Math.max(this.waveIndex, Math.round(fruitsSliced / 2));
+  }
+
   stop(): void {
     this.running = false;
     if (this.timer !== null) {

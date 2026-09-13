@@ -66,6 +66,21 @@ export class GameOverScene extends Phaser.Scene {
     super('GameOverScene');
   }
 
+  /**
+   * Une rotation d'écran reconstruit la scène, qui repartirait sinon de ses
+   * valeurs par défaut : score à 0, cause « plus de vies », aucune statistique.
+   * Le défaut était plus discret qu'en pleine partie, mais tout aussi faux.
+   */
+  captureState(): object {
+    return {
+      score: this.finalScore,
+      mode: this.mode,
+      reason: this.reason,
+      fruitsSliced: this.fruitsSliced,
+      bestCombo: this.bestCombo,
+    };
+  }
+
   init(data: GameOverData): void {
     this.finalScore = data.score ?? 0;
     this.mode = data.mode ?? 'classic';

@@ -15,6 +15,7 @@ import { PauseController } from '../systems/PauseController';
 import { SceneGrading } from '../systems/SceneGrading';
 import { applyShadingTint } from '../utils/surfaceShading';
 import { seedRandom, clearSeed } from '../utils/rng';
+import type { ScoreSnapshot } from '../systems/ScoreManager';
 import { dailySeed, saveTodayResult } from '../utils/dailyChallenge';
 import { exclamationCombo, FRENESIE } from '../utils/creole';
 import {
@@ -97,9 +98,25 @@ import {
   SLICE_FLASH_MS,
 } from '../utils/constants';
 
+/**
+ * Avancement d'une partie, transporté à travers une rotation d'écran.
+ * Cf. utils/relayout.ts pour le pourquoi.
+ */
+interface RunSnapshot {
+  score: ScoreSnapshot;
+  fruitsSliced: number;
+  bestGestureCombo: number;
+  /** Temps écoulé depuis le début : c'est lui qui porte la difficulté. */
+  elapsedMs: number;
+  /** Temps restant au chrono, en mode Chrono uniquement. */
+  chronoRemainingMs: number;
+}
+
 /** Données passées par le menu au lancement d'une partie. */
 interface GameSceneData {
   mode?: GameMode;
+  /** Présent seulement lors d'une reconstruction après rotation. */
+  resume?: RunSnapshot;
 }
 
 /**
@@ -194,6 +211,10 @@ export class GameScene extends Phaser.Scene {
   private frenzyZoomed = false;
   private grading!: SceneGrading;
   private chronoEndTime = 0;
+  /** Avancement à restaurer après une rotation d'écran, sinon null. */
+  private resume: RunSnapshot | null = null;
+  /** Instant du début de la partie, reporté en arrière après une rotation. */
+  private startedAt = 0;
   private lastShownSecond = -1;
 
   // Gestes de coupe en cours, un slot par doigt (recréés dans create())
@@ -205,6 +226,8 @@ export class GameScene extends Phaser.Scene {
 
   init(data: GameSceneData): void {
     this.mode = data.mode ?? 'classic';
+    this.resume = data.resume ?? null;
+    this.startedAt = 0;
 
     // Le Défi du jour sème la source de hasard avec la date : tout le monde
     // reçoit la même séquence de fruits. Les autres modes la relâchent, sinon
@@ -217,8 +240,8 @@ export class GameScene extends Phaser.Scene {
     this.gameEnded = false;
     this.lastShownSecond = -1;
     this.multiplierTimer = null;
-    this.fruitsSliced = 0;
-    this.bestGestureCombo = 0;
+    this.fruitsSliced = data.resume?.fruitsSliced ?? 0;
+    this.bestGestureCombo = data.resume?.bestGestureCombo ?? 0;
     this.frameCount = 0;
     // La scène est réutilisée au restart : on repart d'un tableau vide pour
     // ne pas garder de références aux croix (détruites) de la partie passée.
@@ -366,7 +389,9 @@ export class GameScene extends Phaser.Scene {
       this.chronoEndTime = this.time.now + CHRONO_DURATION_MS;
     }
 
+    this.startedAt = this.time.now;
     this.spawnManager.start();
+    this.restoreRun();
     fadeIn(this);
   }
 
@@ -384,6 +409,80 @@ export class GameScene extends Phaser.Scene {
     if (this.mode === 'chrono' && !this.gameEnded) {
       this.updateChrono();
     }
+  }
+
+  /**
+   * Photographie l'avancement avant une reconstruction pour rotation d'écran.
+   *
+   * Renvoie `undefined` si la partie est finie : il n'y a plus rien à sauver,
+   * et la scène peut repartir de ses données d'origine.
+   */
+  captureState(): object | undefined {
+    if (this.gameEnded) {
+      return { mode: this.mode };
+    }
+    return {
+      mode: this.mode,
+      resume: {
+        score: this.scoreManager.snapshot(),
+        fruitsSliced: this.fruitsSliced,
+        bestGestureCombo: this.bestGestureCombo,
+        elapsedMs: this.time.now - this.startedAt,
+        chronoRemainingMs: this.mode === 'chrono' ? Math.max(0, this.chronoEndTime - this.time.now) : 0,
+      },
+    };
+  }
+
+  /**
+   * Reprend la partie là où la rotation l'a interrompue.
+   *
+   * La PAUSE est posée dans la foulée, et c'est délibéré : le joueur vient de
+   * tourner son téléphone, il ne regarde pas l'écran, et les fruits en vol ont
+   * disparu avec l'ancienne forme du monde. Le relancer aussitôt au milieu
+   * d'une salve serait lui reprendre d'une main ce qu'on lui rend de l'autre.
+   */
+  private restoreRun(): void {
+    const etat = this.resume;
+    if (etat === null) {
+      return;
+    }
+    this.scoreManager.restore(etat.score);
+    this.startedAt = this.time.now - etat.elapsedMs;
+    this.spawnManager.resumeFrom(etat.elapsedMs, etat.fruitsSliced);
+    if (this.mode === 'chrono') {
+      this.chronoEndTime = this.time.now + etat.chronoRemainingMs;
+      this.updateChrono();
+    }
+
+    this.settleHud(etat.score.score);
+    this.pause.setPaused(true);
+  }
+
+  /**
+   * Pose le HUD dans son état d'arrivée, sans jouer les animations.
+   *
+   * Tout ce qui s'affiche ici est normalement ANIMÉ : le score monte par un
+   * tween, les croix de vie arrivent en grand et se posent, le chrono ne se
+   * rafraîchit que dans update(). Or la reprise après rotation met aussitôt le
+   * jeu en pause, ce qui fige tweens et update() au milieu du geste.
+   *
+   * Sans ce réglage d'autorité, le joueur retrouvait un score à 0, un chrono à
+   * 60 s et des croix à moitié dessinées — le pire des deux mondes, puisque la
+   * partie était bien conservée mais que rien de ce qu'il VOYAIT ne le disait.
+   */
+  private settleHud(score: number): void {
+    this.tweens.killTweensOf(this.scoreCounter);
+    this.tweens.killTweensOf(this.scoreValue);
+    this.scoreCounter.value = score;
+    this.displayedScore = score;
+    this.scoreValue.setText(String(score)).setScale(1);
+
+    for (const croix of this.lifeCrosses) {
+      this.tweens.killTweensOf(croix);
+      croix.setAngle(0);
+    }
+    // setDisplaySize rétablit l'échelle de repos, la teinte et l'opacité.
+    this.syncLifeCrossStyles();
   }
 
   /**

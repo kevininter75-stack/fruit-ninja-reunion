@@ -13,6 +13,13 @@ import {
  * - 'life-gained' () — un palier de score a effacé une croix de strike
  * - 'game-over' (score: number)
  */
+/** Avancement d'une partie, transportable à travers une rotation d'écran. */
+export interface ScoreSnapshot {
+  score: number;
+  lives: number;
+  nextExtraLifeAt: number;
+}
+
 export class ScoreManager {
   private score = 0;
   private lives = STARTING_LIVES;
@@ -22,6 +29,27 @@ export class ScoreManager {
   private nextExtraLifeAt = EXTRA_LIFE_SCORE_STEP;
 
   constructor(private readonly scene: Phaser.Scene) {}
+
+  /**
+   * Photographie de l'avancement, pour survivre à une rotation d'écran.
+   *
+   * Le multiplicateur n'en fait PAS partie, volontairement : il est lié à une
+   * date d'expiration, donc le transporter demanderait de reporter une durée
+   * restante à travers la reconstruction de la scène. Il dure cinq secondes ;
+   * on le laisse tomber, et c'est tout.
+   */
+  snapshot(): ScoreSnapshot {
+    return { score: this.score, lives: this.lives, nextExtraLifeAt: this.nextExtraLifeAt };
+  }
+
+  /** Restaure l'avancement photographié avant une rotation. */
+  restore(etat: ScoreSnapshot): void {
+    this.score = etat.score;
+    this.lives = etat.lives;
+    this.nextExtraLifeAt = etat.nextExtraLifeAt;
+    this.scene.events.emit('score-changed', this.score);
+    this.scene.events.emit('lives-changed', this.lives);
+  }
 
   getScore(): number {
     return this.score;

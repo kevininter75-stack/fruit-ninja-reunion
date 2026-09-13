@@ -3,6 +3,7 @@ import { gameConfig } from './config/gameConfig';
 import { computeViewport } from './utils/viewport';
 import { GAME_FONT } from './utils/constants';
 import { installAppLifecycle } from './systems/appLifecycle';
+import { relayoutActiveScenes } from './utils/relayout';
 
 /**
  * Attend que la police d'affichage soit réellement disponible.
@@ -98,12 +99,10 @@ async function boot(): Promise<void> {
     if (vp.isPortrait !== currentPortrait) {
       currentPortrait = vp.isPortrait;
       game.scale.setGameSize(vp.width, vp.height);
-      // Relayout : la seule scène active (Menu, Game ou GameOver) se recrée à
-      // la nouvelle taille. Tourner l'écran en pleine partie repart donc à
-      // zéro — c'est un geste volontaire et rare, on l'accepte.
-      for (const scene of game.scene.getScenes(true)) {
-        scene.scene.restart();
-      }
+      // Reconstruction à la nouvelle taille, en rendant à chaque scène
+      // l'avancement qu'elle demande à conserver (cf. utils/relayout.ts).
+      // Tourner l'écran ne coûte plus la partie en cours.
+      relayoutActiveScenes(game);
     }
     // INDISPENSABLE : setGameSize change la taille LOGIQUE mais ne re-mesure
     // pas le conteneur. Sans ce refresh, le canvas reste mis à l'échelle
