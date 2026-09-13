@@ -84,6 +84,7 @@ import {
   CRIT_MULTIPLIER,
   GESTURE_COMBO_MIN,
   GESTURE_BANNER_MIN,
+  GESTURE_HUGE_MIN,
   GESTURE_COMBO_BONUS,
   type GameMode,
   type GameOverReason,
@@ -1514,28 +1515,42 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
+    // Trois paliers de PRÉSENCE pour deux mots. Au-delà de GESTURE_HUGE_MIN
+    // fruits, l'exclamation ne change pas mais tout le reste grossit : c'est
+    // le geste dont on parle après la partie, il doit s'entendre comme tel.
+    const enorme = n >= GESTURE_HUGE_MIN;
+
     // L'exclamation creole passe AVANT le chiffre : c'est elle qu'on lit en
     // premier, et c'est elle qui donne sa voix au jeu.
-    this.showBigBanner(`${exclamationCombo(n)}\nx${n}  +${awarded}`);
+    this.showBigBanner(`${exclamationCombo(n)}\nx${n}  +${awarded}`, enorme ? 1.3 : 1);
     sfx.bigCombo(n);
 
     // Ponctuation visuelle du combo : gel bref, caméra qui respire, onde
     // partant du dernier fruit tranché, secousse croissante avec le combo.
-    this.hitStop(HITSTOP_COMBO_MS);
-    this.cameraPunch(COMBO_PUNCH_ZOOM, COMBO_PUNCH_MS);
+    this.hitStop(enorme ? Math.round(HITSTOP_COMBO_MS * 1.6) : HITSTOP_COMBO_MS);
+    this.cameraPunch(enorme ? COMBO_PUNCH_ZOOM * 1.5 : COMBO_PUNCH_ZOOM, COMBO_PUNCH_MS);
     this.spawnRing(gesture.lastX, gesture.lastY, 5 + n, 0xffe066, 520);
-    this.shakeCamera(120, 0.002 + Math.min(n, 6) * 0.0008);
+    this.shakeCamera(enorme ? 200 : 120, 0.002 + Math.min(n, 10) * 0.0009);
     // Gerbe dorée le long du geste, proportionnée au nombre de fruits
     this.juiceEmitter.setParticleTint(0xffe066);
     this.juiceEmitter.emitParticleAt(gesture.lastX, gesture.lastY, JUICE_PARTICLE_COUNT * 2);
   }
 
   /** Bannière centrée éphémère (gros combo) : apparition en "pop" puis fondu. */
-  private showBigBanner(message: string): void {
+  /**
+   * `emphase` grossit la bannière et la fait tenir plus longtemps.
+   *
+   * C'est le troisième palier, obtenu SANS troisième mot. Fruit Ninja gradue
+   * six rangs nommés, mais il ne gradue pas que les noms : à chaque rang les
+   * tambours montent d'un cran. Ici les exclamations créoles validées sont au
+   * nombre de deux et ne s'inventent pas — la montée se joue donc sur la
+   * PRÉSENCE : même mot, mais dit beaucoup plus fort.
+   */
+  private showBigBanner(message: string, emphase = 1): void {
     const banner = this.add
       .text(this.scale.width / 2, this.scale.height * 0.34, message, {
         fontFamily: GAME_FONT,
-        fontSize: fontPx(76),
+        fontSize: fontPx(Math.round(76 * emphase)),
         fontStyle: 'bold',
         color: '#ffe066',
         align: 'center',
@@ -1557,7 +1572,7 @@ export class GameScene extends Phaser.Scene {
           targets: banner,
           alpha: 0,
           scale: 1.15,
-          delay: 350,
+          delay: 350 * emphase,
           duration: 350,
           onComplete: () => banner.destroy(),
         });

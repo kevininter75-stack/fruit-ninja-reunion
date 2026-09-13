@@ -505,6 +505,16 @@ export const GESTURE_COMBO_MIN = 3;
  */
 export const GESTURE_BANNER_MIN = 4;
 /**
+ * À partir de combien de fruits le jeu crie PLUS FORT.
+ *
+ * Le troisième palier, obtenu sans troisième mot. Fruit Ninja gradue six rangs
+ * nommés, mais il ne gradue pas que les noms : à chaque rang les tambours
+ * montent d'un cran. Les exclamations créoles validées étant au nombre de
+ * deux, et ne s'inventant pas, la montée se joue ici sur la PRÉSENCE — même
+ * mot, bannière plus grande, tenue plus longue, gel et secousse appuyés.
+ */
+export const GESTURE_HUGE_MIN = 8;
+/**
  * Bonus par fruit d'un combo, versé en une fois à la fin du coup de sabre.
  *
  * Monté de 15 à 25 en même temps que disparaît l'ancien bonus cumulatif par
