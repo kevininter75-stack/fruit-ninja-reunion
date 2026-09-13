@@ -116,8 +116,42 @@ export const BOMB_SAFE_WAVES = 8; // aucune bombe avant la 9e vague
 // L'ancien système par paliers de score sautait d'un cran entier sur un seul
 // coup critique : l'accélération paraissait arbitraire.
 export const INTENSITY_RAMP_MS = 260_000; // Classique : plein régime vers 4 min 20
+
+/**
+ * LA PHASE SANS FIN, après le plein régime.
+ *
+ * Écart le plus net avec Fruit Ninja : là-bas la cadence n'arrête JAMAIS
+ * d'augmenter, et c'est ce qui met fin à une partie. Ici l'intensité était
+ * bornée à 1, donc au-delà de 4 min 20 le jeu ne durcissait plus du tout : une
+ * bonne partie devenait un test d'endurance à difficulté constante, sans
+ * jamais de point de rupture.
+ *
+ * Le sur-régime reprend donc la main là où la rampe s'arrête, mais avec une
+ * pente bien plus douce et un plancher absolu : il s'agit de ne jamais laisser
+ * la partie s'installer, pas de la rendre injouable d'un coup.
+ */
+export const OVERDRIVE_RAMP_MS = 240_000;
+/** Intervalle plancher absolu, en plein sur-régime. */
+export const SPAWN_INTERVAL_FLOOR_MS = 520;
+/** Densité de bombes en plein sur-régime (Fruit Ninja : environ une pour six). */
+export const BOMB_EVERY_FRUITS_OVERDRIVE = 4;
 export const INTENSITY_RAMP_CHRONO_MS = 55_000; // Chrono (60 s) : montée plus vive
-export const INTENSITY_RAMP_SCORE = 4200; // score suffisant pour saturer l'intensité
+/**
+ * Nombre de fruits tranchés qui suffit à saturer l'intensité.
+ *
+ * C'était un SCORE (4200 points), et c'était fragile pour la même raison que
+ * le palier de la grenade : le score n'est pas une mesure de progression, il
+ * dépend des combos, du combava qui double tout, et d'une frénésie qui verse
+ * plusieurs centaines de points d'un coup. Le moindre rééquilibrage du barème
+ * déplaçait donc la difficulté sans que personne ne l'ait demandé.
+ *
+ * Le nombre de fruits tranchés, lui, ne bouge pas : c'est la mesure que Fruit
+ * Ninja utilise (la cadence y monte à mesure que l'on tranche), et elle reste
+ * juste quel que soit le barème.
+ *
+ * 260 fruits : environ deux minutes et demie de jeu soutenu.
+ */
+export const INTENSITY_RAMP_FRUITS = 260;
 
 // Intervalle bruité de ±18 % : sans ça le spawn est un métronome, et l'oreille
 // comme l'œil s'y habituent — le jeu perd toute tension.

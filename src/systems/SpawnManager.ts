@@ -20,7 +20,10 @@ import {
   SPAWN_WARMUP_WAVES,
   INTENSITY_RAMP_MS,
   INTENSITY_RAMP_CHRONO_MS,
-  INTENSITY_RAMP_SCORE,
+  INTENSITY_RAMP_FRUITS,
+  OVERDRIVE_RAMP_MS,
+  SPAWN_INTERVAL_FLOOR_MS,
+  BOMB_EVERY_FRUITS_OVERDRIVE,
   BOMB_SAFE_WAVES,
   BOMB_SAFE_TIME_MS,
   BOMB_EVERY_FRUITS_EASY,
@@ -117,7 +120,9 @@ export class SpawnManager {
     private readonly fruits: Phaser.Physics.Arcade.Group,
     private readonly bombs: Phaser.Physics.Arcade.Group,
     private readonly scoreManager: ScoreManager,
-    private readonly mode: GameMode
+    private readonly mode: GameMode,
+    /** Fruits tranchés depuis le début de la partie (mesure de progression). */
+    private readonly fruitsSliced: () => number = () => 0
   ) {}
 
   start(): void {
@@ -149,8 +154,26 @@ export class SpawnManager {
   getIntensity(): number {
     const rampMs = this.mode === 'chrono' ? INTENSITY_RAMP_CHRONO_MS : INTENSITY_RAMP_MS;
     const byTime = (this.scene.time.now - this.startTime) / rampMs;
-    const byScore = this.scoreManager.getScore() / INTENSITY_RAMP_SCORE;
-    return Phaser.Math.Clamp(Math.max(byTime, byScore), 0, 1);
+    // Progression du JOUEUR, mesurée en fruits tranchés et non en points :
+    // le score dépend des combos, du combava et de la frénésie, donc il
+    // déplaçait la difficulté à chaque rééquilibrage du barème. C'est aussi
+    // la mesure de Fruit Ninja : la cadence y monte à mesure que l'on tranche.
+    const byFruits = this.fruitsSliced() / INTENSITY_RAMP_FRUITS;
+    return Phaser.Math.Clamp(Math.max(byTime, byFruits), 0, 1);
+  }
+
+  /**
+   * Sur-régime : ce qui se passe APRÈS le plein régime, de 0 à 1.
+   *
+   * Purement temporel, et c'est voulu : une fois l'intensité saturée, la
+   * partie doit continuer de durcir à un rythme prévisible, que le joueur
+   * tranche beaucoup ou peu. En mode Chrono il vaut toujours zéro — 60 s de
+   * jeu ne laissent pas le temps d'y entrer.
+   */
+  private getOverdrive(): number {
+    const rampMs = this.mode === 'chrono' ? INTENSITY_RAMP_CHRONO_MS : INTENSITY_RAMP_MS;
+    const apres = this.scene.time.now - this.startTime - rampMs;
+    return Phaser.Math.Clamp(apres / OVERDRIVE_RAMP_MS, 0, 1);
   }
 
   /** Intervalle avant la prochaine salve (interpolé, bruité, respiration). */
@@ -160,8 +183,12 @@ export class SpawnManager {
       SPAWN_INTERVAL_MIN_MS,
       this.getIntensity()
     );
+    // Au-delà du plein régime, l'intervalle continue de se resserrer vers un
+    // plancher absolu : sans cela le jeu cessait de durcir et une bonne partie
+    // n'avait plus de point de rupture.
+    const serre = Phaser.Math.Linear(base, SPAWN_INTERVAL_FLOOR_MS, this.getOverdrive());
     const jitter = rndFloat(1 - SPAWN_INTERVAL_JITTER, 1 + SPAWN_INTERVAL_JITTER);
-    let interval = base * jitter;
+    let interval = serre * jitter;
     if (this.needsBreather) {
       interval *= SPAWN_BREATHER_FACTOR;
     }
@@ -234,7 +261,11 @@ export class SpawnManager {
       return 0;
     }
     const every = Math.round(
-      Phaser.Math.Linear(BOMB_EVERY_FRUITS_EASY, BOMB_EVERY_FRUITS_HARD, this.getIntensity())
+      Phaser.Math.Linear(
+        Phaser.Math.Linear(BOMB_EVERY_FRUITS_EASY, BOMB_EVERY_FRUITS_HARD, this.getIntensity()),
+        BOMB_EVERY_FRUITS_OVERDRIVE,
+        this.getOverdrive()
+      )
     );
     if (this.fruitsSinceBomb < every) {
       return 0;

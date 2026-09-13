@@ -284,7 +284,14 @@ export class GameScene extends Phaser.Scene {
 
     this.scoreManager = new ScoreManager(this);
     this.sliceDetector = new SliceDetector();
-    this.spawnManager = new SpawnManager(this, this.fruits, this.bombs, this.scoreManager, this.mode);
+    this.spawnManager = new SpawnManager(
+      this,
+      this.fruits,
+      this.bombs,
+      this.scoreManager,
+      this.mode,
+      () => this.fruitsSliced
+    );
 
     // Slots de gestes multi-touch : traînées et états pré-alloués,
     // aucune allocation quand un doigt se pose en pleine partie.
