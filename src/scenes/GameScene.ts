@@ -15,6 +15,7 @@ import { prefersReducedMotion } from '../utils/settings';
 import { PauseController } from '../systems/PauseController';
 import { seedRandom, clearSeed } from '../utils/rng';
 import { dailySeed, saveTodayResult } from '../utils/dailyChallenge';
+import { exclamationCombo, FRENESIE } from '../utils/creole';
 import {
   FRUIT_POOL_SIZE,
   HALF_POOL_SIZE,
@@ -1172,7 +1173,7 @@ export class GameScene extends Phaser.Scene {
     this.spawnRing(grenade.x, grenade.y, 12, 0xff5c78, 750);
     this.hitStop(HITSTOP_GRENADE_MS);
     sfx.crit();
-    this.showBigBanner(`${slashes} COUPS !\n+${awarded}`);
+    this.showBigBanner(`${FRENESIE}\n${slashes} coups  +${awarded}`);
 
     this.hideFrenzyVisuals();
     grenade.kill();
@@ -1204,7 +1205,9 @@ export class GameScene extends Phaser.Scene {
     }
     const n = gesture.comboCount;
     const awarded = this.scoreManager.addScore(n * GESTURE_COMBO_BONUS);
-    this.showBigBanner(`COMBO x${n} !\n+${awarded}`);
+    // L'exclamation creole passe AVANT le chiffre : c'est elle qu'on lit en
+    // premier, et c'est elle qui donne sa voix au jeu.
+    this.showBigBanner(`${exclamationCombo(n)}\nx${n}  +${awarded}`);
     sfx.bigCombo(n);
 
     // Ponctuation visuelle du combo : gel bref, caméra qui respire, onde

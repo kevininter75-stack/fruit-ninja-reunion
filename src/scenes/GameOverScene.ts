@@ -18,6 +18,7 @@ import { AnimatedBackground } from '../entities/AnimatedBackground';
 import { addVignette, fadeIn, fadeToScene } from '../utils/ui';
 import { prefersReducedMotion } from '../utils/settings';
 import { buildShareText, getStreak } from '../utils/dailyChallenge';
+import { RECORD, BOMBE } from '../utils/creole';
 
 /** Données passées par la GameScene à la fin d'une partie. */
 interface GameOverData {
@@ -31,7 +32,8 @@ interface GameOverData {
 /** Titre et sous-titre adaptés à la cause de fin de partie. */
 const REASON_DISPLAY: Record<GameOverReason, { title: string; subtitle: string; color: string }> = {
   lives: { title: 'GAME OVER', subtitle: 'Plus de vies !', color: '#ff6b6b' },
-  bomb: { title: 'BOUM !', subtitle: 'Vous avez tranché une bombe…', color: '#ffb347' },
+  // « La plané » — la formule que Kevin emploie quand c'est fichu.
+  bomb: { title: BOMBE, subtitle: 'Vous avez tranché une bombe…', color: '#ffb347' },
   time: { title: 'TEMPS ÉCOULÉ', subtitle: 'Les 60 secondes sont passées !', color: '#7fd4f0' },
 };
 
@@ -320,11 +322,12 @@ export class GameOverScene extends Phaser.Scene {
     }
 
     const record = this.add
-      .text(w / 2, y, '★ NOUVEAU RECORD ! ★', {
+      .text(w / 2, y, `★ ${RECORD} ★\nNouveau record`, {
         fontFamily: GAME_FONT,
         fontSize: '40px',
         fontStyle: '700',
         color: '#ffe066',
+        align: 'center',
         stroke: '#1d2731',
         strokeThickness: 6,
       })
