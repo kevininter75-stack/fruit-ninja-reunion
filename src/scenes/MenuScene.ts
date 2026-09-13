@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { SceneGrading } from '../systems/SceneGrading';
 import {
   type GameMode,
   SLICE_MIN_SPEED,
@@ -60,6 +61,7 @@ export class MenuScene extends Phaser.Scene {
     this.slicing = false;
     this.emblems = [];
 
+    new SceneGrading(this);
     new AnimatedBackground(this, true);
     music.ensureRunning();
 
@@ -103,13 +105,28 @@ export class MenuScene extends Phaser.Scene {
         : 'Une partie par jour';
 
     if (portrait) {
-      this.createEmblem(w / 2, h * 0.42, classic, 'classic', 'CLASSIQUE', `3 vies · Record ${getBestScore('classic')}`);
-      this.createEmblem(w / 2, h * 0.62, chrono, 'chrono', 'CHRONO', `60 s · Record ${getBestScore('chrono')}`);
-      this.createEmblem(w / 2, h * 0.82, daily, 'daily', 'DÉFI DU JOUR', sousTitreDefi);
+      // Portrait : le fruit à gauche, ses libellés à côté.
+      //
+      // Empilés avec le texte DESSOUS, les trois emblèmes ne tenaient pas :
+      // à l'échelle 1,7 l'ananas mesure 755 de haut pour 512 de pas entre
+      // rangées, si bien que « CLASSIQUE » tombait en plein milieu de
+      // l'ananas et « CHRONO » sur le goyavier. Ce n'était pas un défaut de
+      // réglage mais d'agencement : en portrait la hauteur manque, alors que
+      // les 720 de largeur restaient vides de part et d'autre.
+      //
+      // Mettre le texte À CÔTÉ remplit cette largeur inutilisée et supprime
+      // le conflit à la racine : plus rien n'occupe l'espace vertical entre
+      // deux fruits. On garde au passage des emblèmes deux fois plus gros que
+      // ce qu'un empilement aurait permis.
+      const pas = h * 0.19;
+      const premier = h * 0.4;
+      this.createEmblem(w * 0.31, premier, classic, 'classic', 'CLASSIQUE', `3 vies · Record ${getBestScore('classic')}`, 1.15, 'right');
+      this.createEmblem(w * 0.31, premier + pas, chrono, 'chrono', 'CHRONO', `60 s · Record ${getBestScore('chrono')}`, 1.15, 'right');
+      this.createEmblem(w * 0.31, premier + pas * 2, daily, 'daily', 'DÉFI DU JOUR', sousTitreDefi, 1.15, 'right');
     } else {
-      this.createEmblem(w * 0.22, h * 0.58, classic, 'classic', 'CLASSIQUE', `3 vies · Record ${getBestScore('classic')}`);
-      this.createEmblem(w * 0.5, h * 0.58, chrono, 'chrono', 'CHRONO', `60 s · Record ${getBestScore('chrono')}`);
-      this.createEmblem(w * 0.78, h * 0.58, daily, 'daily', 'DÉFI DU JOUR', sousTitreDefi);
+      this.createEmblem(w * 0.22, h * 0.58, classic, 'classic', 'CLASSIQUE', `3 vies · Record ${getBestScore('classic')}`, 1.7, 'below');
+      this.createEmblem(w * 0.5, h * 0.58, chrono, 'chrono', 'CHRONO', `60 s · Record ${getBestScore('chrono')}`, 1.7, 'below');
+      this.createEmblem(w * 0.78, h * 0.58, daily, 'daily', 'DÉFI DU JOUR', sousTitreDefi, 1.7, 'below');
     }
 
     // Jus (feedback de coupe) + lame qui suit le doigt
@@ -145,9 +162,10 @@ export class MenuScene extends Phaser.Scene {
     variety: FruitVariety,
     mode: GameMode,
     label: string,
-    subtitle: string
+    subtitle: string,
+    scale: number,
+    cote: 'below' | 'right'
   ): void {
-    const scale = 1.7;
     // Rayon de coupe = rayon logique du fruit mis à l'échelle
     const radius = variety.radius * scale;
 
@@ -183,8 +201,17 @@ export class MenuScene extends Phaser.Scene {
       ease: 'Sine.easeInOut',
     });
 
+    // À côté, le texte part du bord droit du fruit et se cale à gauche ;
+    // dessous, il reste centré sous lui. Les deux cas ne diffèrent que par
+    // ces trois valeurs, le reste du traçé est commun.
+    const aCote = cote === 'right';
+    const tx = aCote ? x + radius + px(30) : x;
+    const tyLabel = aCote ? y - px(30) : y + radius + px(16);
+    const tySub = aCote ? y + px(24) : y + radius + px(68);
+    const ancre = aCote ? 0 : 0.5;
+
     this.add
-      .text(x, y + radius + px(16), label, {
+      .text(tx, tyLabel, label, {
         fontFamily: GAME_FONT,
         fontSize: fontPx(46),
         fontStyle: 'bold',
@@ -192,14 +219,14 @@ export class MenuScene extends Phaser.Scene {
         stroke: '#2d3a4a',
         strokeThickness: px(6),
       })
-      .setOrigin(0.5, 0);
+      .setOrigin(ancre, 0);
     this.add
-      .text(x, y + radius + px(68), subtitle, {
+      .text(tx, tySub, subtitle, {
         fontFamily: GAME_FONT,
         fontSize: fontPx(26),
         color: '#fff3e0',
       })
-      .setOrigin(0.5, 0);
+      .setOrigin(ancre, 0);
 
     // Secours : un simple appui sélectionne aussi le mode
     sprite.on('pointerup', () => this.selectMode(mode, sprite));

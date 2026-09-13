@@ -33,7 +33,7 @@ function catmullRom(p0: number, p1: number, p2: number, p3: number, t: number): 
  * Traînée de lame façon Fruit Ninja : un ruban lisse, effilé en pointe à
  * l'arrière, le plus large sous le doigt, terminé par une pointe avant.
  *
- * Rendu en trois passes concentriques (halo translucide, cœur, éclat
+ * Rendu en quatre passes concentriques (halo translucide, cœur, éclat
  * central) pour un aspect brillant de lame, sur une courbe Catmull-Rom
  * qui gomme les angles de la polyligne brute du pointeur.
  *
@@ -43,6 +43,20 @@ function catmullRom(p0: number, p1: number, p2: number, p3: number, t: number): 
  * intermédiaires).
  */
 export class SliceTrail {
+  /**
+   * Deux calques et non un seul.
+   *
+   * Le halo est dessiné en fusion ADDITIVE : au lieu de poser du blanc
+   * translucide PAR-DESSUS le decor, il AJOUTE sa lumiere a ce qui est
+   * derriere. C'est la difference entre une lame recouverte de calque et une
+   * lame qui rayonne — et c'est exactement ce que fait un Bloom, mais
+   * restreint à l'objet qui brille, sans cible de rendu, sans passe de flou,
+   * et sans toucher à la netteté du texte du HUD.
+   *
+   * Le cœur reste en fusion normale : additionné, il saturerait à blanc pur
+   * et la lame perdrait son dégradé de température.
+   */
+  private readonly halo: Phaser.GameObjects.Graphics;
   private readonly graphics: Phaser.GameObjects.Graphics;
   private readonly points: TrailPoint[];
   private head = 0; // index du prochain point à écrire
@@ -58,6 +72,8 @@ export class SliceTrail {
   private readonly normalY = new Float32Array(MAX_SAMPLES);
 
   constructor(scene: Phaser.Scene) {
+    this.halo = scene.add.graphics();
+    this.halo.setDepth(99).setBlendMode(Phaser.BlendModes.ADD);
     this.graphics = scene.add.graphics();
     this.graphics.setDepth(100); // toujours au-dessus des fruits
     this.points = [];
@@ -81,11 +97,13 @@ export class SliceTrail {
     for (const p of this.points) {
       p.used = false;
     }
+    this.halo.clear();
     this.graphics.clear();
   }
 
   /** Redessine le ruban à partir des points encore frais. */
   update(now: number): void {
+    this.halo.clear();
     this.graphics.clear();
 
     const n = this.collectValidPoints(now);
@@ -98,10 +116,13 @@ export class SliceTrail {
     // Quatre passes, du plus large au plus fin, et du plus froid au plus
     // chaud : le dégradé de température donne l'éclat d'une lame chauffée à
     // blanc en son centre, là où un ruban uniformément blanc restait plat.
-    this.drawRibbon(m, 3.1, COLOR_TRAIL_GLOW, 0.1);
-    this.drawRibbon(m, 2.1, COLOR_TRAIL_GLOW, 0.18);
-    this.drawRibbon(m, 1.0, COLOR_TRAIL_CORE, 0.88);
-    this.drawRibbon(m, 0.38, COLOR_TRAIL_SPARK, 1);
+    // Les deux passes larges vont sur le calque additif, les deux fines sur
+    // le calque normal. Les alphas du halo baissent : ce qui s'ajoute éclaire
+    // bien plus fort que ce qui se superpose, à valeur égale.
+    this.drawRibbon(this.halo, m, 3.4, COLOR_TRAIL_GLOW, 0.055);
+    this.drawRibbon(this.halo, m, 2.1, COLOR_TRAIL_GLOW, 0.1);
+    this.drawRibbon(this.graphics, m, 1.0, COLOR_TRAIL_CORE, 0.88);
+    this.drawRibbon(this.graphics, m, 0.38, COLOR_TRAIL_SPARK, 1);
   }
 
   /**
@@ -186,8 +207,13 @@ export class SliceTrail {
   }
 
   /** Trace le polygone du ruban (aller côté gauche, retour côté droit). */
-  private drawRibbon(m: number, widthScale: number, color: number, alpha: number): void {
-    const g = this.graphics;
+  private drawRibbon(
+    g: Phaser.GameObjects.Graphics,
+    m: number,
+    widthScale: number,
+    color: number,
+    alpha: number
+  ): void {
     g.fillStyle(color, alpha);
     g.beginPath();
     g.moveTo(

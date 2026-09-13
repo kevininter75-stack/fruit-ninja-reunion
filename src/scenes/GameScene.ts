@@ -13,6 +13,7 @@ import { createMuteButton, addHudPanel, addVignette, fadeIn, fadeToScene } from 
 import { AnimatedBackground } from '../entities/AnimatedBackground';
 import { prefersReducedMotion } from '../utils/settings';
 import { PauseController } from '../systems/PauseController';
+import { SceneGrading } from '../systems/SceneGrading';
 import { seedRandom, clearSeed } from '../utils/rng';
 import { dailySeed, saveTodayResult } from '../utils/dailyChallenge';
 import { exclamationCombo, FRENESIE } from '../utils/creole';
@@ -174,6 +175,7 @@ export class GameScene extends Phaser.Scene {
   // restart, donc TOUT l'état mutable doit être réinitialisé dans init().
   private gameEnded = false;
   private pause!: PauseController;
+  private grading!: SceneGrading;
   private chronoEndTime = 0;
   private lastShownSecond = -1;
 
@@ -214,6 +216,10 @@ export class GameScene extends Phaser.Scene {
     this.physics.resume();
     this.tweens.timeScale = 1;
     this.hitStopActive = false;
+
+    // L'étalonnage d'abord : il s'installe sur la caméra, pas sur la scène,
+    // donc l'ordre de création des objets ne le concerne pas.
+    this.grading = new SceneGrading(this);
 
     new AnimatedBackground(this);
     // Voile sombre : atténue le décor pendant la partie pour que les fruits
@@ -1008,6 +1014,7 @@ export class GameScene extends Phaser.Scene {
   private enterFrenzyZoom(grenade: Fruit): void {
     const cibleX = this.scale.width / 2 + (grenade.x - this.scale.width / 2) * FRENZY_PAN_RATIO;
     const cibleY = this.scale.height / 2 + (grenade.y - this.scale.height / 2) * FRENZY_PAN_RATIO;
+    this.grading.setMode('frenzy');
     this.zoomCamera(FRENZY_ZOOM, FRENZY_ZOOM_MS, 'Sine.easeOut');
     this.panCamera(cibleX, cibleY, FRENZY_ZOOM_MS, 'Sine.easeOut');
     this.setHudDimmed(true);
@@ -1015,6 +1022,7 @@ export class GameScene extends Phaser.Scene {
 
   /** Rend la caméra à son cadrage normal (fin de frénésie). */
   private exitFrenzyZoom(): void {
+    this.grading.setMode(this.filledCrosses >= STARTING_LIVES - 1 ? 'danger' : 'normal');
     this.zoomCamera(1, FRENZY_ZOOM_MS, 'Sine.easeInOut');
     this.panCamera(this.scale.width / 2, this.scale.height / 2, FRENZY_ZOOM_MS, 'Sine.easeInOut');
     this.setHudDimmed(false);
@@ -1445,6 +1453,9 @@ export class GameScene extends Phaser.Scene {
     // quand on encaisse un strike, celle qui s'éteint quand on regagne une vie.
     const changedIndex = filled > this.filledCrosses ? filled - 1 : filled;
     this.filledCrosses = filled;
+    // Dernière vie : l'image se refroidit et se désature. Un signal en
+    // périphérie de vision, qui n'occupe aucune place à l'écran.
+    this.grading.setMode(filled >= STARTING_LIVES - 1 ? 'danger' : 'normal');
     this.syncLifeCrossStyles();
     const target = this.lifeCrosses[changedIndex];
     if (target === undefined) {

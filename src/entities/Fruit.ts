@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { FRUIT_RADIUS, DEPTH_FRUIT } from '../utils/constants';
+import { FRUIT_RADIUS, DEPTH_FRUIT, TEX_SHEEN, DEPTH_SHEEN } from '../utils/constants';
 import { type FruitVariety, wholeTextureKey } from '../utils/fruitCatalog';
 
 /**
@@ -30,8 +30,59 @@ export class Fruit extends Phaser.Physics.Arcade.Sprite {
 
   private variety: FruitVariety | null = null;
 
+  /**
+   * Le reflet : un calque additif posé sur le fruit, qui ne tourne JAMAIS.
+   *
+   * Un fruit tourne jusqu'à 160°/s. Tout ce qui est peint dans sa texture
+   * tourne avec lui, reflet compris — et un soleil qui fait le tour d'un
+   * fruit est ce qui trahit le plus sûrement une fausse 3D. Le grand reflet
+   * est donc sorti de la texture (cf. SPECULAIRE_CUIT) et posé ici, à
+   * rotation nulle : la lumière reste en place pendant que le fruit tourne
+   * dessous, comme dans le monde réel.
+   *
+   * Créé une fois avec le fruit, jamais détruit : les fruits viennent d'un
+   * pool, donc le nombre de reflets est borné par la taille du pool.
+   */
+  private sheen: Phaser.GameObjects.Image | null = null;
+
   getVariety(): FruitVariety | null {
     return this.variety;
+  }
+
+  /** Crée le calque de reflet au premier lancer (le pool le réutilise ensuite). */
+  private ensureSheen(): Phaser.GameObjects.Image {
+    if (this.sheen === null) {
+      this.sheen = this.scene.add
+        .image(this.x, this.y, TEX_SHEEN)
+        .setDepth(DEPTH_SHEEN)
+        .setBlendMode(Phaser.BlendModes.ADD);
+    }
+    return this.sheen;
+  }
+
+  /**
+   * Recale le reflet sur le fruit : même position, même taille, mais angle
+   * toujours nul. C'est la ligne `setRotation(0)` implicite — on ne touche
+   * simplement jamais à l'angle — qui porte tout l'effet.
+   */
+  private syncSheen(): void {
+    const sheen = this.sheen;
+    if (sheen === null) {
+      return;
+    }
+    if (!this.active || !this.visible) {
+      sheen.setVisible(false);
+      return;
+    }
+    // Le reflet couvre le CORPS du fruit, pas sa texture : celle-ci comprend
+    // une marge pour les feuilles et l'ombre portée, où aucun reflet n'a lieu
+    // d'apparaître. On se cale donc sur le rayon de coupe.
+    const diametre = this.sliceRadius * 2 * this.scaleX;
+    sheen
+      .setVisible(true)
+      .setPosition(this.x, this.y)
+      .setDisplaySize(diametre, diametre)
+      .setAlpha(this.alpha);
   }
 
   /**
@@ -58,6 +109,7 @@ export class Fruit extends Phaser.Physics.Arcade.Sprite {
     this.setTexture(wholeTextureKey(variety));
     this.setDepth(DEPTH_FRUIT); // au-dessus des taches de jus persistantes
 
+    this.ensureSheen();
     this.enableBody(true, x, y, true, true);
     // Ceinture et bretelles : un fruit sortant du pool doit toujours retrouver
     // une physique normale, même si la frénésie précédente s'est mal terminée.
@@ -125,6 +177,7 @@ export class Fruit extends Phaser.Physics.Arcade.Sprite {
     }
     this.frenzyActive = false;
     this.disableBody(true, true);
+    this.sheen?.setVisible(false);
   }
 
   /**
@@ -136,6 +189,7 @@ export class Fruit extends Phaser.Physics.Arcade.Sprite {
    */
   preUpdate(time: number, delta: number): void {
     super.preUpdate(time, delta);
+    this.syncSheen();
     if (this.frenzyActive) {
       return; // grenade figée en frénésie : elle ne tombe pas, donc rien à manquer
     }

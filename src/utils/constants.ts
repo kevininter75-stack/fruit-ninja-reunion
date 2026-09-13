@@ -349,6 +349,14 @@ export const DEPTH_DARKEN = 1;
 export const DEPTH_SPLAT = 2;
 export const DEPTH_HALF = 5;
 export const DEPTH_FRUIT = 6;
+/**
+ * Reflet des fruits : juste au-dessus du fruit, sous tout le reste.
+ *
+ * Il doit passer par-dessus la peau (c'est un reflet) mais rester sous le
+ * jus, les taches et le HUD — un reflet qui brillerait par-dessus une
+ * éclaboussure mettrait la lumière devant la matière.
+ */
+export const DEPTH_SHEEN = 7;
 export const DEPTH_JUICE = 40;
 
 // Combo : points bonus par coupe supplémentaire dans la fenêtre COMBO_WINDOW_MS
@@ -395,10 +403,31 @@ export const GESTURE_COMBO_BONUS = 15;
 // Fond animé
 // ------------------------------------------------------------------
 export const TEX_GLOW = 'glow';
+/** Calque de reflet fixe posé sur les fruits en rotation (cf. paintSphereSheen). */
+export const TEX_SHEEN = 'sheen';
+/** Côté de la texture de reflet, en pixels logiques. */
+export const SHEEN_TEX_SIZE = 256;
 export const TEX_CLOUD = 'cloud';
 // Position du soleil (fraction de l'écran) — partagée entre le décor baké
 // et le halo animé pour qu'ils coïncident dans les deux orientations.
-export const SUN_FRAC_X = 0.66;
+/**
+ * Position du soleil dans le décor, en fractions de l'écran.
+ *
+ * Il était à 0,66 — c'est-à-dire à DROITE — alors que les fruits sont
+ * éclairés depuis le HAUT-GAUCHE : c'est la direction de la lumière clé du
+ * moteur d'ombrage (surfaceShading), celle du reflet verni (addGloss) et
+ * celle du dégradé de sphère (sphereGradient).
+ *
+ * Une image où le soleil est d'un côté et les ombres de l'autre se lit comme
+ * un montage, même si personne ne sait dire pourquoi. C'est le défaut le
+ * plus coûteux en crédibilité et le moins cher à corriger.
+ *
+ * On déplace le soleil plutôt que la lumière des fruits : dix variétés ont
+ * été peintes à la main autour de ce haut-gauche (jusqu'à la joue rouge de
+ * la mangue, placée à droite précisément parce que le reflet occupe l'autre
+ * côté). Une constante contre dix peintures à reprendre.
+ */
+export const SUN_FRAC_X = 0.34;
 export const SUN_FRAC_Y = 0.52;
 export const BG_CLOUD_COUNT = 5;
 // Profondeurs du fond animé (sous tout le reste, sous le voile sombre)

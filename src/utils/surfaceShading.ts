@@ -36,13 +36,20 @@ export interface SurfaceMaterial {
   bump: number;
 }
 
-/** Lumière d'un couchant réunionnais : chaude et rasante. */
-const KEY = normalize(-0.46, -0.58, 0.67);
+/**
+ * Lumière d'un couchant réunionnais : chaude et rasante, venant du
+ * haut-gauche. Le soleil du décor est placé du même côté (SUN_FRAC_X) —
+ * c'est la même lumière, il ne peut y en avoir qu'une.
+ */
+export const KEY = normalize(-0.46, -0.58, 0.67);
 const KEY_COLOR: [number, number, number] = [1.0, 0.9, 0.78];
 /** Remplissage froid venant du ciel opposé : sans lui, l'ombre est un trou. */
 const FILL = normalize(0.52, 0.34, 0.45);
 const FILL_COLOR: [number, number, number] = [0.44, 0.56, 0.78];
 const AMBIENT = 0.36;
+
+/** Part du spéculaire laissée dans la texture (le reste va sur le calque fixe). */
+const SPECULAIRE_CUIT = 0.3;
 
 function normalize(x: number, y: number, z: number): [number, number, number] {
   const l = Math.hypot(x, y, z) || 1;
@@ -191,7 +198,20 @@ export function shadeSphericalSurface(
       const lightG = AMBIENT + diffuse * KEY_COLOR[1] + fill * 0.5 * FILL_COLOR[1];
       const lightB = AMBIENT + diffuse * KEY_COLOR[2] + fill * 0.5 * FILL_COLOR[2];
 
-      const specAmount = specular * 235;
+      // Le spéculaire cuit dans la texture est volontairement atténué.
+      //
+      // POURQUOI. Un fruit tourne en vol (jusqu'à 160°/s). Tout ce qui est
+      // peint dans sa texture tourne avec lui — y compris le reflet. Or un
+      // reflet spéculaire ne tourne PAS avec l'objet : il reste face à la
+      // lumière. Cuit dans la texture, il donne donc l'impression d'un soleil
+      // qui fait le tour du fruit, et c'est l'indice numéro un qui trahit une
+      // fausse 3D.
+      //
+      // Ce qui reste ici (30 %) sert au grain de la matière : les micro-éclats
+      // au sommet des écailles d'un letchi appartiennent bien à la peau et
+      // doivent tourner avec elle. Le grand reflet, lui, est reporté sur un
+      // calque qui ne tourne jamais (cf. paintSphereSheen).
+      const specAmount = specular * 235 * SPECULAIRE_CUIT;
       const rimAmount = rim * 0.55;
 
       const o = i * 4;
@@ -219,4 +239,73 @@ export function shadeSphericalSurface(
 
 function clamp255(value: number): number {
   return value < 0 ? 0 : value > 255 ? 255 : value;
+}
+
+/**
+ * Peint le REFLET d'une sphère — spéculaire et contre-jour seulement, sur
+ * fond transparent. C'est le calque qui ne tourne jamais.
+ *
+ * Posé en fusion additive par-dessus un fruit qui tourne, il rétablit la
+ * seule chose qu'une rotation de sprite met en défaut : la lumière reste où
+ * elle est pendant que l'objet tourne sous elle. C'est exactement ce que fait
+ * un moteur 3D, obtenu ici avec une texture partagée par tous les fruits et
+ * un sprite supplémentaire à l'écran — ni shader, ni cible de rendu.
+ *
+ * Le reflet s'arrête avant le bord (facteur 0,93) : la silhouette réelle d'un
+ * ananas ou d'une carambole n'est pas un disque, et un liseré posé au ras du
+ * rayon déborderait du fruit.
+ */
+export function paintSphereSheen(ctx: CanvasRenderingContext2D, size: number, radius: number): void {
+  const image = ctx.createImageData(size, size);
+  const data = image.data;
+  const c = size / 2;
+  const bord = radius * 0.93;
+
+  // Vecteur à mi-chemin lumière/œil, constant sur toute la sphère (Blinn-Phong).
+  const hx = KEY[0];
+  const hy = KEY[1];
+  const hz = KEY[2] + 1;
+  const hl = Math.hypot(hx, hy, hz) || 1;
+
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const dx = (x - c) / bord;
+      const dy = (y - c) / bord;
+      const d2 = dx * dx + dy * dy;
+      if (d2 >= 1) {
+        continue; // hors de la sphère : reste transparent
+      }
+      const nz = Math.sqrt(1 - d2);
+      const ndh = Math.max(0, (dx * hx + dy * hy + nz * hz) / hl);
+
+      // Deux lobes : un large et doux pour le galbe verni, un serré et vif
+      // pour le point chaud. Un seul exposant donne soit une tache molle,
+      // soit un point dur ; les deux ensemble donnent du verre.
+      const large = Math.pow(ndh, 16) * 0.24;
+      const serre = Math.pow(ndh, 78) * 0.5;
+
+      // Contre-jour : le pourtour s'allume, ce qui détache la silhouette du
+      // décor sombre. Attenué très près du bord pour éviter un cerne net.
+      const rim = Math.pow(1 - nz, 3.4) * (1 - Math.pow(d2, 8)) * 0.3;
+
+      // Plafond à 0,62 et non à 1. En fusion additive, un alpha de 1 ajoute
+      // 255 à un fruit déjà éclairé : le reflet devient un disque blanc à bord
+      // net, qui se lit comme un défaut d'affichage et non comme du verni.
+      // Un reflet réel garde toujours un dégradé.
+      const force = Math.min(0.62, large + serre + rim);
+      if (force <= 0.002) {
+        continue;
+      }
+
+      const o = (y * size + x) * 4;
+      // Teinte du reflet : celle de la lumière clé, pas du blanc pur. Un
+      // reflet blanc sous un soleil orange se voit immédiatement.
+      data[o] = 255;
+      data[o + 1] = 238;
+      data[o + 2] = 214;
+      data[o + 3] = Math.round(force * 255);
+    }
+  }
+
+  ctx.putImageData(image, 0, 0);
 }

@@ -10,6 +10,8 @@ import {
   SPLAT_VARIANTS,
   BOMB_RADIUS,
   TEX_GLOW,
+  TEX_SHEEN,
+  SHEEN_TEX_SIZE,
   TEX_CLOUD,
   TEX_VIGNETTE,
   TEX_RING,
@@ -24,6 +26,8 @@ import {
   SUN_FRAC_Y,
   SPRITE_SUPERSAMPLE,
   fontPx,
+  px,
+  RENDER_SCALE,
 } from '../utils/constants';
 import {
   FRUIT_VARIETIES,
@@ -34,6 +38,8 @@ import {
   halfTextureKeys,
 } from '../utils/fruitCatalog';
 import { paintWhole, paintCut } from '../utils/fruitArt';
+import { paintBackdrop } from '../utils/backdrop';
+import { paintSphereSheen } from '../utils/surfaceShading';
 
 /**
  * Génération des assets placeholder.
@@ -87,6 +93,7 @@ export class PreloadScene extends Phaser.Scene {
     } });
     this.taches.push({ libelle: 'Les finitions', run: () => {
       this.createGlowTexture();
+      this.createSheenTexture();
       this.createCloudTexture();
       this.createVignetteTexture();
       this.createRingTexture();
@@ -163,12 +170,16 @@ export class PreloadScene extends Phaser.Scene {
    * le même langage visuel que les éclaboussures de jus du jeu.
    */
   private createCrossTexture(): void {
+    // Le canevas suit la résolution, le TRACÉ reste en coordonnées logiques :
+    // la mise à l'échelle du contexte fait le pont. Sans elle, monter la
+    // résolution donnerait une grande image contenant un petit dessin.
     const size = 128;
-    const tex = this.textures.createCanvas(TEX_CROSS, size, size);
+    const tex = this.textures.createCanvas(TEX_CROSS, px(size), px(size));
     if (tex === null) {
       return;
     }
     const ctx = tex.getContext();
+    ctx.scale(RENDER_SCALE, RENDER_SCALE);
     ctx.fillStyle = '#ffffff';
 
     // Un trait effilé aux extrémités : on assemble deux courbes de Bézier
@@ -286,7 +297,7 @@ export class PreloadScene extends Phaser.Scene {
 
   /** Onde de choc : anneau clair à bord fondu, agrandi puis effacé en tween. */
   private createRingTexture(): void {
-    const size = 256;
+    const size = px(256);
     const c = size / 2;
     const tex = this.textures.createCanvas(TEX_RING, size, size);
     if (tex === null) {
@@ -307,7 +318,7 @@ export class PreloadScene extends Phaser.Scene {
 
   /** Vignettage : cadre radial sombre (transparent au centre, sombre aux bords). */
   private createVignetteTexture(): void {
-    const size = 512;
+    const size = px(512);
     const c = size / 2;
     const tex = this.textures.createCanvas(TEX_VIGNETTE, size, size);
     if (tex === null) {
@@ -324,7 +335,7 @@ export class PreloadScene extends Phaser.Scene {
 
   /** Halo lumineux radial : le "glow" animé placé sur le soleil du décor. */
   private createGlowTexture(): void {
-    const size = 520;
+    const size = px(520);
     const c = size / 2;
     const tex = this.textures.createCanvas(TEX_GLOW, size, size);
     if (tex === null) {
@@ -340,15 +351,34 @@ export class PreloadScene extends Phaser.Scene {
     tex.refresh();
   }
 
+  /**
+   * Reflet de sphère partagé par tous les fruits.
+   *
+   * Une seule texture pour dix variétés : le reflet ne dépend que de la
+   * lumière et de la forme sphérique, jamais de la peau. Elle est peinte à
+   * la résolution de l'écran puis réduite à la taille de chaque fruit — un
+   * reflet réduit reste net, un reflet agrandi baverait.
+   */
+  private createSheenTexture(): void {
+    const cote = px(SHEEN_TEX_SIZE);
+    const tex = this.textures.createCanvas(TEX_SHEEN, cote, cote);
+    if (tex === null) {
+      return;
+    }
+    paintSphereSheen(tex.getContext(), cote, cote / 2);
+    tex.refresh();
+  }
+
   /** Nuage doux : amas de cercles flous (bord adouci par shadowBlur). */
   private createCloudTexture(): void {
     const w = 360;
     const h = 150;
-    const tex = this.textures.createCanvas(TEX_CLOUD, w, h);
+    const tex = this.textures.createCanvas(TEX_CLOUD, px(w), px(h));
     if (tex === null) {
       return;
     }
     const ctx = tex.getContext();
+    ctx.scale(RENDER_SCALE, RENDER_SCALE);
     ctx.fillStyle = '#ffffff';
     ctx.shadowColor = 'rgba(255, 255, 255, 1)';
     ctx.shadowBlur = 28;
@@ -375,130 +405,8 @@ export class PreloadScene extends Phaser.Scene {
     if (texture === null) {
       return; // ne peut arriver que si la clé existe déjà
     }
-    const ctx = texture.getContext();
-
-    // Ciel : lagon en haut → or → corail au couchant
-    const sky = ctx.createLinearGradient(0, 0, 0, H);
-    sky.addColorStop(0, '#1478a0');
-    sky.addColorStop(0.45, '#3fa7c4');
-    sky.addColorStop(0.72, '#f2a95c');
-    sky.addColorStop(1, '#e2603c');
-    ctx.fillStyle = sky;
-    ctx.fillRect(0, 0, W, H);
-
-    // (Les nuages sont désormais des sprites animés qui dérivent — cf. AnimatedBackground.)
-
-    // Soleil couchant avec halo, partiellement derrière les montagnes.
-    // Position partagée avec le halo animé (SUN_FRAC_*) pour qu'ils coïncident.
-    const sunX = W * SUN_FRAC_X;
-    const sunY = H * SUN_FRAC_Y;
-    const halo = ctx.createRadialGradient(sunX, sunY, 20, sunX, sunY, 240);
-    halo.addColorStop(0, 'rgba(255, 222, 150, 0.55)');
-    halo.addColorStop(1, 'rgba(255, 222, 150, 0)');
-    ctx.fillStyle = halo;
-    ctx.beginPath();
-    ctx.arc(sunX, sunY, 240, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#ffd98c';
-    ctx.beginPath();
-    ctx.arc(sunX, sunY, 80, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Montagnes lointaines (plus claires, pour la profondeur)
-    ctx.fillStyle = 'rgba(77, 95, 112, 0.5)';
-    ctx.beginPath();
-    ctx.moveTo(0, H * 0.74);
-    ctx.lineTo(W * 0.18, H * 0.6);
-    ctx.lineTo(W * 0.34, H * 0.7);
-    ctx.lineTo(W * 0.52, H * 0.63);
-    ctx.lineTo(W * 0.75, H * 0.72);
-    ctx.lineTo(W, H * 0.65);
-    ctx.lineTo(W, H);
-    ctx.lineTo(0, H);
-    ctx.closePath();
-    ctx.fill();
-
-    // Volcan proche (silhouette du Piton, cratère marqué)
-    ctx.fillStyle = 'rgba(45, 58, 74, 0.8)';
-    ctx.beginPath();
-    ctx.moveTo(0, H);
-    ctx.lineTo(0, H * 0.8);
-    ctx.lineTo(W * 0.22, H * 0.64);
-    ctx.lineTo(W * 0.38, H * 0.74);
-    ctx.lineTo(W * 0.58, H * 0.57);
-    ctx.lineTo(W * 0.63, H * 0.6); // cratère
-    ctx.lineTo(W * 0.68, H * 0.58);
-    ctx.lineTo(W * 0.85, H * 0.72);
-    ctx.lineTo(W, H * 0.68);
-    ctx.lineTo(W, H);
-    ctx.closePath();
-    ctx.fill();
-
-    // Océan au pied du volcan
-    const seaTop = H * 0.87;
-    const sea = ctx.createLinearGradient(0, seaTop, 0, H);
-    sea.addColorStop(0, '#1a6f8f');
-    sea.addColorStop(1, '#0e4a63');
-    ctx.fillStyle = sea;
-    ctx.fillRect(0, seaTop, W, H - seaTop);
-
-    // Reflets du couchant sur l'eau
-    ctx.strokeStyle = 'rgba(255, 235, 190, 0.28)';
-    ctx.lineWidth = 3;
-    for (const [wx, wy, len] of [
-      [W * 0.5, seaTop + 24, 130],
-      [W * 0.62, seaTop + 52, 90],
-      [W * 0.42, seaTop + 78, 110],
-      [W * 0.58, seaTop + 108, 70],
-      [W * 0.15, seaTop + 60, 60],
-      [W * 0.85, seaTop + 90, 60],
-    ]) {
-      ctx.beginPath();
-      ctx.moveTo(wx - len / 2, wy);
-      ctx.lineTo(wx + len / 2, wy);
-      ctx.stroke();
-    }
-
-    // Palmiers en silhouette dans les coins bas
-    this.drawPalm(ctx, W * 0.07, seaTop + 14, 1);
-    this.drawPalm(ctx, W * 0.94, seaTop + 22, -1);
-
+    paintBackdrop(texture.getContext(), W, H, SUN_FRAC_X, SUN_FRAC_Y);
     texture.refresh();
-  }
-
-  /** Palmier stylisé en silhouette : tronc courbé + palmes en arcs. */
-  private drawPalm(ctx: CanvasRenderingContext2D, baseX: number, baseY: number, dir: number): void {
-    ctx.strokeStyle = '#22303c';
-    ctx.fillStyle = '#22303c';
-    const topX = baseX + dir * 42;
-    const topY = baseY - 165;
-
-    ctx.lineWidth = 13;
-    ctx.beginPath();
-    ctx.moveTo(baseX, baseY);
-    ctx.quadraticCurveTo(baseX + dir * 6, baseY - 90, topX, topY);
-    ctx.stroke();
-
-    // Palmes : arcs partant du sommet dans toutes les directions
-    ctx.lineWidth = 7;
-    for (const [dx, dy, cx, cy] of [
-      [-85, 10, -40, -35],
-      [-70, 45, -30, 0],
-      [-20, -55, -5, -45],
-      [30, -50, 10, -50],
-      [80, 15, 40, -30],
-      [65, 50, 30, 5],
-    ]) {
-      ctx.beginPath();
-      ctx.moveTo(topX, topY);
-      ctx.quadraticCurveTo(topX + cx * dir, topY + cy, topX + dx * dir, topY + dy);
-      ctx.stroke();
-    }
-    // Noix de coco
-    ctx.beginPath();
-    ctx.arc(topX - dir * 8, topY + 12, 8, 0, Math.PI * 2);
-    ctx.arc(topX + dir * 6, topY + 14, 8, 0, Math.PI * 2);
-    ctx.fill();
   }
 
   // ------------------------------------------------------------------
@@ -508,7 +416,7 @@ export class PreloadScene extends Phaser.Scene {
   private createVarietyTextures(variety: FruitVariety): void {
     // Marge élargie : place pour feuilles/couronnes/halo ET pour l'ombre
     // portée douce qui détache le fruit du décor assombri.
-    const size = variety.radius * 2 + 64;
+    const size = variety.radius * 2 + px(64);
     const variants: Array<'whole' | 'left' | 'right'> = ['whole', 'left', 'right'];
     const halves = halfTextureKeys(variety);
 
@@ -606,11 +514,12 @@ export class PreloadScene extends Phaser.Scene {
   private createJuiceTexture(): void {
     const size = 28;
     const c = size / 2;
-    const tex = this.textures.createCanvas(TEX_JUICE, size, size);
+    const tex = this.textures.createCanvas(TEX_JUICE, px(size), px(size));
     if (tex === null) {
       return;
     }
     const ctx = tex.getContext();
+    ctx.scale(RENDER_SCALE, RENDER_SCALE);
     const g = ctx.createRadialGradient(c, c, 0, c, c, c);
     g.addColorStop(0, 'rgba(255, 255, 255, 1)');
     g.addColorStop(0.55, 'rgba(255, 255, 255, 0.85)');
@@ -630,6 +539,7 @@ export class PreloadScene extends Phaser.Scene {
     const c = size / 2;
     for (let variant = 0; variant < SPLAT_VARIANTS; variant++) {
       const g = this.make.graphics({ x: 0, y: 0 }, false);
+      g.setScale(RENDER_SCALE);
       // Corps principal de la tache
       g.fillStyle(0xffffff, 0.85);
       g.fillCircle(c, c, 34 + variant * 3);
@@ -647,7 +557,7 @@ export class PreloadScene extends Phaser.Scene {
         const dist = 62 + ((i * 11 + variant * 7) % 20);
         g.fillCircle(c + Math.cos(angle) * dist, c + Math.sin(angle) * dist, 4 + (i % 3) * 2);
       }
-      g.generateTexture(`${TEX_SPLAT_PREFIX}${variant}`, size, size);
+      g.generateTexture(`${TEX_SPLAT_PREFIX}${variant}`, px(size), px(size));
       g.destroy();
     }
   }

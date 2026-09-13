@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { SceneGrading } from '../systems/SceneGrading';
 import {
   type GameMode,
   type GameOverReason,
@@ -81,6 +82,7 @@ export class GameOverScene extends Phaser.Scene {
     const h = this.scale.height;
     const portrait = h > w;
 
+    new SceneGrading(this);
     new AnimatedBackground(this, true);
     this.add.rectangle(0, 0, w, h, 0x0b2a3a, 0.62).setOrigin(0);
 
