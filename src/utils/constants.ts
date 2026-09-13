@@ -197,6 +197,22 @@ export const GAMEOVER_STEP_MS = 130; // décalage entre deux éléments révél�
 // ------------------------------------------------------------------
 // Typographie
 // ------------------------------------------------------------------
+/**
+ * Suréchantillonnage de la génération des sprites.
+ *
+ * Les textures de fruits sont peintes à SPRITE_SUPERSAMPLE fois leur taille
+ * finale, puis réduites. La taille de texture ne change PAS : rien à reprendre
+ * dans la mise en page, aucun facteur d'échelle à propager aux entités.
+ *
+ * Ce qui change, c'est la qualité du relief. Les écailles calculées pixel par
+ * pixel crénelaient à 1x — à cette échelle, un sillon fait un pixel de large et
+ * se met à scintiller. Réduites depuis 3x, elles sont lissées proprement.
+ *
+ * Coût : neuf fois plus de pixels à calculer, au CHARGEMENT uniquement. En
+ * partie, exactement rien.
+ */
+export const SPRITE_SUPERSAMPLE = 3;
+
 // Police d'affichage du jeu (Fredoka, SIL OFL, embarquée dans public/fonts).
 // Ronde et généreuse, avec des chiffres très lisibles en petit — critère
 // décisif pour un score sur mobile. La pile de repli garantit un rendu

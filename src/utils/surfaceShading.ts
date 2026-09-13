@@ -79,46 +79,61 @@ export function shadeSphericalSurface(
   height: ((x: number, y: number) => number) | null,
   cacheKey?: string
 ): void {
-  if (cacheKey) {
-    const cached = surfaceCache.get(cacheKey);
+
+  // Facteur de suréchantillonnage lu sur la transformation du contexte. Le
+  // générateur de textures peint à 3x puis réduit : sans cette lecture, on
+  // calculerait une image basse résolution étirée, et tout le bénéfice du
+  // suréchantillonnage serait perdu exactement là où il compte — sur le relief.
+  const ss = Math.max(1, Math.round(ctx.getTransform().a));
+
+  // La clé inclut le suréchantillonnage : deux facteurs différents ne peuvent
+  // évidemment pas partager la même surface.
+  const cle = cacheKey ? `${cacheKey}|x${ss}` : null;
+  if (cle) {
+    const cached = surfaceCache.get(cle);
     if (cached) {
-      ctx.drawImage(cached, 0, 0);
+      ctx.drawImage(cached, 0, 0, size, size);
       return;
     }
   }
 
-  const c = size / 2;
-  const field = new Float32Array(size * size);
+  const px = Math.round(size * ss);
+  const c = px / 2;
+  const radiusPx = radius * ss;
+  const field = new Float32Array(px * px);
 
   // Le relief n'est calculé que DANS le fruit, avec une marge d'un pixel pour
   // que les pentes du bord restent justes. Au-delà, la silhouette découpe de
   // toute façon : c'était un tiers du travail jeté.
-  const portee = Math.ceil(radius) + 2;
+  const portee = Math.ceil(radiusPx) + 2;
   const xMin = Math.max(0, Math.floor(c - portee));
-  const xMax = Math.min(size, Math.ceil(c + portee));
+  const xMax = Math.min(px, Math.ceil(c + portee));
   const yMin = Math.max(0, Math.floor(c - portee));
-  const yMax = Math.min(size, Math.ceil(c + portee));
+  const yMax = Math.min(px, Math.ceil(c + portee));
 
   if (height) {
     for (let y = yMin; y < yMax; y++) {
       for (let x = xMin; x < xMax; x++) {
-        field[y * size + x] = height(x, y);
+        // La fonction de relief raisonne en coordonnées LOGIQUES : on lui
+        // repasse donc la position divisée par le suréchantillonnage, sinon
+        // les écailles rétréciraient d'autant.
+        field[y * px + x] = height(x / ss, y / ss);
       }
     }
   }
 
-  const image = ctx.createImageData(size, size);
+  const image = ctx.createImageData(px, px);
   const data = image.data;
   const shininess = 8 + material.smoothness * 90;
 
   for (let py = yMin; py < yMax; py++) {
-    for (let px = xMin; px < xMax; px++) {
-      const i = py * size + px;
+    for (let pxi = xMin; pxi < xMax; pxi++) {
+      const i = py * px + pxi;
 
       // Normale de sphère. Au-delà du rayon on rabat la normale vers le
       // tranchant : c'est la zone du contour, celle que le liseré allume.
-      const dx = (px - c) / radius;
-      const dy = (py - c) / radius;
+      const dx = (pxi - c) / radiusPx;
+      const dy = (py - c) / radiusPx;
       const d2 = dx * dx + dy * dy;
       const nzBase = Math.sqrt(Math.max(0, 1 - Math.min(1, d2)));
 
@@ -131,12 +146,12 @@ export function shadeSphericalSurface(
       if (height) {
         // Pente du relief, par différences centrées. Aux bords du sprite on
         // retombe sur le pixel courant plutôt que de sortir du tableau.
-        const xm = px > 0 ? field[i - 1] : h;
-        const xp = px < size - 1 ? field[i + 1] : h;
-        const ym = py > 0 ? field[i - size] : h;
-        const yp = py < size - 1 ? field[i + size] : h;
-        nx -= (xp - xm) * material.bump;
-        ny -= (yp - ym) * material.bump;
+        const xm = pxi > 0 ? field[i - 1] : h;
+        const xp = pxi < px - 1 ? field[i + 1] : h;
+        const ym = py > 0 ? field[i - px] : h;
+        const yp = py < px - 1 ? field[i + px] : h;
+        nx -= (xp - xm) * material.bump * ss;
+        ny -= (yp - ym) * material.bump * ss;
       }
 
       const len = Math.hypot(nx, ny, nz) || 1;
@@ -190,13 +205,15 @@ export function shadeSphericalSurface(
   // Passage par un canevas intermédiaire : putImageData ignore le clip, et la
   // surface déborderait de la silhouette du fruit.
   const buffer = document.createElement('canvas');
-  buffer.width = size;
-  buffer.height = size;
+  buffer.width = px;
+  buffer.height = px;
   buffer.getContext('2d')!.putImageData(image, 0, 0);
-  ctx.drawImage(buffer, 0, 0);
+  // Dessiné en coordonnées logiques : la transformation du contexte remet
+  // l'image à l'échelle, et le suréchantillonnage se fait à la réduction.
+  ctx.drawImage(buffer, 0, 0, size, size);
 
-  if (cacheKey) {
-    surfaceCache.set(cacheKey, buffer);
+  if (cle) {
+    surfaceCache.set(cle, buffer);
   }
 }
 

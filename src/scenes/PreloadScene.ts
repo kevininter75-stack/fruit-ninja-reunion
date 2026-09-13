@@ -22,6 +22,7 @@ import {
   GAME_FONT,
   SUN_FRAC_X,
   SUN_FRAC_Y,
+  SPRITE_SUPERSAMPLE,
 } from '../utils/constants';
 import {
   FRUIT_VARIETIES,
@@ -49,25 +50,108 @@ export class PreloadScene extends Phaser.Scene {
     super('PreloadScene');
   }
 
+  private taches: Array<{ libelle: string; run: () => void }> = [];
+  private tacheCourante = 0;
+  private barre?: Phaser.GameObjects.Rectangle;
+  private legende?: Phaser.GameObjects.Text;
+
   create(): void {
-    // Un décor par orientation : la scène active choisit le bon (backgroundKey)
-    this.createBackgroundTexture('background_portrait', PORTRAIT_WIDTH, PORTRAIT_HEIGHT);
-    this.createBackgroundTexture('background_landscape', LANDSCAPE_WIDTH, LANDSCAPE_HEIGHT);
+    this.buildLoadingScreen();
+
+    // Les textures sont générées EN TÂCHES, une par frame, au lieu d'un seul
+    // bloc. Mesuré : 852 ms rien que pour les fruits, suréchantillonnage
+    // compris. En un bloc, le navigateur ne repeint rien pendant tout ce
+    // temps : la barre de progression resterait figée à zéro puis le jeu
+    // apparaîtrait — autant ne pas en mettre.
+    this.taches = [
+      { libelle: 'Le décor', run: () => {
+        this.createBackgroundTexture('background_portrait', PORTRAIT_WIDTH, PORTRAIT_HEIGHT);
+        this.createBackgroundTexture('background_landscape', LANDSCAPE_WIDTH, LANDSCAPE_HEIGHT);
+      } },
+    ];
+
     for (const variety of FRUIT_VARIETIES) {
-      this.createVarietyTextures(variety);
+      this.taches.push({
+        libelle: variety.displayName,
+        run: () => this.createVarietyTextures(variety),
+      });
     }
-    this.createVarietyTextures(BONUS_VARIETY);
-    this.createVarietyTextures(FRENZY_VARIETY);
-    this.createBombTexture();
-    this.createJuiceTexture();
-    this.createSplatTextures();
-    this.createGlowTexture();
-    this.createCloudTexture();
-    this.createVignetteTexture();
-    this.createRingTexture();
-    this.createCrossTexture();
-    this.createDigitFont();
-    this.scene.start('MenuScene');
+
+    this.taches.push({ libelle: BONUS_VARIETY.displayName, run: () => this.createVarietyTextures(BONUS_VARIETY) });
+    this.taches.push({ libelle: FRENZY_VARIETY.displayName, run: () => this.createVarietyTextures(FRENZY_VARIETY) });
+    this.taches.push({ libelle: 'La lame et le jus', run: () => {
+      this.createBombTexture();
+      this.createJuiceTexture();
+      this.createSplatTextures();
+    } });
+    this.taches.push({ libelle: 'Les finitions', run: () => {
+      this.createGlowTexture();
+      this.createCloudTexture();
+      this.createVignetteTexture();
+      this.createRingTexture();
+      this.createCrossTexture();
+      this.createDigitFont();
+    } });
+  }
+
+  update(): void {
+    if (this.tacheCourante >= this.taches.length) {
+      return;
+    }
+
+    const tache = this.taches[this.tacheCourante];
+    this.tacheCourante++;
+    tache.run();
+
+    const avancement = this.tacheCourante / this.taches.length;
+    this.barre?.setScale(avancement, 1);
+    this.legende?.setText(tache.libelle);
+
+    if (this.tacheCourante >= this.taches.length) {
+      // Une frame de plus avant de basculer : la barre doit atteindre le bout
+      // visiblement, sinon le chargement paraît s'interrompre à 90 %.
+      this.time.delayedCall(140, () => this.scene.start('MenuScene'));
+    }
+  }
+
+  /**
+   * Écran de chargement. Volontairement sobre : il est fait de rectangles et
+   * de texte, sans aucune texture — puisque c'est précisément les textures
+   * qu'il attend.
+   */
+  private buildLoadingScreen(): void {
+    const w = this.scale.width;
+    const h = this.scale.height;
+
+    this.add.rectangle(0, 0, w, h, 0x0b2a3a).setOrigin(0);
+
+    this.add
+      .text(w / 2, h * 0.4, "Kout Sab'", {
+        fontFamily: GAME_FONT,
+        fontSize: '64px',
+        color: '#fff3e0',
+      })
+      .setOrigin(0.5);
+
+    const largeur = Math.min(w * 0.6, 460);
+    this.add
+      .rectangle(w / 2, h * 0.56, largeur, 10, 0xffffff, 0.16)
+      .setOrigin(0.5);
+
+    // La barre grandit par setScale depuis son bord gauche : redimensionner un
+    // rectangle centré le ferait grandir des deux côtés.
+    this.barre = this.add
+      .rectangle(w / 2 - largeur / 2, h * 0.56, largeur, 10, 0xffd76a)
+      .setOrigin(0, 0.5)
+      .setScale(0, 1);
+
+    this.legende = this.add
+      .text(w / 2, h * 0.62, '', {
+        fontFamily: GAME_FONT,
+        fontSize: '24px',
+        color: '#9fb8c8',
+      })
+      .setOrigin(0.5);
   }
 
   /**
@@ -434,7 +518,16 @@ export class PreloadScene extends Phaser.Scene {
       if (texture === null) {
         continue;
       }
-      const ctx = texture.getContext();
+      // Suréchantillonnage : on peint dans un canevas SPRITE_SUPERSAMPLE fois
+      // plus grand, puis on le réduit dans la texture. La texture garde donc
+      // exactement sa taille — rien à reprendre dans la mise en page — mais son
+      // relief, calculé pixel par pixel, cesse de créneler.
+      const ss = SPRITE_SUPERSAMPLE;
+      const grand = document.createElement('canvas');
+      grand.width = size * ss;
+      grand.height = size * ss;
+      const ctx = grand.getContext('2d')!;
+      ctx.scale(ss, ss);
 
       ctx.save();
       // Les moitiés sont le MÊME dessin que l'entier, clippé au fil du
@@ -463,6 +556,13 @@ export class PreloadScene extends Phaser.Scene {
         paintCut(ctx, variety, size, variant);
       }
       ctx.restore();
+
+      // Réduction : c'est ici que le suréchantillonnage devient du lissage.
+      const cible = texture.getContext();
+      cible.clearRect(0, 0, size, size);
+      cible.imageSmoothingEnabled = true;
+      cible.imageSmoothingQuality = 'high';
+      cible.drawImage(grand, 0, 0, size, size);
       texture.refresh();
     }
   }

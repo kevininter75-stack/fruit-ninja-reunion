@@ -431,6 +431,35 @@ function rgb(color: number): [number, number, number] {
   return [(color >> 16) & 255, (color >> 8) & 255, color & 255];
 }
 
+/** Assombrit une couleur, en composantes 0-255. */
+function darken(color: number, amount: number): [number, number, number] {
+  const k = 1 - amount;
+  return [((color >> 16) & 255) * k, ((color >> 8) & 255) * k, (color & 255) * k];
+}
+
+/**
+ * Matériau dérivé de la couleur de peau de la variété.
+ *
+ * La couleur des sillons n'est pas choisie à part : c'est la peau assombrie.
+ * Un sillon reste de la peau — lui donner une teinte indépendante produit des
+ * fruits qui semblent peints en deux couches, ce qu'aucun fruit n'est.
+ */
+function skinMaterial(
+  skin: number,
+  grooveAmount: number,
+  smoothness: number,
+  bump: number,
+  rimColor: [number, number, number]
+): SurfaceMaterial {
+  return {
+    albedo: rgb(skin),
+    groove: darken(skin, grooveAmount),
+    rim: rimColor,
+    smoothness,
+    bump,
+  };
+}
+
 /**
  * Peint un corps de fruit RÉELLEMENT ÉCLAIRÉ, au lieu de l'imiter par des
  * dégradés radiaux.
@@ -578,7 +607,7 @@ export function paintWhole(
         ctx.stroke();
       }
 
-      paintBody(ctx, variety, size, skin, () => {
+      paintShadedBody(ctx, variety, size, skinMaterial(skin, 0.5, 0.3, 20, [255, 214, 150]), (x, y) => voronoiHeight(x, y, 11 / size, 0.26, 0x1a77), () => {
         // Quadrillage en losanges + "œil" brun au centre de chaque écaille :
         // c'est ce motif, plus que la couleur, qui dit « ananas ».
         const step = r * 0.29;
@@ -624,7 +653,7 @@ export function paintWhole(
     }
 
     case 'mangue_jose': {
-      paintBody(ctx, variety, size, skin, () => {
+      paintShadedBody(ctx, variety, size, skinMaterial(skin, 0.45, 0.62, 0, [255, 186, 120]), null, () => {
         // Joue rouge du côté exposé au soleil — signature de la mangue José.
         // Placée à DROITE : le reflet verni occupe le haut-gauche et
         // effacerait complètement un dégradé rouge posé au même endroit.
@@ -663,7 +692,7 @@ export function paintWhole(
     }
 
     case 'fruit_de_la_passion': {
-      paintBody(ctx, variety, size, skin, () => {
+      paintShadedBody(ctx, variety, size, skinMaterial(skin, 0.4, 0.3, 0, [200, 150, 220]), null, () => {
         // Peau mate et légèrement ridée : arcs sombres concentriques
         ctx.strokeStyle = shadeAlpha(skin, -0.35, 0.5);
         ctx.lineWidth = 2;
@@ -708,7 +737,7 @@ export function paintWhole(
     }
 
     case 'corossol': {
-      paintBody(ctx, variety, size, skin, () => {
+      paintShadedBody(ctx, variety, size, skinMaterial(skin, 0.5, 0.16, 24, [190, 230, 140]), (x, y) => voronoiHeight(x, y, 8 / size, 0.3, 0x2c19), () => {
         // Écailles à pointe recourbée : chaque bosse du contour a sa base
         ctx.strokeStyle = 'rgba(40, 78, 32, 0.6)';
         ctx.lineWidth = 2.2;
@@ -780,7 +809,7 @@ export function paintWhole(
     }
 
     case 'carambole': {
-      paintBody(ctx, variety, size, skin, () => {
+      paintShadedBody(ctx, variety, size, skinMaterial(skin, 0.45, 0.5, 0, [255, 240, 150]), null, () => {
         // Arêtes : une nervure du centre vers chaque pointe, plus une
         // facette claire par branche → la lecture "fruit à 5 côtes".
         for (let i = 0; i < 5; i++) {
@@ -819,7 +848,7 @@ export function paintWhole(
       ctx.arc(c, c, r * 1.2, 0, TAU);
       ctx.fill();
 
-      paintBody(ctx, variety, size, skin, () => {
+      paintShadedBody(ctx, variety, size, skinMaterial(skin, 0.5, 0.42, 18, [255, 240, 170]), (x, y) => voronoiHeight(x, y, 26 / size, 0.17, 0x9f31), () => {
         // Peau bosselée du combava : cratères sombres et crêtes claires
         speckle(ctx, c, r * 0.85, 30, shadeAlpha(skin, -0.42, 0.6), 3);
         speckle(ctx, c, r * 0.7, 22, shadeAlpha(skin, 0.5, 0.45), 2);
@@ -831,7 +860,7 @@ export function paintWhole(
     }
 
     case 'goyavier': {
-      paintBody(ctx, variety, size, skin, () => {
+      paintShadedBody(ctx, variety, size, skinMaterial(skin, 0.45, 0.55, 0, [255, 170, 140]), null, () => {
         // Peau lisse et cireuse : aucune écaille, juste une joue plus mûre
         // d'un côté et un semis de pores clairs.
         ctx.fillStyle = shadeAlpha(skin, 0.4, 0.3);
@@ -910,7 +939,7 @@ export function paintWhole(
       for (let i = 0; i < 5; i++) {
         bract((i / 5) * TAU + 0.3, 0.5, 0.2);
       }
-      paintBody(ctx, variety, size, skin, () => {
+      paintShadedBody(ctx, variety, size, skinMaterial(skin, 0.45, 0.38, 0, [255, 150, 190]), null, () => {
         // Le corps lui-même n'est pas uniforme : des nervures verticales plus
         // sombres suivent l'ovoïde, comme sur un vrai fruit du dragon.
         ctx.strokeStyle = shadeAlpha(skin, -0.3, 0.4);
@@ -935,7 +964,7 @@ export function paintWhole(
     }
 
     case 'grenade': {
-      paintBody(ctx, variety, size, skin, () => {
+      paintShadedBody(ctx, variety, size, skinMaterial(skin, 0.5, 0.3, 0, [255, 140, 140]), null, () => {
         // Peau bicolore rouge/ocre et quelques méplats : la grenade n'est
         // jamais uniforme, c'est ce qui l'empêche de passer pour une pomme.
         const patina = ctx.createLinearGradient(c - r, c - r, c + r, c + r);

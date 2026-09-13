@@ -19,42 +19,59 @@
       import { FRUIT_VARIETIES, BONUS_VARIETY, FRENZY_VARIETY } from '/src/utils/fruitCatalog.ts';
       import { paintWhole, paintCut } from '/src/utils/fruitArt.ts';
 
-      // Reproduit exactement ce que fait PreloadScene.createVarietyTextures
+      const params = new URLSearchParams(location.search);
+      const only = params.get('only');
+      const zoom = Math.max(1, Math.min(4, Number(params.get('zoom')) || 1));
+      const SUPERSAMPLE = 3;
+
+      // Reproduit exactement ce que fait PreloadScene.createVarietyTextures,
+      // suréchantillonnage compris. Sans cette fidélité, la planche montrerait
+      // un rendu qui n'existe nulle part dans le jeu — et servirait donc à
+      // juger autre chose que ce que voit le joueur.
+      //
+      // ?zoom=N agrandit le TRACÉ, il n'étire pas une image : on veut juger la
+      // netteté réelle du dessin, pas des pixels agrandis.
       function renderVariant(variety, variant) {
-        const size = variety.radius * 2 + 64;
-        const cv = document.createElement('canvas');
-        cv.width = size;
-        cv.height = size;
-        const ctx = cv.getContext('2d');
+        const size = (variety.radius * 2 + 64) * zoom;
+        const echelle = SUPERSAMPLE * zoom;
+
+        const grand = document.createElement('canvas');
+        grand.width = size * SUPERSAMPLE;
+        grand.height = size * SUPERSAMPLE;
+        const ctx = grand.getContext('2d');
+        ctx.scale(echelle, echelle);
+
+        const logique = size / zoom;
         ctx.save();
         if (variant === 'left') {
           ctx.beginPath();
-          ctx.rect(0, 0, size / 2, size);
+          ctx.rect(0, 0, logique / 2, logique);
           ctx.clip();
         } else if (variant === 'right') {
           ctx.beginPath();
-          ctx.rect(size / 2, 0, size / 2, size);
+          ctx.rect(logique / 2, 0, logique / 2, logique);
           ctx.clip();
         }
         ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
         ctx.shadowBlur = 13;
-        paintWhole(ctx, variety, size);
+        paintWhole(ctx, variety, logique);
         if (variant !== 'whole') {
-          paintCut(ctx, variety, size, variant);
+          paintCut(ctx, variety, logique, variant);
         }
         ctx.restore();
+
+        const cv = document.createElement('canvas');
+        cv.width = size;
+        cv.height = size;
+        const petit = cv.getContext('2d');
+        petit.imageSmoothingEnabled = true;
+        petit.imageSmoothingQuality = 'high';
+        petit.drawImage(grand, 0, 0, size, size);
         return cv;
       }
 
-      // Filtre par clé : fruits-preview.html?only=pitaya n'affiche que cette
-      // variété, en haut de page. Sur une planche de dix fruits il fallait
-      // faire défiler pour juger le dernier, ce qui rendait toute comparaison
-      // pénible — et impossible à capturer d'un coup.
-      // ?zoom=2 double la taille de tracé, pour examiner un détail de peau.
-      const params = new URLSearchParams(location.search);
-      const only = params.get('only');
-      const zoom = Math.max(1, Math.min(4, Number(params.get('zoom')) || 1));
-
+      // ?only=<clé> n'affiche qu'une variété, en haut de page : sur une planche
+      // de dix fruits il fallait faire défiler pour juger le dernier.
       let all = [...FRUIT_VARIETIES, BONUS_VARIETY, FRENZY_VARIETY];
       if (only) {
         const filtre = all.filter((v) => v.key === only);
@@ -64,7 +81,7 @@
           document.title = 'CLE INCONNUE';
         }
       }
-      const CELL = 210;
+      const CELL = 210 * zoom;
       const ROW = CELL + 46;
       const sheet = document.getElementById('sheet');
       sheet.width = CELL * 3 + 40;
