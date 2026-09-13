@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_FONT } from '../utils/constants';
+import { GAME_FONT, fontPx, px } from '../utils/constants';
 
 /**
  * La pause — absente jusqu'ici, et c'est le manque le plus gênant sur mobile :
@@ -43,11 +43,11 @@ export class PauseController {
     // Symétrique du bouton de son, en bas à droite. Cible de 56 px de côté :
     // en dessous, un bouton devient difficile à viser au pouce en pleine action.
     this.button = this.scene.add
-      .text(this.scene.scale.width - 52, this.scene.scale.height - 52, '❚❚', {
+      .text(this.scene.scale.width - px(52), this.scene.scale.height - px(52), '❚❚', {
         fontFamily: GAME_FONT,
-        fontSize: '30px',
+        fontSize: fontPx(30),
         color: '#eef3f7',
-        padding: { x: 14, y: 14 },
+        padding: { x: px(14), y: px(14) },
       })
       .setOrigin(0.5)
       .setDepth(90)
@@ -68,15 +68,15 @@ export class PauseController {
 
     const veil = this.scene.add.rectangle(w / 2, h / 2, w, h, 0x0a0712, 0.82);
     const title = this.scene.add
-      .text(w / 2, h / 2 - 110, 'Pause', {
+      .text(w / 2, h / 2 - px(110), 'Pause', {
         fontFamily: GAME_FONT,
-        fontSize: '68px',
+        fontSize: fontPx(68),
         color: '#ffffff',
       })
       .setOrigin(0.5);
 
-    const resume = this.makeChoice(w / 2, h / 2 + 10, 'Reprendre', () => this.setPaused(false));
-    const quit = this.makeChoice(w / 2, h / 2 + 100, 'Menu', () => {
+    const resume = this.makeChoice(w / 2, h / 2 + px(10), 'Reprendre', () => this.setPaused(false));
+    const quit = this.makeChoice(w / 2, h / 2 + px(100), 'Menu', () => {
       this.setPaused(false);
       this.onQuit();
     });
@@ -95,10 +95,10 @@ export class PauseController {
     const text = this.scene.add
       .text(x, y, label, {
         fontFamily: GAME_FONT,
-        fontSize: '40px',
+        fontSize: fontPx(40),
         color: '#ffffff',
         backgroundColor: '#2a1a2e',
-        padding: { x: 34, y: 16 },
+        padding: { x: px(34), y: px(16) },
       })
       .setOrigin(0.5)
       .setInteractive({ useHandCursor: true });

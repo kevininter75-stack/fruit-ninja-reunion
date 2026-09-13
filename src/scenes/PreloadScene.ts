@@ -23,6 +23,7 @@ import {
   SUN_FRAC_X,
   SUN_FRAC_Y,
   SPRITE_SUPERSAMPLE,
+  fontPx,
 } from '../utils/constants';
 import {
   FRUIT_VARIETIES,
@@ -128,7 +129,7 @@ export class PreloadScene extends Phaser.Scene {
     this.add
       .text(w / 2, h * 0.4, "Kout Sab'", {
         fontFamily: GAME_FONT,
-        fontSize: '64px',
+        fontSize: fontPx(64),
         color: '#fff3e0',
       })
       .setOrigin(0.5);
@@ -148,7 +149,7 @@ export class PreloadScene extends Phaser.Scene {
     this.legende = this.add
       .text(w / 2, h * 0.62, '', {
         fontFamily: GAME_FONT,
-        fontSize: '24px',
+        fontSize: fontPx(24),
         color: '#9fb8c8',
       })
       .setOrigin(0.5);

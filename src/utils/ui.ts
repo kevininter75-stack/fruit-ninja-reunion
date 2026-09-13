@@ -7,6 +7,8 @@ import {
   HUD_PANEL_COLOR,
   HUD_PANEL_ALPHA,
   SCENE_FADE_MS,
+  fontPx,
+  px,
 } from './constants';
 
 /**
@@ -112,8 +114,8 @@ export function fadeToScene(scene: Phaser.Scene, key: string, data?: object): vo
 export function createMuteButton(scene: Phaser.Scene, x: number, y: number): Phaser.GameObjects.Text {
   const button = scene.add
     .text(x, y, isMuted() ? '🔇' : '🔊', {
-      fontSize: '44px',
-      padding: { x: 14, y: 14 },
+      fontSize: fontPx(44),
+      padding: { x: px(14), y: px(14) },
     })
     .setOrigin(0.5)
     .setDepth(90)

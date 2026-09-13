@@ -86,6 +86,8 @@ import {
   type GameOverReason,
   CROSS_SIZE_LIT,
   CROSS_SIZE_DIM,
+  fontPx,
+  px,
 } from '../utils/constants';
 
 /** Données passées par le menu au lancement d'une partie. */
@@ -340,7 +342,7 @@ export class GameScene extends Phaser.Scene {
     this.frenzyCounter = this.add
       .text(0, 0, '', {
         fontFamily: GAME_FONT,
-        fontSize: '64px',
+        fontSize: fontPx(64),
         fontStyle: 'bold',
         color: '#ffd166',
         stroke: '#7a1020',
@@ -511,19 +513,19 @@ export class GameScene extends Phaser.Scene {
     // Cartouche + score. Le libellé « SCORE » est un texte figé (donc gratuit),
     // le nombre est un BitmapText : il change à chaque fruit tranché et un
     // objet Text reconstruirait sa texture à chaque fois.
-    this.hudElements.push(addHudPanel(this, 14, 12, 244, 84));
+    this.hudElements.push(addHudPanel(this, px(14), px(12), px(244), px(84)));
     this.hudElements.push(
       this.add
-        .text(36, 24, 'SCORE', {
+        .text(px(36), px(24), 'SCORE', {
           fontFamily: GAME_FONT,
-          fontSize: '22px',
+          fontSize: fontPx(22),
           fontStyle: '600',
           color: '#9fd0e6',
         })
         .setDepth(50)
     );
     this.scoreValue = this.add
-      .bitmapText(36, 44, FONT_DIGITS, '0', 44)
+      .bitmapText(px(36), px(44), FONT_DIGITS, '0', px(44))
       .setOrigin(0, 0)
       .setDepth(50);
     this.hudElements.push(this.scoreValue);
@@ -537,7 +539,7 @@ export class GameScene extends Phaser.Scene {
     this.multiplierBanner = this.add
       .text(24, 106, `SCORE x${BONUS_X2_FACTOR} !`, {
         fontFamily: GAME_FONT,
-        fontSize: '32px',
+        fontSize: fontPx(32),
         fontStyle: '700',
         color: '#ffd700',
         stroke: '#2d3a4a',
@@ -557,16 +559,16 @@ export class GameScene extends Phaser.Scene {
     if (this.mode !== 'chrono') {
       // Pas de libellé « VIES » : trois croix parlent d'elles-mêmes, et le
       // texte entrait en collision avec les éclaboussures de la dernière.
-      this.hudElements.push(addHudPanel(this, w - 14 - 204, 12, 204, 84));
+      this.hudElements.push(addHudPanel(this, w - px(14) - px(204), px(12), px(204), px(84)));
       this.createLifeCrosses();
       this.hudElements.push(...this.lifeCrosses);
     } else {
-      this.hudElements.push(addHudPanel(this, w - 14 - 160, 12, 160, 84));
+      this.hudElements.push(addHudPanel(this, w - px(14) - px(160), px(12), px(160), px(84)));
       this.hudElements.push(
         this.add
           .text(w - 36, 20, 'TEMPS', {
             fontFamily: GAME_FONT,
-            fontSize: '22px',
+            fontSize: fontPx(22),
             fontStyle: '600',
             color: '#9fd0e6',
           })
@@ -576,7 +578,7 @@ export class GameScene extends Phaser.Scene {
       this.infoText = this.add
         .text(w - 36, 44, '60 s', {
           fontFamily: GAME_FONT,
-          fontSize: '40px',
+          fontSize: fontPx(40),
           fontStyle: '700',
           color: '#ffffff',
           stroke: '#2d3a4a',
@@ -587,7 +589,7 @@ export class GameScene extends Phaser.Scene {
       this.hudElements.push(this.infoText);
     }
 
-    createMuteButton(this, 52, this.scale.height - 52);
+    createMuteButton(this, px(52), this.scale.height - px(52));
 
     // La pause ne doit pas pouvoir s'ouvrir sur un game over ni pendant la
     // frénésie : dans les deux cas la partie n'est plus entre les mains du
@@ -656,13 +658,13 @@ export class GameScene extends Phaser.Scene {
     // Croix centrées dans leur cartouche (panneau de 204 px collé au bord)
     // Écart généreux : les éclaboussures débordent largement du corps de la
     // croix, deux croix trop proches se lisaient comme une seule tache.
-    const gap = 64;
-    const panelCenterX = this.scale.width - 14 - 204 / 2;
+    const gap = px(64);
+    const panelCenterX = this.scale.width - px(14) - px(204) / 2;
     for (let i = 0; i < STARTING_LIVES; i++) {
       // i = 0 le plus à gauche : les croix s'allument de gauche à droite
       const x = panelCenterX + (i - (STARTING_LIVES - 1) / 2) * gap;
       const cross = this.add
-        .image(x, 54, TEX_CROSS)
+        .image(x, px(54), TEX_CROSS)
         .setDisplaySize(40, 40)
         .setOrigin(0.5)
         .setDepth(50)
@@ -674,9 +676,9 @@ export class GameScene extends Phaser.Scene {
     // Le nombre de vies écrit en clair. C'est la seule forme d'information
     // qui reste lisible quelles que soient la vision et la luminosité.
     this.livesLabel = this.add
-      .text(panelCenterX, 92, `${STARTING_LIVES} / ${STARTING_LIVES}`, {
+      .text(panelCenterX, px(92), `${STARTING_LIVES} / ${STARTING_LIVES}`, {
         fontFamily: GAME_FONT,
-        fontSize: '22px',
+        fontSize: fontPx(22),
         color: '#eef3f7',
       })
       .setOrigin(0.5)
@@ -1226,7 +1228,7 @@ export class GameScene extends Phaser.Scene {
     const banner = this.add
       .text(this.scale.width / 2, this.scale.height * 0.34, message, {
         fontFamily: GAME_FONT,
-        fontSize: '76px',
+        fontSize: fontPx(76),
         fontStyle: 'bold',
         color: '#ffe066',
         align: 'center',

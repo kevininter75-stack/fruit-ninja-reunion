@@ -7,6 +7,8 @@ import {
   DEPTH_JUICE,
   TEX_GLOW,
   GAME_FONT,
+  fontPx,
+  px,
 } from '../utils/constants';
 import { getBestScore } from '../utils/bestScore';
 import { sfx } from '../systems/SfxManager';
@@ -64,7 +66,7 @@ export class MenuScene extends Phaser.Scene {
     const title = this.add
       .text(w / 2, h * 0.15, portrait ? "Kout\nSab'" : "Kout Sab'", {
         fontFamily: GAME_FONT,
-        fontSize: '76px',
+        fontSize: fontPx(76),
         fontStyle: 'bold',
         color: '#ffffff',
         align: 'center',
@@ -78,7 +80,7 @@ export class MenuScene extends Phaser.Scene {
     this.add
       .text(w / 2, h * (portrait ? 0.26 : 0.28), 'Tranchez un fruit pour choisir !', {
         fontFamily: GAME_FONT,
-        fontSize: '34px',
+        fontSize: fontPx(34),
         color: '#fff3e0',
         align: 'center',
       })
@@ -125,7 +127,7 @@ export class MenuScene extends Phaser.Scene {
 
     this.registerPointerEvents();
     addVignette(this);
-    createMuteButton(this, w - 52, h - 52);
+    createMuteButton(this, w - px(52), h - px(52));
     fadeIn(this);
   }
 
@@ -174,7 +176,7 @@ export class MenuScene extends Phaser.Scene {
     // Ondulation permanente pour attirer l'œil
     this.tweens.add({
       targets: sprite,
-      y: y - 12,
+      y: y - px(12),
       duration: 1000,
       yoyo: true,
       repeat: -1,
@@ -182,19 +184,19 @@ export class MenuScene extends Phaser.Scene {
     });
 
     this.add
-      .text(x, y + radius + 16, label, {
+      .text(x, y + radius + px(16), label, {
         fontFamily: GAME_FONT,
-        fontSize: '46px',
+        fontSize: fontPx(46),
         fontStyle: 'bold',
         color: '#ffffff',
         stroke: '#2d3a4a',
-        strokeThickness: 6,
+        strokeThickness: px(6),
       })
       .setOrigin(0.5, 0);
     this.add
-      .text(x, y + radius + 68, subtitle, {
+      .text(x, y + radius + px(68), subtitle, {
         fontFamily: GAME_FONT,
-        fontSize: '26px',
+        fontSize: fontPx(26),
         color: '#fff3e0',
       })
       .setOrigin(0.5, 0);

@@ -1,4 +1,5 @@
 import { rnd } from './rng';
+import { px } from './constants';
 /**
  * Catalogue des fruits réunionnais.
  *
@@ -38,26 +39,26 @@ export const FRUIT_VARIETIES: FruitVariety[] = [
   // (423 000 pixels, six espèces, Wikimedia) : cinq des six tombaient déjà à
   // moins de 6° de teinte de la mesure. Seul le corossol s'écartait de 10°.
   // Elles sont donc conservées telles quelles.
-  { key: 'litchi', displayName: 'Letchi', radius: 60, skinColor: 0xd93b52, juiceColor: 0xf2b8c6, fleshColor: 0xfbe6d4, weight: 16 },
+  { key: 'litchi', displayName: 'Letchi', radius: px(60), skinColor: 0xd93b52, juiceColor: 0xf2b8c6, fleshColor: 0xfbe6d4, weight: 16 },
   // Petit, rapide, il rapporte plus. Et « la saison des goyaviers » est la
   // référence fruitière la plus partagée de l'île.
   // Mesuré : teinte 11°, dominante #9C4935, pointe #E57862.
-  { key: 'goyavier', displayName: 'Goyavier', radius: 44, skinColor: 0xc0442e, juiceColor: 0xef8a6a, fleshColor: 0xf7e8dd, weight: 14 },
-  { key: 'ananas_victoria', displayName: 'Ananas Victoria', radius: 79, skinColor: 0xe8a417, juiceColor: 0xffd75e, fleshColor: 0xffe07a, weight: 10 },
-  { key: 'mangue_jose', displayName: 'Mangue José', radius: 77, skinColor: 0xf08a20, juiceColor: 0xffb347, fleshColor: 0xffc35e, weight: 12 },
-  { key: 'fruit_de_la_passion', displayName: 'Fruit de la passion', radius: 64, skinColor: 0x6b3576, juiceColor: 0xffc93c, fleshColor: 0xffc93c, weight: 12 },
+  { key: 'goyavier', displayName: 'Goyavier', radius: px(44), skinColor: 0xc0442e, juiceColor: 0xef8a6a, fleshColor: 0xf7e8dd, weight: 14 },
+  { key: 'ananas_victoria', displayName: 'Ananas Victoria', radius: px(79), skinColor: 0xe8a417, juiceColor: 0xffd75e, fleshColor: 0xffe07a, weight: 10 },
+  { key: 'mangue_jose', displayName: 'Mangue José', radius: px(77), skinColor: 0xf08a20, juiceColor: 0xffb347, fleshColor: 0xffc35e, weight: 12 },
+  { key: 'fruit_de_la_passion', displayName: 'Fruit de la passion', radius: px(64), skinColor: 0x6b3576, juiceColor: 0xffc93c, fleshColor: 0xffc93c, weight: 12 },
   // La coupe la plus spectaculaire du catalogue : chair blanche mouchetée de
   // noir sur une peau fuchsia. Mesuré : teinte 350°, dominante #8F3D4A.
-  { key: 'pitaya', displayName: 'Pitaya', radius: 82, skinColor: 0xd93b6e, juiceColor: 0xf7c8da, fleshColor: 0xf7f5f5, weight: 9 },
-  { key: 'corossol', displayName: 'Corossol', radius: 77, skinColor: 0x74a94e, juiceColor: 0xf5f0e6, fleshColor: 0xf7f3ea, weight: 8 },
-  { key: 'carambole', displayName: 'Carambole', radius: 72, skinColor: 0xf2cf3f, juiceColor: 0xfdf0a0, fleshColor: 0xfdf6c9, weight: 12 },
+  { key: 'pitaya', displayName: 'Pitaya', radius: px(82), skinColor: 0xd93b6e, juiceColor: 0xf7c8da, fleshColor: 0xf7f5f5, weight: 9 },
+  { key: 'corossol', displayName: 'Corossol', radius: px(77), skinColor: 0x74a94e, juiceColor: 0xf5f0e6, fleshColor: 0xf7f3ea, weight: 8 },
+  { key: 'carambole', displayName: 'Carambole', radius: px(72), skinColor: 0xf2cf3f, juiceColor: 0xfdf0a0, fleshColor: 0xfdf6c9, weight: 12 },
 ];
 
 /** Fruit bonus : le combava doré déclenche un score x2 temporaire. */
 export const BONUS_VARIETY: FruitVariety = {
   key: 'combava_bonus',
   displayName: 'Combava doré',
-  radius: 66,
+  radius: px(66),
   skinColor: 0xf5c518,
   juiceColor: 0xffe680,
   fleshColor: 0xfff2b3,
@@ -72,7 +73,7 @@ export const BONUS_VARIETY: FruitVariety = {
 export const FRENZY_VARIETY: FruitVariety = {
   key: 'grenade',
   displayName: 'Grenade',
-  radius: 70,
+  radius: px(70),
   skinColor: 0xb5243b,
   juiceColor: 0xd63b52,
   fleshColor: 0xe8455f,

@@ -11,6 +11,8 @@ import {
   GAMEOVER_STEP_MS,
   TEX_RING,
   TEX_JUICE,
+  fontPx,
+  px,
 } from '../utils/constants';
 import { getBestScore, saveBestScore } from '../utils/bestScore';
 import { sfx } from '../systems/SfxManager';
@@ -92,16 +94,16 @@ export class GameOverScene extends Phaser.Scene {
     // provoquait des chevauchements. La médaille passe donc SUR LE CÔTÉ du
     // score en paysage, et reste dessous en portrait où la place ne manque pas.
     const L = portrait
-      ? { title: 0.14, sub: 0.21, scoreLabel: 0.3, score: 0.33, scoreSize: 76,
+      ? { title: 0.14, sub: 0.21, scoreLabel: 0.3, score: 0.33, scoreSize: px(76),
           medalX: w / 2, medalY: h * 0.47, record: 0.6, stats: 0.66 }
-      : { title: 0.12, sub: 0.19, scoreLabel: 0.29, score: 0.32, scoreSize: 68,
-          medalX: w / 2 - 300, medalY: h * 0.37, record: 0.53, stats: 0.62 };
+      : { title: 0.12, sub: 0.19, scoreLabel: 0.29, score: 0.32, scoreSize: px(68),
+          medalX: w / 2 - px(300), medalY: h * 0.37, record: 0.53, stats: 0.62 };
 
     // --- Titre et cause, révélés en premier ---
     const title = this.add
       .text(w / 2, h * L.title, display.title, {
         fontFamily: GAME_FONT,
-        fontSize: portrait ? '78px' : '80px',
+        fontSize: portrait ? fontPx(78) : fontPx(80),
         fontStyle: '700',
         color: display.color,
         stroke: '#1d2731',
@@ -113,7 +115,7 @@ export class GameOverScene extends Phaser.Scene {
     const subtitle = this.add
       .text(w / 2, h * L.sub, display.subtitle, {
         fontFamily: GAME_FONT,
-        fontSize: '30px',
+        fontSize: fontPx(30),
         color: '#fff3e0',
       })
       .setOrigin(0.5);
@@ -123,7 +125,7 @@ export class GameOverScene extends Phaser.Scene {
     const label = this.add
       .text(w / 2, h * L.scoreLabel, 'SCORE', {
         fontFamily: GAME_FONT,
-        fontSize: '26px',
+        fontSize: fontPx(26),
         fontStyle: '600',
         color: '#9fd0e6',
       })
@@ -148,7 +150,7 @@ export class GameOverScene extends Phaser.Scene {
     const stats = this.add
       .text(w / 2, h * L.stats, this.statsLine(), {
         fontFamily: GAME_FONT,
-        fontSize: '27px',
+        fontSize: fontPx(27),
         color: '#cfe6f0',
       })
       .setOrigin(0.5);
@@ -255,7 +257,7 @@ export class GameOverScene extends Phaser.Scene {
     const label = this.add
       .text(0, 68, MEDAL_LABELS[medal], {
         fontFamily: GAME_FONT,
-        fontSize: '24px',
+        fontSize: fontPx(24),
         fontStyle: '700',
         color: '#ffffff',
         stroke: '#1d2731',
@@ -301,7 +303,7 @@ export class GameOverScene extends Phaser.Scene {
       const ligne = this.add
         .text(w / 2, y, libelle, {
           fontFamily: GAME_FONT,
-          fontSize: '32px',
+          fontSize: fontPx(32),
           color: serie > 1 ? '#ffd76a' : '#fff3e0',
         })
         .setOrigin(0.5);
@@ -313,7 +315,7 @@ export class GameOverScene extends Phaser.Scene {
       const line = this.add
         .text(w / 2, y, `Record : ${getBestScore(this.mode)}`, {
           fontFamily: GAME_FONT,
-          fontSize: '30px',
+          fontSize: fontPx(30),
           color: '#fff3e0',
         })
         .setOrigin(0.5);
@@ -324,7 +326,7 @@ export class GameOverScene extends Phaser.Scene {
     const record = this.add
       .text(w / 2, y, `★ ${RECORD} ★\nNouveau record`, {
         fontFamily: GAME_FONT,
-        fontSize: '40px',
+        fontSize: fontPx(40),
         fontStyle: '700',
         color: '#ffe066',
         align: 'center',
@@ -382,26 +384,26 @@ export class GameOverScene extends Phaser.Scene {
 
     // Portrait : boutons empilés ; paysage : côte à côte. Le Défi ajoute un
     // troisième bouton, donc l'écartement se resserre pour qu'ils tiennent.
-    const ecart = defi ? 210 : 150;
+    const ecart = defi ? px(210) : px(150);
     const replayX = portrait ? w / 2 : w / 2 - ecart;
     const replayY = portrait ? h * 0.76 : h * 0.83;
     const menuX = portrait ? w / 2 : w / 2 + ecart;
     const menuY = portrait ? h * 0.93 : h * 0.83;
 
-    this.makeButton(replayX, replayY, 264, 78, 'Rejouer', 0xe0455a, 7, () => {
+    this.makeButton(replayX, replayY, px(264), px(78), 'Rejouer', 0xe0455a, 7, () => {
       sfx.click();
       fadeToScene(this, 'GameScene', { mode: this.mode });
     });
 
     if (defi) {
       this.makeButton(portrait ? w / 2 : w / 2, portrait ? h * 0.845 : h * 0.83,
-        236, 70, 'Partager', 0x2f7d5b, 8, () => {
+        px(236), px(70), 'Partager', 0x2f7d5b, 8, () => {
         sfx.click();
         void this.shareResult();
       });
     }
 
-    this.makeButton(menuX, menuY, 224, 70, 'Menu', 0x2d3a4a, defi ? 9 : 8, () => {
+    this.makeButton(menuX, menuY, px(224), px(70), 'Menu', 0x2d3a4a, defi ? 9 : 8, () => {
       sfx.click();
       fadeToScene(this, 'MenuScene');
     });
@@ -442,7 +444,7 @@ export class GameOverScene extends Phaser.Scene {
     const note = this.add
       .text(this.scale.width / 2, this.scale.height * 0.7, message, {
         fontFamily: GAME_FONT,
-        fontSize: '30px',
+        fontSize: fontPx(30),
         color: '#9ff0c4',
       })
       .setOrigin(0.5)
@@ -487,7 +489,7 @@ export class GameOverScene extends Phaser.Scene {
       this.add
         .text(0, 0, label, {
           fontFamily: GAME_FONT,
-          fontSize: '40px',
+          fontSize: fontPx(40),
           fontStyle: '700',
           color: '#ffffff',
         })

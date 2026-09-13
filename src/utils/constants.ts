@@ -1,3 +1,64 @@
+// ------------------------------------------------------------------
+// Échelle de rendu
+// ------------------------------------------------------------------
+
+/**
+ * Facteur multipliant la résolution LOGIQUE du jeu.
+ *
+ * Pourquoi il existe : dans Phaser 3, le tampon de rendu vaut exactement la
+ * taille logique du jeu — vérifié dans les sources, `baseSize` est recopié de
+ * `gameSize` et c'est lui qui fixe `canvas.width`. Le réglage `zoom` ne touche
+ * que la taille CSS. Autrement dit, la seule façon d'obtenir plus de pixels
+ * est d'agrandir la résolution logique.
+ *
+ * Sans ça, un jeu en 720×1280 affiché sur un écran de 1440 px de large est
+ * étiré du simple au double par le navigateur. C'était, et de loin, le premier
+ * facteur de flou — devant la qualité des fruits eux-mêmes.
+ *
+ * Le facteur se déduit de la taille PHYSIQUE de la fenêtre, pas du seul
+ * devicePixelRatio : ce qui compte est le rapport entre les pixels réellement
+ * disponibles et notre résolution logique. Plafonné à 2 — au-delà le gain
+ * devient invisible alors que la surface à remplir continue de croître au
+ * carré, ce qui se paierait sur les téléphones d'entrée de gamme.
+ *
+ * Toutes les constantes exprimées en PIXELS passent par px() ci-dessous. Les
+ * positions relatives (w * 0.5) et les durées n'ont évidemment rien à faire.
+ */
+export const RENDER_SCALE: number = computeRenderScale();
+
+function computeRenderScale(): number {
+  if (typeof window === 'undefined') {
+    return 1;
+  }
+
+  // Surcharge de test : ?renderScale=2 force le facteur. Indispensable pour
+  // vérifier la mise en page à l'échelle haute depuis un écran qui ne la
+  // déclencherait pas — sinon on ne découvre les débordements que sur le
+  // téléphone, c'est-à-dire trop tard.
+  const force = Number(new URLSearchParams(window.location.search).get('renderScale'));
+  if (force >= 1 && force <= 3) {
+    return force;
+  }
+
+  const dpr = window.devicePixelRatio || 1;
+  const petitCoteCss = Math.min(window.innerWidth, window.innerHeight);
+  const petitCotePhysique = petitCoteCss * dpr;
+
+  // 720 est le petit côté de la résolution logique de référence.
+  const souhaite = petitCotePhysique / 720;
+  return Math.max(1, Math.min(2, Math.round(souhaite * 2) / 2));
+}
+
+/** Convertit une mesure en pixels de référence vers l'échelle de rendu. */
+export function px(value: number): number {
+  return Math.round(value * RENDER_SCALE);
+}
+
+/** Taille de police en pixels de référence, prête pour une style Phaser. */
+export function fontPx(value: number): string {
+  return `${px(value)}px`;
+}
+
 /**
  * Constantes globales du jeu.
  * Toutes les valeurs de gameplay ajustables sont centralisées ici
@@ -7,10 +68,10 @@
 // Résolutions logiques : le jeu suit l'orientation du device (responsive).
 // Phaser met à l'échelle via Scale.FIT et bascule entre ces deux formats à la
 // rotation du téléphone (voir utils/viewport.ts et main.ts).
-export const PORTRAIT_WIDTH = 720;
-export const PORTRAIT_HEIGHT = 1280;
-export const LANDSCAPE_WIDTH = 1280;
-export const LANDSCAPE_HEIGHT = 720;
+export const PORTRAIT_WIDTH = px(720);
+export const PORTRAIT_HEIGHT = px(1280);
+export const LANDSCAPE_WIDTH = px(1280);
+export const LANDSCAPE_HEIGHT = px(720);
 
 // Physique — gravité douce pour un vrai temps de suspension à l'apex
 // (façon Fruit Ninja : le fruit "flotte" un instant, fenêtre de tir confortable).
@@ -79,7 +140,7 @@ export const BOMB_DOUBLE_INTENSITY = 0.8; // au-delà, une salve peut porter 2 b
 export const CLUSTER_MIN_INTENSITY = 0.08;
 // Écart supérieur au diamètre d'un gros fruit : sinon la grappe se chevauche
 // et ne se lit plus comme une rangée à trancher.
-export const CLUSTER_SPREAD_PX = 125; // écart horizontal entre deux fruits de grappe
+export const CLUSTER_SPREAD_PX = px(125); // écart horizontal entre deux fruits de grappe
 export const CLUSTER_STAGGER_MS = 45; // départs très rapprochés
 
 // Vie regagnée tous les N points (façon « extra life » de Fruit Ninja) :
@@ -104,8 +165,8 @@ export const FRENZY_POINTS_PER_SLASH = 5;
 // hauteur : assez haut pour ne pas gêner le HUD, assez bas pour rester à portée.
 export const FRENZY_ZONE_TOP = 0.28;
 export const FRENZY_ZONE_BOTTOM = 0.68;
-export const FRENZY_SETTLE_MARGIN = 24; // marge au bord, en plus du rayon
-export const FRENZY_BOB_PX = 12; // amplitude du flottement sur place
+export const FRENZY_SETTLE_MARGIN = px(24); // marge au bord, en plus du rayon
+export const FRENZY_BOB_PX = px(12); // amplitude du flottement sur place
 // Zoom de frénésie : la caméra se resserre sur la grenade le temps du combo.
 // Volontairement modeste — au-delà, le HUD sort du cadre et on perd de vue
 // le reste de la scène. La caméra ne se recentre qu'à MOITIÉ sur la grenade
@@ -131,10 +192,10 @@ export const FRENZY_AURA_SCALE = 2.8; // taille du halo, en multiples du rayon
 export const SLICE_BUFFER_SIZE = 12; // nb max de points conservés pour la traînée
 export const SLICE_POINT_MAX_AGE_MS = 200; // durée de vie d'un point de traînée
 export const SLICE_MIN_SPEED = 0.35; // vitesse min du geste (px/ms) pour qu'une coupe soit valide
-export const TRAIL_MAX_HALF_WIDTH = 9; // demi-largeur du ruban de lame à la pointe (px)
+export const TRAIL_MAX_HALF_WIDTH = px(9); // demi-largeur du ruban de lame à la pointe (px)
 
 // Fruits
-export const FRUIT_RADIUS = 62; // rayon du placeholder et du cercle de collision
+export const FRUIT_RADIUS = px(62); // rayon du placeholder et du cercle de collision
 export const HALF_LIFETIME_MS = 1000; // durée avant disparition des moitiés coupées
 export const FRUIT_POOL_SIZE = 24;
 export const HALF_POOL_SIZE = 48;
@@ -198,7 +259,12 @@ export const GAMEOVER_STEP_MS = 130; // décalage entre deux éléments révél�
 // Typographie
 // ------------------------------------------------------------------
 /**
- * Suréchantillonnage de la génération des sprites.
+ * Suréchantillonnage de la génération des sprites, ADAPTÉ à l'échelle de rendu.
+ *
+ * Les deux jouent sur la même chose — la densité de pixels du relief — et les
+ * cumuler au maximum ferait exploser le temps de génération pour un gain
+ * invisible : le coût croît comme le CARRÉ de leur produit. On vise donc une
+ * densité effective d'environ 4, quel que soit l'appareil.
  *
  * Les textures de fruits sont peintes à SPRITE_SUPERSAMPLE fois leur taille
  * finale, puis réduites. La taille de texture ne change PAS : rien à reprendre
@@ -211,7 +277,7 @@ export const GAMEOVER_STEP_MS = 130; // décalage entre deux éléments révél�
  * Coût : neuf fois plus de pixels à calculer, au CHARGEMENT uniquement. En
  * partie, exactement rien.
  */
-export const SPRITE_SUPERSAMPLE = 3;
+export const SPRITE_SUPERSAMPLE: number = RENDER_SCALE >= 2 ? 2 : 3;
 
 // Police d'affichage du jeu (Fredoka, SIL OFL, embarquée dans public/fonts).
 // Ronde et généreuse, avec des chiffres très lisibles en petit — critère
@@ -225,9 +291,9 @@ export const GAME_FONT = '"Fredoka", "Trebuchet MS", sans-serif';
 // bouge à chaque fruit tranché.
 export const FONT_DIGITS = 'hud_digits';
 export const DIGIT_CHARS = '0123456789';
-export const DIGIT_CELL_W = 62; // largeur de cellule de la planche
-export const DIGIT_CELL_H = 86;
-export const DIGIT_FONT_SIZE = 72; // taille de tracé dans la planche
+export const DIGIT_CELL_W = px(62); // largeur de cellule de la planche
+export const DIGIT_CELL_H = px(86);
+export const DIGIT_FONT_SIZE = px(72); // taille de tracé dans la planche
 
 // Croix de vie peintes (remplacent le glyphe ✕, qui faisait « page web »)
 export const TEX_CROSS = 'cross_splat';
@@ -241,9 +307,9 @@ export const CROSS_COLOR_LIT = 0xff3b3b; // strike encaissé
 export const CROSS_COLOR_DIM = 0x2b3a47; // vie encore disponible
 
 /** Côté d'une croix de strike allumée, en pixels. */
-export const CROSS_SIZE_LIT = 42;
+export const CROSS_SIZE_LIT = px(42);
 /** Côté d'une croix éteinte. L'écart de taille est le signal principal. */
-export const CROSS_SIZE_DIM = 27;
+export const CROSS_SIZE_DIM = px(27);
 
 // ------------------------------------------------------------------
 // Phase 2 — Feel & polish
@@ -257,7 +323,7 @@ export type GameOverReason = 'lives' | 'bomb' | 'time';
 
 // Bombes
 export const TEX_BOMB = 'bomb';
-export const BOMB_RADIUS = 64; // suit l'agrandissement des fruits (×1,2)
+export const BOMB_RADIUS = px(64); // suit l'agrandissement des fruits (×1,2)
 export const BOMB_POOL_SIZE = 8;
 export const BOMB_SAFE_TIME_MS = 5000; // aucune bombe dans les premières secondes
 export const BOMB_GAMEOVER_DELAY_MS = 700; // durée du flash avant l'écran de fin
