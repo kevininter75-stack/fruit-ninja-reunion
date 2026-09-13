@@ -188,6 +188,8 @@ export class GameScene extends Phaser.Scene {
   private pause!: PauseController;
   /** Retour de zoom en attente après un coup de caméra (cf. cameraPunch). */
   private punchReturn: Phaser.Time.TimerEvent | null = null;
+  /** Vrai entre enterFrenzyZoom et exitFrenzyZoom, et seulement là. */
+  private frenzyZoomed = false;
   private grading!: SceneGrading;
   private chronoEndTime = 0;
   private lastShownSecond = -1;
@@ -445,8 +447,14 @@ export class GameScene extends Phaser.Scene {
    */
   private updateFrenzyAura(): void {
     const grenade = this.frenzyGrenade;
-    if (grenade === null || !grenade.active) {
-      if (this.frenzyAura.visible) {
+    // `isFrenzy` en plus de `active` : les fruits viennent d'un POOL, et une
+    // grenade rendue au pool peut être relancée en fruit ordinaire dès la
+    // salve suivante. Elle redeviendrait alors active, et cette condition la
+    // croirait encore en scène — halo collé sur un fruit banal, et surtout
+    // aucune sortie de frénésie. Le test dit maintenant ce qu'il veut dire :
+    // l'objet suivi est-il toujours LA grenade ?
+    if (grenade === null || !grenade.active || !grenade.isFrenzy) {
+      if (this.frenzyAura.visible || this.frenzyZoomed) {
         this.hideFrenzyVisuals();
       }
       return;
@@ -1153,6 +1161,7 @@ export class GameScene extends Phaser.Scene {
    */
   private enterFrenzyZoom(grenade: Fruit): void {
     this.cancelPunchReturn();
+    this.frenzyZoomed = true;
     const cibleX = this.scale.width / 2 + (grenade.x - this.scale.width / 2) * FRENZY_PAN_RATIO;
     const cibleY = this.scale.height / 2 + (grenade.y - this.scale.height / 2) * FRENZY_PAN_RATIO;
     this.grading.setMode('frenzy');
@@ -1164,6 +1173,7 @@ export class GameScene extends Phaser.Scene {
   /** Rend la caméra à son cadrage normal (fin de frénésie). */
   private exitFrenzyZoom(): void {
     this.cancelPunchReturn();
+    this.frenzyZoomed = false;
     this.grading.setMode(this.filledCrosses >= STARTING_LIVES - 1 ? 'danger' : 'normal');
     this.zoomCamera(1, FRENZY_ZOOM_MS, 'Sine.easeInOut');
     this.panCamera(this.scale.width / 2, this.scale.height / 2, FRENZY_ZOOM_MS, 'Sine.easeInOut');
@@ -1279,9 +1289,19 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  /** Zoom auquel la caméra doit revenir une fois l'effet en cours terminé. */
+  /**
+   * Zoom auquel la caméra doit revenir une fois l'effet en cours terminé.
+   *
+   * Il se lit sur l'ÉTAT DU CADRAGE, et surtout pas sur la présence d'une
+   * grenade à l'écran. Ce sont deux choses différentes : la grenade est
+   * suivie dès son ENTRÉE, alors que le zoom ne s'engage qu'au premier COUP
+   * porté. Entre les deux — pendant toute la traversée de l'écran — lire la
+   * grenade faisait croire à un repos de 1,22 alors que la caméra était à 1 :
+   * un simple combo suffisait alors à zoomer sans raison, et le zoom restait
+   * tant que la grenade n'avait pas quitté l'écran.
+   */
   private restingZoom(): number {
-    return this.frenzyGrenade !== null ? FRENZY_ZOOM : 1;
+    return this.frenzyZoomed ? FRENZY_ZOOM : 1;
   }
 
   /**
