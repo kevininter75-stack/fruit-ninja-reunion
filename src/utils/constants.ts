@@ -71,10 +71,41 @@ export function fontPx(value: number): string {
 // Résolutions logiques : le jeu suit l'orientation du device (responsive).
 // Phaser met à l'échelle via Scale.FIT et bascule entre ces deux formats à la
 // rotation du téléphone (voir utils/viewport.ts et main.ts).
-export const PORTRAIT_WIDTH = px(720);
-export const PORTRAIT_HEIGHT = px(1280);
-export const LANDSCAPE_WIDTH = px(1280);
-export const LANDSCAPE_HEIGHT = px(720);
+/**
+ * Rapport long côté / petit côté de l'écran, borné.
+ *
+ * La résolution logique était figée en 16:9 (1280x720). Or un téléphone
+ * moderne tenu à l'horizontale fait 2,16:1 — mesuré 844x390 sur un téléphone
+ * courant, 2,14 sur un S23 Ultra. Scale.FIT conservant le rapport, 17 % de la
+ * largeur partaient donc en bandes noires sur les côtés, là où le joueur
+ * cherche justement à voir arriver les fruits.
+ *
+ * En prenant le rapport de l'écran, le jeu remplit la dalle. Les bornes
+ * évitent d'avoir à dessiner pour des formats absurdes : 1,5 couvre les
+ * tablettes (4:3 tourné = 1,33 serait trop carré pour la lisibilité des
+ * salves), 2,4 les téléphones les plus allongés.
+ *
+ * Mesuré une fois au démarrage : tourner l'appareil ne change pas le rapport
+ * entre son grand et son petit côté.
+ */
+function computeAspect(): number {
+  if (typeof window === 'undefined') {
+    return 16 / 9;
+  }
+  const grand = Math.max(window.innerWidth, window.innerHeight);
+  const petit = Math.min(window.innerWidth, window.innerHeight) || 1;
+  return Math.min(2.4, Math.max(1.5, grand / petit));
+}
+
+const ASPECT = computeAspect();
+
+/** Petit côté de référence : c'est lui qui fixe l'échelle de tout le jeu. */
+const PETIT_COTE = px(720);
+
+export const PORTRAIT_WIDTH = PETIT_COTE;
+export const PORTRAIT_HEIGHT = Math.round(PETIT_COTE * ASPECT);
+export const LANDSCAPE_WIDTH = Math.round(PETIT_COTE * ASPECT);
+export const LANDSCAPE_HEIGHT = PETIT_COTE;
 
 // Physique — gravité douce pour un vrai temps de suspension à l'apex
 // (façon Fruit Ninja : le fruit "flotte" un instant, fenêtre de tir confortable).

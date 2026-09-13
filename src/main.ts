@@ -38,12 +38,40 @@ async function waitForFont(): Promise<void> {
 }
 
 /**
+ * Demande le paysage, sans jamais bloquer le jeu s'il est refusé.
+ *
+ * OÙ ÇA MARCHE VRAIMENT. Dans l'application installée, c'est le SYSTÈME qui
+ * impose l'orientation : `screenOrientation="sensorLandscape"` côté Android
+ * (paysage dans les deux sens, le téléphone bascule seul) et `"orientation":
+ * "landscape"` dans le manifeste PWA. Ces deux-là suffisent pour la cible.
+ *
+ * L'API du navigateur, elle, exige le plein écran et refuse presque toujours.
+ * On tente quand même — c'est gratuit là où ça passe — et on absorbe le refus
+ * sans bruit. Le jeu reste jouable en portrait dans un onglet ordinaire : un
+ * portfolio s'ouvre depuis un lien, mieux vaut une partie dans le mauvais sens
+ * qu'un mur « tournez votre téléphone ».
+ */
+function demanderPaysage(): void {
+  const orientation = screen.orientation as ScreenOrientation & {
+    lock?: (o: string) => Promise<void>;
+  };
+  try {
+    void orientation?.lock?.('landscape').catch(() => undefined);
+  } catch {
+    // Navigateur sans l'API, ou refus synchrone : sans conséquence.
+  }
+}
+
+/**
  * Point d'entrée. Le jeu n'est instancié qu'une fois la police chargée : c'est
  * plus simple et plus sûr que de retarder le démarrage des scènes après coup.
  */
 async function boot(): Promise<void> {
   await waitForFont();
   const game = new Phaser.Game(gameConfig);
+
+  // Fruit Ninja se joue à l'horizontale, et Kout Sab' aussi.
+  demanderPaysage();
 
   // Arrêt de tout ce qui doit s'arrêter quand le joueur quitte l'application.
   // Phaser met sa boucle en pause tout seul ; la musique, elle, tourne sur une
