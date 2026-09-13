@@ -83,6 +83,7 @@ import {
   CRIT_CHANCE,
   CRIT_MULTIPLIER,
   GESTURE_COMBO_MIN,
+  GESTURE_BANNER_MIN,
   GESTURE_COMBO_BONUS,
   type GameMode,
   type GameOverReason,
@@ -1498,6 +1499,21 @@ export class GameScene extends Phaser.Scene {
     }
     const n = gesture.comboCount;
     const awarded = this.scoreManager.addScore(n * GESTURE_COMBO_BONUS);
+
+    // Trois fruits d'un geste : la réussite ORDINAIRE. Elle se paie et se
+    // voit — chiffre flottant, onde, son — mais elle ne crie pas.
+    //
+    // Elle criait, et c'était le défaut : sur 22 gestes relevés à intensité
+    // maximale, deux bannières sur trois étaient des x3, disant toutes le même
+    // mot. Une exclamation qui sert à chaque geste réussi ne dit plus rien —
+    // et les vrais grands gestes n'ont alors plus rien de plus à offrir.
+    if (n < GESTURE_BANNER_MIN) {
+      this.showPopup(gesture.lastX, gesture.lastY - px(30), `x${n}  +${awarded}`, '#ffe066', px(40));
+      sfx.bigCombo(n);
+      this.spawnRing(gesture.lastX, gesture.lastY, 4, 0xffe066, 380);
+      return;
+    }
+
     // L'exclamation creole passe AVANT le chiffre : c'est elle qu'on lit en
     // premier, et c'est elle qui donne sa voix au jeu.
     this.showBigBanner(`${exclamationCombo(n)}\nx${n}  +${awarded}`);

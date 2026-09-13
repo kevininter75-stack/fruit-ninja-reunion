@@ -493,6 +493,18 @@ export const CRIT_MULTIPLIER = 3;
 // Fruit Ninja). Célébré en grand à partir du seuil, avec bonus par fruit.
 export const GESTURE_COMBO_MIN = 3;
 /**
+ * À partir de combien de fruits le jeu CRIE.
+ *
+ * En deçà, le combo est bien payé et signalé — chiffre flottant, onde, son —
+ * mais sans bannière plein écran, sans gel, sans secousse et sans exclamation
+ * créole. Trois fruits d'un geste, c'est la réussite ORDINAIRE : la célébrer
+ * comme un exploit use l'exploit.
+ *
+ * C'est la gradation de Fruit Ninja, qui réserve ses gros effets aux combos
+ * élevés et se contente d'un petit « Combo Blitz +5 » à trois fruits.
+ */
+export const GESTURE_BANNER_MIN = 4;
+/**
  * Bonus par fruit d'un combo, versé en une fois à la fin du coup de sabre.
  *
  * Monté de 15 à 25 en même temps que disparaît l'ancien bonus cumulatif par
