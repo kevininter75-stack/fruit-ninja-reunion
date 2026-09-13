@@ -44,6 +44,16 @@ async function boot(): Promise<void> {
   await waitForFont();
   const game = new Phaser.Game(gameConfig);
 
+  // Accès au jeu depuis la console, en DÉVELOPPEMENT UNIQUEMENT.
+  // import.meta.env.DEV est remplacé par false au build et la branche entière
+  // disparaît : rien de tout ceci n'existe dans la version publiée.
+  // Sert à piloter une partie depuis la console pour vérifier un comportement
+  // sans dépendre de clics aux coordonnées, que le redimensionnement du canvas
+  // rend peu fiables.
+  if (import.meta.env.DEV) {
+    (window as unknown as { koutSab?: Phaser.Game }).koutSab = game;
+  }
+
   // Responsive : le jeu suit l'orientation du device. Quand elle change, on
   // bascule la résolution logique (portrait ↔ paysage) et on relance la scène
   // active pour qu'elle se réagence à la nouvelle taille.

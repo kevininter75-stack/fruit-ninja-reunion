@@ -12,6 +12,7 @@ import { FRUIT_VARIETIES, halfTextureKeys, wholeTextureKey } from '../utils/frui
 import { createMuteButton, addHudPanel, addVignette, fadeIn, fadeToScene } from '../utils/ui';
 import { AnimatedBackground } from '../entities/AnimatedBackground';
 import { prefersReducedMotion } from '../utils/settings';
+import { PauseController } from '../systems/PauseController';
 import {
   FRUIT_POOL_SIZE,
   HALF_POOL_SIZE,
@@ -167,6 +168,7 @@ export class GameScene extends Phaser.Scene {
   // État de la partie — la même instance de scène est réutilisée à chaque
   // restart, donc TOUT l'état mutable doit être réinitialisé dans init().
   private gameEnded = false;
+  private pause!: PauseController;
   private chronoEndTime = 0;
   private lastShownSecond = -1;
 
@@ -295,6 +297,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(): void {
+    if (this.pause?.isPaused) {
+      return;
+    }
     for (const gesture of this.gestures) {
       gesture.trail.update(this.time.now);
     }
@@ -571,6 +576,16 @@ export class GameScene extends Phaser.Scene {
     }
 
     createMuteButton(this, 52, this.scale.height - 52);
+
+    // La pause ne doit pas pouvoir s'ouvrir sur un game over ni pendant la
+    // frénésie : dans les deux cas la partie n'est plus entre les mains du
+    // joueur, et geler là laisserait un état intermédiaire à démêler.
+    this.pause = new PauseController(
+      this,
+      () => fadeToScene(this, 'MenuScene'),
+      () => !this.gameEnded && this.frenzyGrenade === null
+    );
+    this.pause.create();
   }
 
   /**
@@ -816,7 +831,7 @@ export class GameScene extends Phaser.Scene {
    *    immobile sur l'écran ne doit pas couper.
    */
   private handleSliceMove(gesture: SliceGesture, pointer: Phaser.Input.Pointer): void {
-    if (this.gameEnded) {
+    if (this.gameEnded || this.pause?.isPaused) {
       return;
     }
     const now = this.time.now;
