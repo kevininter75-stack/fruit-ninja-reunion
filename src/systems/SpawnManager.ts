@@ -33,6 +33,8 @@ import {
   BONUS_SAFE_TIME_MS,
   FRENZY_SCORE_STEP,
   FRENZY_SAFE_TIME_MS,
+  FRENZY_STEP_GROWTH,
+  FRENZY_MIN_GAP_MS,
   FRENZY_APEX_FRACTION,
   FRENZY_CROSS_FACTOR,
 } from '../utils/constants';
@@ -102,6 +104,12 @@ export class SpawnManager {
   private needsBreather = false;
   /** Prochain palier de score qui fera apparaître une grenade. */
   private nextFrenzyAt = FRENZY_SCORE_STEP;
+  /** Nombre de grenades déjà lancées : le palier s'éloigne à chacune. */
+  private frenzyCount = 0;
+  /** Fin de la dernière frénésie, pour le délai plancher entre deux. */
+  private lastFrenzyEndedAt = -Infinity;
+  /** Mémoire de l'état précédent, pour détecter la FIN d'une frénésie. */
+  private frenzyOnStage = false;
   private readonly launchParams: LaunchParams = { x: 0, y: 0, velocityX: 0, velocityY: 0 };
 
   constructor(
@@ -119,6 +127,9 @@ export class SpawnManager {
     this.fruitsSinceBomb = 0;
     this.needsBreather = false;
     this.nextFrenzyAt = FRENZY_SCORE_STEP;
+    this.frenzyCount = 0;
+    this.lastFrenzyEndedAt = -Infinity;
+    this.frenzyOnStage = false;
     this.scheduleNextWave();
   }
 
@@ -257,7 +268,17 @@ export class SpawnManager {
     // rendait la séquence illisible et injustement difficile.
     // La condition s'auto-libère (grenade explosée ou tombée hors écran), donc
     // aucun drapeau à réinitialiser : impossible de rester bloqué.
-    if (this.isFrenzyOnStage()) {
+    const frenzyEnScene = this.isFrenzyOnStage();
+    if (this.frenzyOnStage && !frenzyEnScene) {
+      // La frénésie vient de se terminer. On recale le palier sur le score
+      // ATTEINT : sans cela, les points qu'elle vient de rapporter
+      // compteraient pour la grenade suivante, et une bonne frénésie en
+      // réarmerait presque immédiatement une autre.
+      this.lastFrenzyEndedAt = this.scene.time.now;
+      this.nextFrenzyAt = this.scoreManager.getScore() + this.frenzyStep();
+    }
+    this.frenzyOnStage = frenzyEnScene;
+    if (frenzyEnScene) {
       return;
     }
     this.waveIndex += 1;
@@ -326,6 +347,12 @@ export class SpawnManager {
     if (this.scene.time.now - this.startTime < FRENZY_SAFE_TIME_MS) {
       return;
     }
+    // Délai plancher en temps réel. C'est la seule garantie qu'un joueur qui
+    // marque plus vite que prévu ne puisse pas déborder : un palier de score,
+    // aussi haut soit-il, finit toujours par être atteint plus tôt.
+    if (this.scene.time.now - this.lastFrenzyEndedAt < FRENZY_MIN_GAP_MS) {
+      return;
+    }
     if (this.scoreManager.getScore() < this.nextFrenzyAt) {
       return;
     }
@@ -337,7 +364,17 @@ export class SpawnManager {
     if (grenade === null) {
       return; // pool plein : on retentera à la salve suivante, palier conservé
     }
-    this.nextFrenzyAt += FRENZY_SCORE_STEP;
+    this.frenzyCount += 1;
+    // Palier provisoire : il sera recalé sur le score réel à la fin de la
+    // frénésie. Le poser dès maintenant évite qu'un échec de tir (pool plein)
+    // laisse le seuil derrière le score.
+    this.nextFrenzyAt = this.scoreManager.getScore() + this.frenzyStep();
+    // Le délai plancher démarre dès le LANCEMENT, pas seulement à la fin.
+    // La fin est détectée au tic de salve suivant ; si une frénésie très
+    // courte tombait entre deux tics, la transition serait manquée et rien
+    // n'espacerait plus les grenades. Repartir du lancement rend le plancher
+    // vrai dans tous les cas, et il ne fait que se décaler ensuite.
+    this.lastFrenzyEndedAt = this.scene.time.now;
     const p = this.computeSideLaunch();
     grenade.launchAs(FRENZY_VARIETY, false, p.x, p.y, p.velocityX, p.velocityY, true);
     sfx.launch();
@@ -363,6 +400,16 @@ export class SpawnManager {
     p.velocityY = -Math.sqrt(2 * GRAVITY_Y * FRENZY_APEX_FRACTION * height);
     p.velocityX = (fromLeft ? 1 : -1) * width * FRENZY_CROSS_FACTOR;
     return p;
+  }
+
+  /**
+   * Écart de score jusqu'à la prochaine grenade. Il s'éloigne à chaque
+   * frénésie, parce que le joueur marque de plus en plus vite : à palier
+   * constant, la grenade se rapprocherait dans le temps sans jamais que rien
+   * ne le demande.
+   */
+  private frenzyStep(): number {
+    return Math.round(FRENZY_SCORE_STEP * (1 + this.frenzyCount * FRENZY_STEP_GROWTH));
   }
 
   /** Vrai tant qu'une grenade de frénésie est en jeu (parcours du pool). */

@@ -4,7 +4,6 @@ import { Bomb } from '../entities/Bomb';
 import { SliceTrail } from '../entities/SliceTrail';
 import { SliceDetector } from '../systems/SliceDetector';
 import { ScoreManager } from '../systems/ScoreManager';
-import { ComboManager } from '../systems/ComboManager';
 import { SpawnManager } from '../systems/SpawnManager';
 import { sfx } from '../systems/SfxManager';
 import { music } from '../systems/MusicManager';
@@ -24,6 +23,8 @@ import {
   HALF_LIFETIME_MS,
   SCORE_PER_FRUIT,
   SLICE_MIN_SPEED,
+  STROKE_BREAK_MS,
+  STROKE_MAX_MS,
   STARTING_LIVES,
   FRENZY_ZONE_TOP,
   FRENZY_ZONE_BOTTOM,
@@ -70,7 +71,6 @@ import {
   DEPTH_DARKEN,
   GAME_DARKEN_COLOR,
   GAME_DARKEN_ALPHA,
-  COMBO_BONUS_PER_STEP,
   CHRONO_DURATION_MS,
   POPUP_POOL_SIZE,
   BONUS_X2_FACTOR,
@@ -110,8 +110,14 @@ interface SliceGesture {
   lastX: number;
   lastY: number;
   lastTime: number;
-  /** Nombre de fruits tranchés depuis que ce doigt s'est posé (combo par geste). */
+  /** Nombre de fruits tranchés dans le COUP DE SABRE en cours. */
   comboCount: number;
+  /** Vrai entre le début et la fin d'un coup de sabre. */
+  strokeActive: boolean;
+  /** Instant du début du coup de sabre courant. */
+  strokeStart: number;
+  /** Dernier instant où le doigt allait assez vite pour trancher. */
+  lastFastTime: number;
 }
 
 /** Nombre de gestes simultanés gérés (2 doigts + souris, cf. activePointers). */
@@ -134,7 +140,6 @@ export class GameScene extends Phaser.Scene {
   private bombs!: Phaser.Physics.Arcade.Group;
   private sliceDetector!: SliceDetector;
   private scoreManager!: ScoreManager;
-  private comboManager!: ComboManager;
   private spawnManager!: SpawnManager;
   private juiceEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
   private fuseEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
@@ -253,7 +258,6 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.scoreManager = new ScoreManager(this);
-    this.comboManager = new ComboManager();
     this.sliceDetector = new SliceDetector();
     this.spawnManager = new SpawnManager(this, this.fruits, this.bombs, this.scoreManager, this.mode);
 
@@ -268,6 +272,9 @@ export class GameScene extends Phaser.Scene {
         lastY: 0,
         lastTime: 0,
         comboCount: 0,
+        strokeActive: false,
+        strokeStart: 0,
+        lastFastTime: 0,
       });
     }
 
@@ -329,6 +336,7 @@ export class GameScene extends Phaser.Scene {
     for (const gesture of this.gestures) {
       gesture.trail.update(this.time.now);
     }
+    this.closeStaleStrokes();
     this.updateFuseSparks();
     this.updateHalvesShading();
     this.updateFrenzyAura();
@@ -897,7 +905,8 @@ export class GameScene extends Phaser.Scene {
         return; // plus de 3 doigts : les suivants sont ignorés
       }
       gesture.pointerId = pointer.id;
-      gesture.comboCount = 0; // nouveau geste : le combo par swipe repart de zéro
+      gesture.comboCount = 0;
+      gesture.strokeActive = false;
       gesture.trail.clear();
       // worldX/worldY (et non x/y) : la caméra zoome pendant la frénésie et le
       // drame de la bombe. En espace écran, le doigt ne coïnciderait plus avec
@@ -923,7 +932,7 @@ export class GameScene extends Phaser.Scene {
     const endSlice = (pointer: Phaser.Input.Pointer): void => {
       const gesture = this.findGesture(pointer.id);
       if (gesture !== undefined) {
-        this.celebrateGestureCombo(gesture);
+        this.endStroke(gesture);
         gesture.pointerId = null;
       }
     };
@@ -954,6 +963,16 @@ export class GameScene extends Phaser.Scene {
     gesture.trail.addPoint(px, py, now);
 
     if (speed >= SLICE_MIN_SPEED) {
+      // Un coup de sabre s'ouvre dès que le doigt atteint la vitesse de coupe,
+      // et non quand il se pose : on peut poser le doigt, hésiter, puis
+      // trancher — c'est le tranchage qui compte.
+      if (!gesture.strokeActive) {
+        gesture.strokeActive = true;
+        gesture.strokeStart = now;
+        gesture.comboCount = 0;
+      }
+      gesture.lastFastTime = now;
+
       // Angle du geste : les moitiés s'écarteront perpendiculairement à lui
       const sliceAngle = Math.atan2(py - gesture.lastY, px - gesture.lastX);
       this.sliceDetector.checkSegment<Fruit>(
@@ -1004,8 +1023,10 @@ export class GameScene extends Phaser.Scene {
 
     // Coup critique : bonus rare et appuyé (jamais sur le combava, déjà spécial)
     const isCrit = !fruit.isBonus && Math.random() < CRIT_CHANCE;
-    const comboBonus = (this.comboManager.registerSlice(now) - 1) * COMBO_BONUS_PER_STEP;
-    let points = SCORE_PER_FRUIT + comboBonus;
+    // Un fruit vaut toujours le même prix. Tout le bénéfice d'un enchaînement
+    // est versé EN UNE FOIS à la fin du coup de sabre (cf. celebrateGestureCombo),
+    // comme dans Fruit Ninja. C'est ce qui empêche un bonus de s'auto-alimenter.
+    let points = SCORE_PER_FRUIT;
     if (isCrit) {
       points *= CRIT_MULTIPLIER;
     }
@@ -1294,9 +1315,46 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Fin d'un geste : si le doigt a tranché GESTURE_COMBO_MIN fruits ou plus
-   * dans le même swipe, on célèbre en grand (bannière centrée + bonus + son)
-   * — la signature de Fruit Ninja, « couper plein de fruits d'un coup ».
+   * Ferme les coups de sabre qui ne se termineront jamais d'eux-mêmes.
+   *
+   * C'ÉTAIT LE BUG. Le combo ne se clôturait qu'au LEVER du doigt. Un joueur
+   * qui gardait le doigt posé et continuait à balayer restait donc dans un
+   * seul et même « geste », indéfiniment — le compteur montait sans fin et
+   * chaque fruit valait de plus en plus cher. Ce n'est pas comme cela qu'un
+   * coup de sabre se termine : il se termine quand le geste s'arrête, pas
+   * quand la main quitte l'écran.
+   *
+   * Deux fins possibles, et il faut les deux. L'arrêt (le doigt ralentit
+   * sous la vitesse de coupe) couvre le cas normal : entre deux balayages, la
+   * main décélère toujours pour repartir dans l'autre sens. La durée maximale
+   * couvre le cas limite : un doigt qui tourne en rond sans jamais ralentir.
+   */
+  private closeStaleStrokes(): void {
+    const now = this.time.now;
+    for (const gesture of this.gestures) {
+      if (!gesture.strokeActive) {
+        continue;
+      }
+      const arret = now - gesture.lastFastTime > STROKE_BREAK_MS;
+      const tropLong = now - gesture.strokeStart > STROKE_MAX_MS;
+      if (arret || tropLong) {
+        this.endStroke(gesture);
+      }
+    }
+  }
+
+  /** Clôt un coup de sabre : on le célèbre s'il le mérite, puis on repart de zéro. */
+  private endStroke(gesture: SliceGesture): void {
+    this.celebrateGestureCombo(gesture);
+    gesture.strokeActive = false;
+    gesture.comboCount = 0;
+  }
+
+  /**
+   * Fin d'un coup de sabre : si le doigt a tranché GESTURE_COMBO_MIN fruits ou
+   * plus dans le même mouvement, on célèbre en grand (bannière centrée +
+   * bonus + son) — la signature de Fruit Ninja, « couper plein de fruits d'un
+   * coup ».
    */
   private celebrateGestureCombo(gesture: SliceGesture): void {
     if (this.gameEnded || gesture.comboCount < GESTURE_COMBO_MIN) {

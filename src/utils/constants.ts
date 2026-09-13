@@ -159,7 +159,32 @@ export const EXTRA_LIFE_FALLBACK_POINTS = 50;
 // score, se fige en l'air à la première coupe, puis on la tranche autant de
 // fois que possible pendant quelques secondes avant qu'elle n'éclate : chaque
 // coup rapporte, et l'explosion emporte tous les fruits à l'écran.
+/**
+ * Cadence de la grenade.
+ *
+ * LE DÉFAUT. Le palier était FIXE : une grenade tous les 700 points, pour
+ * toujours. Mais le rythme de score, lui, ne l'est pas — les salves
+ * grossissent, les combos paient plus, le combava double tout, et la frénésie
+ * elle-même rapporte gros. Un palier constant en POINTS devient donc un
+ * intervalle de plus en plus court en SECONDES : la grenade, événement rare
+ * en début de partie, finissait par revenir sans arrêt.
+ *
+ * Pire, les points de la frénésie comptaient pour le palier suivant : une
+ * bonne frénésie réarmait presque immédiatement la prochaine.
+ *
+ * TROIS CORRECTIONS, qui se complètent :
+ *   le palier CROÎT à chaque grenade (FRENZY_STEP_GROWTH) ;
+ *   il est recalé sur le score à la FIN de la frénésie, donc ce qu'elle
+ *     rapporte ne compte jamais pour la suivante ;
+ *   un délai plancher en temps réel (FRENZY_MIN_GAP_MS) garantit l'espacement
+ *     quoi qu'il arrive. C'est la seule des trois qui ne puisse pas être
+ *     débordée par un joueur qui marque plus vite que prévu.
+ */
 export const FRENZY_SCORE_STEP = 700; // un palier de score = une grenade
+/** Chaque grenade recule le palier suivant de 55 %. */
+export const FRENZY_STEP_GROWTH = 0.55;
+/** Deux grenades ne peuvent jamais être séparées de moins de 25 s. */
+export const FRENZY_MIN_GAP_MS = 25_000;
 export const FRENZY_SAFE_TIME_MS = 15_000; // jamais en tout début de partie
 export const FRENZY_DURATION_MS = 4000; // durée de la frénésie une fois amorcée
 export const FRENZY_HIT_COOLDOWN_MS = 70; // borne le compteur (~14 coups/s max)
@@ -208,7 +233,25 @@ export const SCORE_PER_FRUIT = 10;
 export const STARTING_LIVES = 3;
 
 // Fenêtre de combo (Phase 2) : délai max entre deux coupes pour chaîner un combo
-export const COMBO_WINDOW_MS = 300;
+/**
+ * Fin d'un coup de sabre sans lever de doigt.
+ *
+ * Un coup de sabre se termine quand le GESTE s'arrête, pas quand la main
+ * quitte l'écran. Sans ces deux bornes, un joueur qui gardait le doigt posé
+ * et continuait à balayer restait dans un seul et même geste indéfiniment.
+ *
+ * L'arrêt couvre le cas normal : entre deux balayages, la main décélère
+ * toujours sous la vitesse de coupe pour repartir dans l'autre sens. 150 ms,
+ * soit un peu plus que la durée de vie d'un point de traînée : quand le
+ * ruban a visiblement disparu, le coup est fini.
+ *
+ * La durée maximale couvre le cas limite : un doigt qui tourne en rond sans
+ * jamais ralentir. Un vrai balayage dure 150 à 400 ms ; 700 est large, et
+ * c'est voulu — cette borne n'est là que pour l'exploit, elle ne doit jamais
+ * tomber sur un geste sincère.
+ */
+export const STROKE_BREAK_MS = 150;
+export const STROKE_MAX_MS = 700;
 
 // Traînée de coupe : trois passes concentriques, du halo froid au cœur chaud.
 // Un ruban entièrement blanc paraissait plat ; le dégradé de température lui
@@ -362,8 +405,7 @@ export const DEPTH_FRUIT = 6;
 export const DEPTH_SHEEN = 7;
 export const DEPTH_JUICE = 40;
 
-// Combo : points bonus par coupe supplémentaire dans la fenêtre COMBO_WINDOW_MS
-export const COMBO_BONUS_PER_STEP = 5;
+
 
 // Mode Chrono
 export const CHRONO_DURATION_MS = 60_000;
@@ -400,7 +442,16 @@ export const CRIT_MULTIPLIER = 3;
 // Combo par geste : nombre de fruits tranchés dans UN même swipe (façon
 // Fruit Ninja). Célébré en grand à partir du seuil, avec bonus par fruit.
 export const GESTURE_COMBO_MIN = 3;
-export const GESTURE_COMBO_BONUS = 15;
+/**
+ * Bonus par fruit d'un combo, versé en une fois à la fin du coup de sabre.
+ *
+ * Monté de 15 à 25 en même temps que disparaît l'ancien bonus cumulatif par
+ * fruit. Sur un combo de cinq, l'ancien système donnait 100 (escalade) + 75
+ * (bonus) = 175 ; le nouveau donne 50 + 125 = 175. L'échelle des scores est
+ * donc préservée, et les seuils de médailles restent valables — seul
+ * disparaît ce qui pouvait croître sans fin.
+ */
+export const GESTURE_COMBO_BONUS = 25;
 
 // ------------------------------------------------------------------
 // Fond animé
