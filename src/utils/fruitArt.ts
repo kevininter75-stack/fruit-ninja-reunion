@@ -19,6 +19,8 @@
  * arriveront, seul PreloadScene changera — les clés de texture sont stables.
  */
 import type { FruitVariety } from './fruitCatalog';
+import { shadeSphericalSurface, type SurfaceMaterial } from './surfaceShading';
+import { voronoiHeight } from './voronoi';
 
 const TAU = Math.PI * 2;
 
@@ -421,100 +423,66 @@ function paintBody(
 
 /** Semis de petits points sombres/clairs — grain de peau (letchi, longane). */
 // ------------------------------------------------------------------
-// Écailles en Voronoï
+// Corps éclairé
 // ------------------------------------------------------------------
 
-/** Hachage 2D déterministe : même graine, même peau, à chaque chargement. */
-function hash2(x: number, y: number, seed: number): number {
-  let h = seed ^ Math.imul(x, 0x27d4eb2f) ^ Math.imul(y, 0x165667b1);
-  h = Math.imul(h ^ (h >>> 15), 0x2545f491);
-  h ^= h >>> 13;
-  return (h >>> 0) / 4294967296;
+/** Décompose une couleur 0xRRGGBB en trois composantes 0-255. */
+function rgb(color: number): [number, number, number] {
+  return [(color >> 16) & 255, (color >> 8) & 255, color & 255];
 }
 
 /**
- * Peau à écailles polygonales, peinte pixel par pixel.
+ * Peint un corps de fruit RÉELLEMENT ÉCLAIRÉ, au lieu de l'imiter par des
+ * dégradés radiaux.
  *
- * Construite sur F2 - F1, l'écart entre les deux germes les plus proches, et
- * NON sur la distance au germe le plus proche. F1 seul produit des dômes
- * ronds, isolés sur une surface lisse — des boutons posés sur une bille. F2 -
- * F1 s'annule exactement sur les frontières entre cellules : il produit des
- * PLAQUES JOINTIVES séparées de sillons fins, ce qui est la peau d'un letchi.
+ * Remplace paintBody pour les fruits dont la peau a du relief. La différence
+ * tient en une phrase : paintBody peint ce à quoi ressemble un fruit éclairé,
+ * celui-ci éclaire une surface. Le reflet se déplace donc correctement sur les
+ * écailles, les sillons s'assombrissent d'eux-mêmes, et le contre-jour détache
+ * la silhouette sans qu'on ait à dessiner un contour.
  *
- * Le quadrillage de losanges qu'elle remplace se lisait comme un motif
- * régulier appliqué sur le fruit ; celui-ci se lit comme la surface du fruit.
- *
- * Coût : une passe sur les pixels du sprite, au chargement seulement. Sur une
- * planche de 184 px de côté c'est quelques millisecondes, et rien à
- * l'exécution — la texture est générée une fois puis réutilisée.
+ * Le coût est payé UNE FOIS, à la génération de la texture. En partie, rien.
  */
-function voronoiScales(
+function paintShadedBody(
   ctx: CanvasRenderingContext2D,
+  variety: FruitVariety,
   size: number,
-  cellsAcross: number,
-  grooveWidth: number,
-  grooveColor: [number, number, number],
-  tipColor: [number, number, number],
-  seed: number
+  material: SurfaceMaterial,
+  height: ((x: number, y: number) => number) | null,
+  details?: () => void
 ): void {
-  const image = ctx.createImageData(size, size);
-  const data = image.data;
-  const scale = cellsAcross / size;
+  const c = size / 2;
+  const r = variety.radius;
 
-  for (let py = 0; py < size; py++) {
-    for (let px = 0; px < size; px++) {
-      const fx = px * scale;
-      const fy = py * scale;
-      const cx = Math.floor(fx);
-      const cy = Math.floor(fy);
+  // L'ombre portée doit être posée AVANT la surface éclairée : elle se peint
+  // sur un premier remplissage plat, sinon chaque pixel de la surface
+  // traînerait son propre halo.
+  buildPath(ctx, variety, size);
+  ctx.fillStyle = shade(variety.skinColor, -0.5);
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
 
-      let f1 = 8;
-      let f2 = 8;
-
-      // Voisinage 3x3 : en 2x2 on rate le germe le plus proche quand il est
-      // dans une cellule diagonale, et le motif se fend de coutures droites.
-      for (let dy = -1; dy <= 1; dy++) {
-        for (let dx = -1; dx <= 1; dx++) {
-          const gx = cx + dx;
-          const gy = cy + dy;
-          const sx = gx + hash2(gx, gy, seed) - fx;
-          const sy = gy + hash2(gx, gy, seed ^ 0x9e3779b9) - fy;
-          const d = Math.sqrt(sx * sx + sy * sy);
-          if (d < f1) {
-            f2 = f1;
-            f1 = d;
-          } else if (d < f2) {
-            f2 = d;
-          }
-        }
-      }
-
-      const edge = Math.min(1, (f2 - f1) / grooveWidth);
-      const plate = edge * edge * (3 - 2 * edge); // lissage
-      const sillon = 1 - plate;
-      const pointe = Math.max(0, 1 - f1 * 2.1);
-
-      const i = (py * size + px) * 4;
-      if (sillon > 0.01 || pointe > 0.01) {
-        // Le sillon assombrit, la pointe éclaircit. Les deux se mélangent dans
-        // le même pixel plutôt qu'en deux passes : une seule écriture.
-        const a = sillon * 0.55 + pointe * 0.22;
-        const m = sillon * 0.55 / (a || 1);
-        data[i] = grooveColor[0] * m + tipColor[0] * (1 - m);
-        data[i + 1] = grooveColor[1] * m + tipColor[1] * (1 - m);
-        data[i + 2] = grooveColor[2] * m + tipColor[2] * (1 - m);
-        data[i + 3] = Math.min(255, a * 255);
-      }
-    }
+  ctx.save();
+  buildPath(ctx, variety, size);
+  ctx.clip();
+  // La clé mêle la variété et la taille : deux tailles différentes ne
+  // peuvent pas partager la même surface.
+  shadeSphericalSurface(ctx, size, r, material, height, `${variety.key}|${size}`);
+  if (details !== undefined) {
+    details();
   }
+  ctx.restore();
 
-  // Passage par un canevas intermédiaire : putImageData ignore le clip et le
-  // motif déborderait de la silhouette du fruit.
-  const buffer = document.createElement('canvas');
-  buffer.width = size;
-  buffer.height = size;
-  buffer.getContext('2d')!.putImageData(image, 0, 0);
-  ctx.drawImage(buffer, 0, 0);
+  // Contour sombre, plus fin que sur un corps peint : le contre-jour fait déjà
+  // une partie du travail de détachement.
+  buildPath(ctx, variety, size);
+  ctx.strokeStyle = shade(variety.skinColor, -0.72);
+  ctx.lineWidth = OUTLINE_WIDTH * 0.7;
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+
+  void c;
 }
 
 function speckle(
@@ -549,20 +517,22 @@ export function paintWhole(
 
   switch (variety.key) {
     case 'litchi': {
-      // Écailles polygonales jointives, calculées en Voronoï. Le quadrillage
-      // de losanges qu'elles remplacent se lisait comme un motif appliqué SUR
-      // le fruit ; celui-ci se lit comme la surface DU fruit.
-      paintBody(ctx, variety, size, skin, () => {
-        voronoiScales(
-          ctx,
-          size,
-          19, // ~110 écailles sur la face visible, l'ordre de grandeur réel
-          0.19,
-          [88, 18, 34], // sillons : rouge très sombre
-          [255, 196, 186], // pointes : rosé clair, à peine éclairci
-          0x5ab3
-        );
-      });
+      // Écailles polygonales éclairées : la lumière rase les plaques, les
+      // sillons s'assombrissent d'eux-mêmes, et le reflet se déplace sur le
+      // relief au lieu d'être une ellipse blanche collée par-dessus.
+      paintShadedBody(
+        ctx,
+        variety,
+        size,
+        {
+          albedo: rgb(skin),
+          groove: [86, 16, 34],
+          rim: [255, 150, 120],
+          smoothness: 0.34,
+          bump: 26,
+        },
+        (x, y) => voronoiHeight(x, y, 19 / size, 0.2, 0x5ab3)
+      );
       drawStem(ctx, c + r * 0.1, c - r * 0.92, r * 0.32, 0.6);
       break;
     }
