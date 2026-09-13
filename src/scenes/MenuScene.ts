@@ -61,7 +61,7 @@ export class MenuScene extends Phaser.Scene {
     music.ensureRunning();
 
     const title = this.add
-      .text(w / 2, h * 0.15, portrait ? 'Fruit Ninja\nRéunion' : 'Fruit Ninja Réunion', {
+      .text(w / 2, h * 0.15, portrait ? "Kout\nSab'" : "Kout Sab'", {
         fontFamily: GAME_FONT,
         fontSize: '76px',
         fontStyle: 'bold',

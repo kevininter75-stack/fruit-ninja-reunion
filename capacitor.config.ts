@@ -7,7 +7,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
  */
 const config: CapacitorConfig = {
   appId: 'com.kevininter.fruitninjareunion',
-  appName: 'Fruit Ninja Réunion',
+  appName: "Kout Sab'",
   webDir: 'dist',
   android: {
     // Fond assorti au jeu pendant le chargement de la WebView

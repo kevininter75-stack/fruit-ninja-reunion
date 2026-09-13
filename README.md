@@ -1,6 +1,8 @@
-# 🍈 Fruit Ninja Réunion
+# 🔪 Kout Sab'
 
-Jeu mobile-first de type **fruit-slicer** (façon Fruit Ninja) mettant en scène les fruits
+> *« Kout sab' »* — un coup de sabre, en créole réunionnais.
+
+Jeu mobile-first de type **fruit-slicer** mettant en scène les fruits
 typiques de La Réunion : letchis, mangues José, ananas Victoria, combavas…
 
 Tranchez les fruits d'un geste du doigt (ou de la souris), évitez les bombes,
