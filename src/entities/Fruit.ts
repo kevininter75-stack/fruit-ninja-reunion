@@ -31,7 +31,7 @@ export class Fruit extends Phaser.Physics.Arcade.Sprite {
 
   private variety: FruitVariety | null = null;
 
-  /** Reflet fixe posé par-dessus le fruit qui tourne (cf. SheenLayer). */
+  /** Éclairage fixe posé par-dessus le fruit qui tourne (cf. SheenLayer). */
   private readonly sheen = new SheenLayer(this.scene);
 
   getVariety(): FruitVariety | null {

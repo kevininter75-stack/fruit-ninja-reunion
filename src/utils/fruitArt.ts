@@ -534,7 +534,15 @@ function speckle(
   }
 }
 
-/** Dessine un fruit entier (silhouette + motifs + accessoires). */
+/**
+ * Dessine un fruit entier (silhouette + motifs + accessoires).
+ *
+ * Le corps est peint SOUS PLEINE LUMIÈRE, sans le galbe de la sphère :
+ * celui-ci est posé à l'affichage par la teinte du sprite, calculée en espace
+ * écran, et c'est ce qui l'empêche de tourner avec le fruit. Entiers et
+ * moitiés sont donc peints à l'identique — et partagent la même surface en
+ * cache, ce qui divise par deux le temps de génération.
+ */
 export function paintWhole(
   ctx: CanvasRenderingContext2D,
   variety: FruitVariety,

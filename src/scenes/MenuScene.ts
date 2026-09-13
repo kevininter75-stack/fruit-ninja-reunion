@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { SceneGrading } from '../systems/SceneGrading';
+import { applyShadingTint } from '../utils/surfaceShading';
 import {
   type GameMode,
   SLICE_MIN_SPEED,
@@ -7,6 +8,7 @@ import {
   TEX_JUICE,
   DEPTH_JUICE,
   TEX_GLOW,
+  TEX_SHEEN,
   GAME_FONT,
   fontPx,
   px,
@@ -193,6 +195,14 @@ export class MenuScene extends Phaser.Scene {
       .image(x, y, wholeTextureKey(variety))
       .setScale(scale)
       .setInteractive({ useHandCursor: true });
+    // L'emblème ne tourne pas : son galbe se pose une fois. Sans cela il
+    // resterait à l'éclairage « plein soleil » dans lequel les textures sont
+    // désormais peintes — plat et surexposé.
+    applyShadingTint(sprite, variety.radius * scale);
+    this.add
+      .image(x, y, TEX_SHEEN)
+      .setDisplaySize(radius * 2, radius * 2)
+      .setBlendMode(Phaser.BlendModes.ADD);
 
     // Ondulation permanente pour attirer l'œil
     this.tweens.add({

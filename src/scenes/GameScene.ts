@@ -14,6 +14,7 @@ import { AnimatedBackground } from '../entities/AnimatedBackground';
 import { prefersReducedMotion } from '../utils/settings';
 import { PauseController } from '../systems/PauseController';
 import { SceneGrading } from '../systems/SceneGrading';
+import { applyShadingTint } from '../utils/surfaceShading';
 import { seedRandom, clearSeed } from '../utils/rng';
 import { dailySeed, saveTodayResult } from '../utils/dailyChallenge';
 import { exclamationCombo, FRENESIE } from '../utils/creole';
@@ -329,9 +330,35 @@ export class GameScene extends Phaser.Scene {
       gesture.trail.update(this.time.now);
     }
     this.updateFuseSparks();
+    this.updateHalvesShading();
     this.updateFrenzyAura();
     if (this.mode === 'chrono' && !this.gameEnded) {
       this.updateChrono();
+    }
+  }
+
+  /**
+   * Rend leur galbe aux moitiés coupées.
+   *
+   * Elles sont peintes sous pleine lumière comme les fruits entiers — même
+   * texture, même surface en cache — et reçoivent donc le même éclairage par
+   * la teinte. Sans cela elles sortiraient plates et surexposées, ce qui se
+   * verrait d'autant plus qu'elles apparaissent à l'endroit exact où le fruit
+   * correctement éclairé vient de disparaître.
+   *
+   * Elles tournent vite (jusqu'à 300°/s) : le recalcul par image est donc
+   * nécessaire, et il coûte quatre évaluations d'une rampe affine.
+   *
+   * Pas de calque de reflet sur elles, en revanche : il déborderait sur la
+   * face de coupe, qui n'est pas une surface de peau.
+   */
+  private updateHalvesShading(): void {
+    for (const objet of this.halves.getChildren()) {
+      const moitie = objet as Phaser.Physics.Arcade.Sprite & { sliceRadius?: number };
+      if (!moitie.active || !moitie.visible) {
+        continue;
+      }
+      applyShadingTint(moitie, moitie.sliceRadius ?? moitie.displayWidth / 3);
     }
   }
 
@@ -1426,6 +1453,10 @@ export class GameScene extends Phaser.Scene {
       if (half === null) {
         continue; // pool plein : on saute l'effet plutôt que d'allouer
       }
+      // Le rayon du fruit d'origine voyage avec la moitié : c'est la référence
+      // de la rampe d'éclairage, et la texture seule ne permet pas de le
+      // retrouver (elle comprend une marge pour feuilles et ombre portée).
+      (half as Phaser.Physics.Arcade.Sprite & { sliceRadius?: number }).sliceRadius = fruit.sliceRadius;
       half.setTexture(side.texture);
       half.enableBody(true, fruit.x, fruit.y, true, true);
       half.setAlpha(1);

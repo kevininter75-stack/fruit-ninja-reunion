@@ -484,27 +484,34 @@ export class PreloadScene extends Phaser.Scene {
   private createBombTexture(): void {
     const r = BOMB_RADIUS;
     const size = r * 2;
-    const bodyRadius = r - 8; // marge pour laisser la mèche dans le canvas
+    const bodyRadius = r - px(8); // marge pour laisser la mèche dans le canvas
     const g = this.make.graphics({ x: 0, y: 0 }, false);
 
-    // Corps sombre + reflet
-    g.fillStyle(0x1d1d26, 1);
-    g.fillCircle(r, r + 6, bodyRadius);
-    g.fillStyle(0x3c3c4e, 1);
-    g.fillCircle(r - bodyRadius * 0.35, r + 6 - bodyRadius * 0.35, bodyRadius * 0.28);
+    // Corps sombre, SANS reflet peint.
+    //
+    // Il y en avait un : un disque plus clair en haut à gauche. Mais une
+    // bombe tourne à 120°/s, et un reflet peint tourne avec elle — on voyait
+    // donc la lumière faire le tour de la sphère. Le reflet vient désormais du
+    // calque additif, et le galbe de la teinte : ni l'un ni l'autre ne tourne.
+    //
+    // La teinte multipliant la couleur, le corps est peint un peu plus clair
+    // qu'il ne doit paraître : c'est l'équivalent, pour une couleur unie, du
+    // « peint sous pleine lumière » des fruits.
+    g.fillStyle(0x23232d, 1);
+    g.fillCircle(r, r + px(6), bodyRadius);
 
     // Mèche stylisée
-    g.lineStyle(6, 0x8a6d4a, 1);
+    g.lineStyle(px(6), 0x8a6d4a, 1);
     g.beginPath();
-    g.moveTo(r, 16);
-    g.lineTo(r + 14, 8);
+    g.moveTo(r, px(16));
+    g.lineTo(r + px(14), px(8));
     g.strokePath();
 
     // Étincelle orange au bout de la mèche
     g.fillStyle(0xffb347, 1);
-    g.fillCircle(r + 17, 8, 7);
+    g.fillCircle(r + px(17), px(8), px(7));
     g.fillStyle(0xfff3b0, 1);
-    g.fillCircle(r + 17, 8, 3);
+    g.fillCircle(r + px(17), px(8), px(3));
 
     g.generateTexture(TEX_BOMB, size, size);
     g.destroy();

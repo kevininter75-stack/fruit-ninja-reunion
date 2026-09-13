@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { BOMB_RADIUS, DEPTH_FRUIT } from '../utils/constants';
+import { BOMB_RADIUS, DEPTH_FRUIT, px } from '../utils/constants';
 import { SheenLayer } from './SheenLayer';
 
 /**
@@ -10,8 +10,8 @@ import { SheenLayer } from './SheenLayer';
  */
 // Position du bout de la mèche dans la texture, relative au centre de la bombe
 // (voir PreloadScene.createBombTexture : étincelle en (r+17, 8) sur un canvas 2r).
-const FUSE_LOCAL_X = 17;
-const FUSE_LOCAL_Y = 8 - BOMB_RADIUS;
+const FUSE_LOCAL_X = px(17);
+const FUSE_LOCAL_Y = px(8) - BOMB_RADIUS;
 
 export class Bomb extends Phaser.Physics.Arcade.Sprite {
   /** Rayon utilisé pour la détection de coupe (cercle approximatif). */
