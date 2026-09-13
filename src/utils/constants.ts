@@ -183,6 +183,9 @@ export const SCENE_FADE_MS = 260;
 export const MEDAL_THRESHOLDS: Record<GameMode, readonly [number, number, number]> = {
   classic: [400, 1200, 2500],
   chrono: [300, 800, 1600],
+  // Le Défi du jour se joue aux règles du Classique : mêmes seuils, pour que
+  // les deux scores restent comparables d'un coup d'œil.
+  daily: [400, 1200, 2500],
 };
 export const MEDAL_COLORS = [0xcd7f32, 0xc0c8d0, 0xffcf40] as const; // bronze, argent, or
 export const MEDAL_LABELS = ['BRONZE', 'ARGENT', 'OR'] as const;
@@ -231,7 +234,7 @@ export const CROSS_SIZE_DIM = 27;
 // ------------------------------------------------------------------
 
 /** Modes de jeu disponibles. */
-export type GameMode = 'classic' | 'chrono';
+export type GameMode = 'classic' | 'chrono' | 'daily';
 
 /** Cause de fin de partie (affichage adapté sur l'écran de fin). */
 export type GameOverReason = 'lives' | 'bomb' | 'time';

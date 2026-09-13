@@ -13,6 +13,8 @@ import { createMuteButton, addHudPanel, addVignette, fadeIn, fadeToScene } from 
 import { AnimatedBackground } from '../entities/AnimatedBackground';
 import { prefersReducedMotion } from '../utils/settings';
 import { PauseController } from '../systems/PauseController';
+import { seedRandom, clearSeed } from '../utils/rng';
+import { dailySeed, saveTodayResult } from '../utils/dailyChallenge';
 import {
   FRUIT_POOL_SIZE,
   HALF_POOL_SIZE,
@@ -181,6 +183,15 @@ export class GameScene extends Phaser.Scene {
 
   init(data: GameSceneData): void {
     this.mode = data.mode ?? 'classic';
+
+    // Le Défi du jour sème la source de hasard avec la date : tout le monde
+    // reçoit la même séquence de fruits. Les autres modes la relâchent, sinon
+    // une partie libre lancée après un défi rejouerait ce même défi.
+    if (this.mode === 'daily') {
+      seedRandom(dailySeed());
+    } else {
+      clearSeed();
+    }
     this.gameEnded = false;
     this.lastShownSecond = -1;
     this.multiplierTimer = null;
@@ -542,7 +553,7 @@ export class GameScene extends Phaser.Scene {
     });
 
     const w = this.scale.width;
-    if (this.mode === 'classic') {
+    if (this.mode !== 'chrono') {
       // Pas de libellé « VIES » : trois croix parlent d'elles-mêmes, et le
       // texte entrait en collision avec les éclaboussures de la dernière.
       this.hudElements.push(addHudPanel(this, w - 14 - 204, 12, 204, 84));
@@ -1479,6 +1490,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   private endGame(reason: GameOverReason): void {
+    // Le résultat du défi est enregistré AVANT la transition : si le joueur
+    // ferme l'onglet pendant le fondu, sa tentative doit quand même compter.
+    // Sans quoi il pourrait quitter juste avant l'écran de fin pour effacer un
+    // mauvais score et rejouer, ce qui viderait le défi de son sens.
+    if (this.mode === 'daily') {
+      saveTodayResult(this.scoreManager.getScore());
+    }
+
     fadeToScene(this, 'GameOverScene', {
       score: this.scoreManager.getScore(),
       mode: this.mode,

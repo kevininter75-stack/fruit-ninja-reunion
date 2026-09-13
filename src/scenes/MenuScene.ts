@@ -15,6 +15,7 @@ import { FRUIT_VARIETIES, wholeTextureKey, type FruitVariety } from '../utils/fr
 import { SliceTrail } from '../entities/SliceTrail';
 import { AnimatedBackground } from '../entities/AnimatedBackground';
 import { createMuteButton, addVignette, fadeIn, fadeToScene } from '../utils/ui';
+import { getTodayResult, getStreak } from '../utils/dailyChallenge';
 
 /** Un emblème-fruit tranchable qui lance un mode de jeu. */
 interface ModeEmblem {
@@ -83,16 +84,30 @@ export class MenuScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    // Emblèmes : letchi (rouge) = Classique, ananas (doré) = Chrono
+    // Emblèmes : letchi = Classique, ananas = Chrono, goyavier = Défi du jour.
+    // Le goyavier n'est pas choisi au hasard — « la saison des goyaviers » est
+    // la référence saisonnière la plus partagée de l'île, et le défi change
+    // justement tous les jours.
     const classic = FRUIT_VARIETIES.find((v) => v.key === 'litchi') ?? FRUIT_VARIETIES[0];
     const chrono = FRUIT_VARIETIES.find((v) => v.key === 'ananas_victoria') ?? FRUIT_VARIETIES[1];
+    const daily = FRUIT_VARIETIES.find((v) => v.key === 'goyavier') ?? FRUIT_VARIETIES[0];
+
+    const resultatDuJour = getTodayResult();
+    const serie = getStreak();
+    const sousTitreDefi = resultatDuJour
+      ? `Fait · ${resultatDuJour.score} pts`
+      : serie > 1
+        ? `Une par jour · série ${serie}`
+        : 'Une partie par jour';
 
     if (portrait) {
-      this.createEmblem(w / 2, h * 0.5, classic, 'classic', 'CLASSIQUE', `3 vies · Record ${getBestScore('classic')}`);
-      this.createEmblem(w / 2, h * 0.74, chrono, 'chrono', 'CHRONO', `60 s · Record ${getBestScore('chrono')}`);
+      this.createEmblem(w / 2, h * 0.42, classic, 'classic', 'CLASSIQUE', `3 vies · Record ${getBestScore('classic')}`);
+      this.createEmblem(w / 2, h * 0.62, chrono, 'chrono', 'CHRONO', `60 s · Record ${getBestScore('chrono')}`);
+      this.createEmblem(w / 2, h * 0.82, daily, 'daily', 'DÉFI DU JOUR', sousTitreDefi);
     } else {
-      this.createEmblem(w * 0.32, h * 0.58, classic, 'classic', 'CLASSIQUE', `3 vies · Record ${getBestScore('classic')}`);
-      this.createEmblem(w * 0.68, h * 0.58, chrono, 'chrono', 'CHRONO', `60 s · Record ${getBestScore('chrono')}`);
+      this.createEmblem(w * 0.22, h * 0.58, classic, 'classic', 'CLASSIQUE', `3 vies · Record ${getBestScore('classic')}`);
+      this.createEmblem(w * 0.5, h * 0.58, chrono, 'chrono', 'CHRONO', `60 s · Record ${getBestScore('chrono')}`);
+      this.createEmblem(w * 0.78, h * 0.58, daily, 'daily', 'DÉFI DU JOUR', sousTitreDefi);
     }
 
     // Jus (feedback de coupe) + lame qui suit le doigt
