@@ -387,6 +387,22 @@ export const SPLAT_FADE_MS = 7000; // durée avant disparition complète d'une t
 // Assombrissement du décor pendant la partie : voile sombre translucide
 // qui désature/atténue le fond pour que les fruits claquent visuellement
 // (le décor complet reste éclatant au menu). Étape 3 du polish "feel".
+/**
+ * Marge de débordement des nappes plein écran.
+ *
+ * Borner la caméra au monde ne suffit pas : dans Phaser, la SECOUSSE est
+ * appliquée APRÈS le bornage (Camera.preRender borne le défilement, puis
+ * appelle shakeEffect.preRender). À zoom 1 il n'y a aucune marge, donc la
+ * moindre secousse découvre le vide au bord — jusqu'à 28 px à l'explosion
+ * d'une bombe, dont la secousse vaut 0,022 de la largeur.
+ *
+ * Le décor, le voile sombre, le vignettage et le flash blanc débordent donc
+ * de cette marge. Elle passe par px() : elle grandit avec la résolution,
+ * exactement comme l'amplitude de la secousse, qui est une fraction de la
+ * largeur.
+ */
+export const SCREEN_BLEED = px(36);
+
 export const GAME_DARKEN_COLOR = 0x0a1a26;
 export const GAME_DARKEN_ALPHA = 0.4;
 

@@ -91,6 +91,7 @@ import {
   fontPx,
   px,
   SLICE_FLASH_POOL_SIZE,
+  SCREEN_BLEED,
   SLICE_FLASH_MS,
 } from '../utils/constants';
 
@@ -231,11 +232,31 @@ export class GameScene extends Phaser.Scene {
     // donc l'ordre de création des objets ne le concerne pas.
     this.grading = new SceneGrading(this);
 
+    // Bornes du monde : la caméra ne peut plus montrer ce qui n'existe pas.
+    //
+    // Le recadrage de la frénésie suit la grenade à mi-chemin, et la grenade
+    // entre par un BORD de l'écran. À un zoom de 1,22 la demi-largeur visible
+    // vaut 0,41 W ; visée à 0,25 W, la caméra débordait donc de 0,16 W à
+    // gauche du décor — on voyait le vide.
+    //
+    // Phaser borne lui-même le défilement à chaque image, et il tient compte
+    // du zoom courant : c'est plus sûr que de calculer la cible à l'avance,
+    // puisque le zoom et le recadrage sont deux tweens indépendants qui ne
+    // finissent pas ensemble.
+    this.cameras.main.setBounds(0, 0, this.scale.width, this.scale.height);
+
     new AnimatedBackground(this);
     // Voile sombre : atténue le décor pendant la partie pour que les fruits
     // ressortent. Au-dessus du fond animé (depths négatifs), sous les taches.
     this.add
-      .rectangle(0, 0, this.scale.width, this.scale.height, GAME_DARKEN_COLOR, GAME_DARKEN_ALPHA)
+      .rectangle(
+        -SCREEN_BLEED,
+        -SCREEN_BLEED,
+        this.scale.width + SCREEN_BLEED * 2,
+        this.scale.height + SCREEN_BLEED * 2,
+        GAME_DARKEN_COLOR,
+        GAME_DARKEN_ALPHA
+      )
       .setOrigin(0)
       .setDepth(DEPTH_DARKEN);
     music.ensureRunning();
@@ -306,7 +327,14 @@ export class GameScene extends Phaser.Scene {
 
     // Flash blanc plein écran (bombe) — créé une fois, réactivé au besoin
     this.flashRect = this.add
-      .rectangle(0, 0, this.scale.width, this.scale.height, 0xffffff, 1)
+      .rectangle(
+        -SCREEN_BLEED,
+        -SCREEN_BLEED,
+        this.scale.width + SCREEN_BLEED * 2,
+        this.scale.height + SCREEN_BLEED * 2,
+        0xffffff,
+        1
+      )
       .setOrigin(0)
       .setDepth(200)
       .setVisible(false)

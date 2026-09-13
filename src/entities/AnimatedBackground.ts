@@ -11,6 +11,7 @@ import {
   DEPTH_BG_GLOW,
   DEPTH_BG_CLOUD,
   DEPTH_BG_MOTE,
+  SCREEN_BLEED,
 } from '../utils/constants';
 
 /**
@@ -36,8 +37,13 @@ export class AnimatedBackground {
     const w = scene.scale.width;
     const h = scene.scale.height;
 
-    // Décor de base (adapté à l'orientation)
-    const base = scene.add.image(0, 0, backgroundKey(scene)).setOrigin(0).setDepth(DEPTH_BG_BASE);
+    // Décor de base (adapté à l'orientation), débordant légèrement de l'écran
+    // pour qu'une secousse de caméra ne découvre jamais le vide (SCREEN_BLEED).
+    const base = scene.add
+      .image(-SCREEN_BLEED, -SCREEN_BLEED, backgroundKey(scene))
+      .setOrigin(0)
+      .setDisplaySize(w + SCREEN_BLEED * 2, h + SCREEN_BLEED * 2)
+      .setDepth(DEPTH_BG_BASE);
 
     // Halo de soleil qui respire, en fusion additive pour un vrai rayonnement
     const glow = scene.add

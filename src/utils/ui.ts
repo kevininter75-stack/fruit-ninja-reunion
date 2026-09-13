@@ -7,6 +7,7 @@ import {
   HUD_PANEL_COLOR,
   HUD_PANEL_ALPHA,
   SCENE_FADE_MS,
+  SCREEN_BLEED,
   GAME_FONT,
   fontPx,
   px,
@@ -18,10 +19,12 @@ import {
  * Étiré à la taille courante, au-dessus du jeu mais sous le HUD.
  */
 export function addVignette(scene: Phaser.Scene): void {
+  // Déborde de l'écran comme le décor : sans cela, une secousse de caméra
+  // ferait apparaître le bord franc du vignettage au ras de l'image.
   scene.add
-    .image(0, 0, TEX_VIGNETTE)
+    .image(-SCREEN_BLEED, -SCREEN_BLEED, TEX_VIGNETTE)
     .setOrigin(0)
-    .setDisplaySize(scene.scale.width, scene.scale.height)
+    .setDisplaySize(scene.scale.width + SCREEN_BLEED * 2, scene.scale.height + SCREEN_BLEED * 2)
     .setDepth(DEPTH_VIGNETTE);
 }
 

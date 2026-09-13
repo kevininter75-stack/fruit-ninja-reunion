@@ -209,18 +209,34 @@ function paintHaze(ctx: CanvasRenderingContext2D, W: number, H: number, sunX: nu
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
 
-  const band = ctx.createLinearGradient(0, H * 0.52, 0, H * 0.9);
+  // LES DEUX NAPPES COUVRENT TOUTE L'IMAGE, et c'est le point important.
+  //
+  // Elles étaient peintes dans un rectangle, et un dégradé qui ne vaut pas
+  // zéro au bord de son rectangle y laisse une ARRÊTE. La nappe chaude du
+  // soleil s'arrêtait à 0,40 H, alors qu'elle valait encore 0,15 d'alpha à
+  // cette hauteur : l'image se coupait en deux le long d'une ligne
+  // parfaitement horizontale, juste au-dessus du soleil. Mesuré sur la
+  // colonne du soleil : un écart de 104 entre deux lignes voisines, là où le
+  // reste du ciel ne dépasse jamais 9.
+  //
+  // La règle qui évite définitivement ce défaut : on ne borne pas une nappe
+  // par son rectangle, on la borne par son propre dégradé. Il suffit qu'elle
+  // atteigne zéro avant le bord de l'image.
+
+  const band = ctx.createLinearGradient(0, 0, 0, H);
   band.addColorStop(0, 'rgba(255, 196, 130, 0)');
-  band.addColorStop(0.5, 'rgba(255, 186, 124, 0.17)');
-  band.addColorStop(1, 'rgba(255, 160, 104, 0.05)');
+  band.addColorStop(0.45, 'rgba(255, 196, 130, 0)');
+  band.addColorStop(0.68, 'rgba(255, 186, 124, 0.17)');
+  band.addColorStop(0.86, 'rgba(255, 168, 110, 0.08)');
+  band.addColorStop(1, 'rgba(255, 160, 104, 0)');
   ctx.fillStyle = band;
-  ctx.fillRect(0, H * 0.52, W, H * 0.38);
+  ctx.fillRect(0, 0, W, H);
 
   const near = ctx.createRadialGradient(sunX, sunY + 40 * u, 20 * u, sunX, sunY + 40 * u, 520 * u);
   near.addColorStop(0, 'rgba(255, 214, 158, 0.2)');
   near.addColorStop(1, 'rgba(255, 214, 158, 0)');
   ctx.fillStyle = near;
-  ctx.fillRect(0, H * 0.4, W, H * 0.5);
+  ctx.fillRect(0, 0, W, H);
 
   ctx.restore();
 }
