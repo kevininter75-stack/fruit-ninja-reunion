@@ -79,6 +79,8 @@ import {
   GESTURE_COMBO_BONUS,
   type GameMode,
   type GameOverReason,
+  CROSS_SIZE_LIT,
+  CROSS_SIZE_DIM,
 } from '../utils/constants';
 
 /** Données passées par le menu au lancement d'une partie. */
@@ -138,6 +140,7 @@ export class GameScene extends Phaser.Scene {
   /** Pool d'ondes de choc (effets de la grenade). */
   private rings!: Phaser.GameObjects.Group;
   private lifeCrosses: Phaser.GameObjects.Image[] = []; // strikes peints (mode Classique)
+  private livesLabel?: Phaser.GameObjects.Text; // « 3 / 3 » sous les croix
   /** Nombre du score, en chiffres bitmap (aucune texture reconstruite). */
   private scoreValue!: Phaser.GameObjects.BitmapText;
   /** Valeur actuellement affichée — évite de réécrire le texte pour rien. */
@@ -590,14 +593,28 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  /** Applique teinte et opacité des croix selon les vies restantes. */
+  /**
+   * Applique taille, teinte et opacité des croix selon les vies restantes.
+   *
+   * La TAILLE est le signal principal, pas la couleur. Auparavant les deux
+   * états ne différaient que par la teinte, avec un contraste de 1,10:1 :
+   * indistinguables pour un daltonien, et illisibles en plein soleil. Un
+   * élément graphique porteur d'information ne doit jamais reposer sur la
+   * seule couleur — ici s'ajoutent un écart de taille de 42 contre 27 px et
+   * le compteur chiffré juste en dessous.
+   */
   private syncLifeCrossStyles(): void {
     for (let i = 0; i < this.lifeCrosses.length; i++) {
       const isFilled = i < this.filledCrosses;
+      const side = isFilled ? CROSS_SIZE_LIT : CROSS_SIZE_DIM;
       this.lifeCrosses[i]
+        .setDisplaySize(side, side)
         .setTint(isFilled ? CROSS_COLOR_LIT : CROSS_COLOR_DIM)
-        .setAlpha(isFilled ? 1 : 0.55);
+        .setAlpha(isFilled ? 1 : 0.7);
     }
+
+    const remaining = STARTING_LIVES - this.filledCrosses;
+    this.livesLabel?.setText(`${remaining} / ${STARTING_LIVES}`);
   }
 
   /**
@@ -622,9 +639,23 @@ export class GameScene extends Phaser.Scene {
         .setOrigin(0.5)
         .setDepth(50)
         .setTint(CROSS_COLOR_DIM)
-        .setAlpha(0.55);
+        .setAlpha(0.7);
       this.lifeCrosses.push(cross);
     }
+
+    // Le nombre de vies écrit en clair. C'est la seule forme d'information
+    // qui reste lisible quelles que soient la vision et la luminosité.
+    this.livesLabel = this.add
+      .text(panelCenterX, 92, `${STARTING_LIVES} / ${STARTING_LIVES}`, {
+        fontFamily: GAME_FONT,
+        fontSize: '22px',
+        color: '#eef3f7',
+      })
+      .setOrigin(0.5)
+      .setDepth(50)
+      .setAlpha(0.9);
+
+    this.syncLifeCrossStyles();
   }
 
   /**

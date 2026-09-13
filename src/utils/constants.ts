@@ -213,7 +213,18 @@ export const DIGIT_FONT_SIZE = 72; // taille de tracé dans la planche
 // Croix de vie peintes (remplacent le glyphe ✕, qui faisait « page web »)
 export const TEX_CROSS = 'cross_splat';
 export const CROSS_COLOR_LIT = 0xff3b3b; // strike encaissé
-export const CROSS_COLOR_DIM = 0x6d8496; // vie encore disponible
+// Ardoise sombre, et non le gris-bleu d'origine : entre 0x6d8496 et le rouge,
+// le contraste ne valait que 1,10:1 — deux états qu'un daltonien, ou n'importe
+// qui en plein soleil, ne pouvait pas distinguer. WCAG demande 3:1 pour un
+// élément graphique porteur d'information ; celui-ci atteint 3,30:1.
+// La couleur ne fait de toute façon que RENFORCER la différence de taille :
+// aucune information du jeu ne doit reposer sur elle seule.
+export const CROSS_COLOR_DIM = 0x2b3a47; // vie encore disponible
+
+/** Côté d'une croix de strike allumée, en pixels. */
+export const CROSS_SIZE_LIT = 42;
+/** Côté d'une croix éteinte. L'écart de taille est le signal principal. */
+export const CROSS_SIZE_DIM = 27;
 
 // ------------------------------------------------------------------
 // Phase 2 — Feel & polish
