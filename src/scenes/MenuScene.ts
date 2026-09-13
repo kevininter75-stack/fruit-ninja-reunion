@@ -73,7 +73,7 @@ export class MenuScene extends Phaser.Scene {
         color: '#ffffff',
         align: 'center',
         stroke: '#2d3a4a',
-        strokeThickness: 10,
+        strokeThickness: px(10),
       })
       .setOrigin(0.5);
     title.setAlpha(0).setY(h * 0.12);

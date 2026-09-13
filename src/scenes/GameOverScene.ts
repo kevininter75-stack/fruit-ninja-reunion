@@ -109,7 +109,7 @@ export class GameOverScene extends Phaser.Scene {
         fontStyle: '700',
         color: display.color,
         stroke: '#1d2731',
-        strokeThickness: 10,
+        strokeThickness: px(10),
       })
       .setOrigin(0.5);
     this.reveal(title, 0, true);
@@ -263,7 +263,7 @@ export class GameOverScene extends Phaser.Scene {
         fontStyle: '700',
         color: '#ffffff',
         stroke: '#1d2731',
-        strokeThickness: 5,
+        strokeThickness: px(5),
       })
       .setOrigin(0.5);
     container.add(label);
@@ -333,7 +333,7 @@ export class GameOverScene extends Phaser.Scene {
         color: '#ffe066',
         align: 'center',
         stroke: '#1d2731',
-        strokeThickness: 6,
+        strokeThickness: px(6),
       })
       .setOrigin(0.5);
     this.reveal(record, 5);

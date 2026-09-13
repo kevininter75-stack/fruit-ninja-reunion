@@ -405,6 +405,11 @@ export const GESTURE_COMBO_BONUS = 15;
 // ------------------------------------------------------------------
 // Fond animé
 // ------------------------------------------------------------------
+/** Nombre d'éclats de lame simultanés. Un combo de cinq fruits en tire cinq. */
+export const SLICE_FLASH_POOL_SIZE = 8;
+/** Durée de l'éclat de lame. Au-delà, l'œil y lit un objet, pas un éclat. */
+export const SLICE_FLASH_MS = 190;
+
 export const TEX_GLOW = 'glow';
 /** Calque de reflet fixe posé sur les fruits en rotation (cf. paintSphereSheen). */
 export const TEX_SHEEN = 'sheen';

@@ -89,6 +89,8 @@ import {
   CROSS_SIZE_DIM,
   fontPx,
   px,
+  SLICE_FLASH_POOL_SIZE,
+  SLICE_FLASH_MS,
 } from '../utils/constants';
 
 /** Données passées par le menu au lancement d'une partie. */
@@ -165,6 +167,8 @@ export class GameScene extends Phaser.Scene {
   private multiplierTimer: Phaser.Time.TimerEvent | null = null;
   private popupPool: Phaser.GameObjects.Text[] = [];
   private splatPool: Phaser.GameObjects.Image[] = [];
+  private flashPool: Phaser.GameObjects.Image[] = [];
+  private nextFlashIndex = 0;
   private nextSplatIndex = 0;
 
   // Statistiques de la partie (affichées sur l'écran de fin — Étape 4)
@@ -304,6 +308,7 @@ export class GameScene extends Phaser.Scene {
     this.createUi();
     this.createPopupPool();
     this.createSplatPool();
+    this.createSliceFlashPool();
     this.createFrenzyEffects();
     this.registerGameEvents();
     this.registerPointerEvents();
@@ -352,7 +357,7 @@ export class GameScene extends Phaser.Scene {
         fontStyle: 'bold',
         color: '#ffd166',
         stroke: '#7a1020',
-        strokeThickness: 8,
+        strokeThickness: px(8),
       })
       .setOrigin(0.5, 1)
       .setDepth(50)
@@ -394,7 +399,7 @@ export class GameScene extends Phaser.Scene {
       }
     }
     this.frenzyAura.setPosition(grenade.x, grenade.y);
-    this.frenzyCounter.setPosition(grenade.x, grenade.y - grenade.sliceRadius - 14);
+    this.frenzyCounter.setPosition(grenade.x, grenade.y - grenade.sliceRadius - px(14));
   }
 
   /** Range halo et compteur (fin de frénésie, grenade manquée, fin de partie). */
@@ -549,7 +554,7 @@ export class GameScene extends Phaser.Scene {
         fontStyle: '700',
         color: '#ffd700',
         stroke: '#2d3a4a',
-        strokeThickness: 6,
+        strokeThickness: px(6),
       })
       .setDepth(50)
       .setVisible(false);
@@ -588,7 +593,7 @@ export class GameScene extends Phaser.Scene {
           fontStyle: '700',
           color: '#ffffff',
           stroke: '#2d3a4a',
-          strokeThickness: 6,
+          strokeThickness: px(6),
         })
         .setOrigin(1, 0)
         .setDepth(50);
@@ -671,7 +676,7 @@ export class GameScene extends Phaser.Scene {
       const x = panelCenterX + (i - (STARTING_LIVES - 1) / 2) * gap;
       const cross = this.add
         .image(x, px(54), TEX_CROSS)
-        .setDisplaySize(40, 40)
+        .setDisplaySize(px(40), px(40))
         .setOrigin(0.5)
         .setDepth(50)
         .setTint(CROSS_COLOR_DIM)
@@ -732,6 +737,62 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  /**
+   * Éclats de lame : le trait de lumière qui naît DANS le fruit au moment
+   * où il s'ouvre.
+   *
+   * C'est l'instant que le joueur regarde, et c'est le seul où il ne se
+   * passait rien de lumineux : il y avait du jus, une tache, un texte et un
+   * son, mais aucune trace du coup lui-même. Le halo radial étiré dans l'axe
+   * du geste donne exactement cela — une lame qui accroche le couchant en
+   * traversant — pour un sprite additif recyclé, sans shader.
+   */
+  private createSliceFlashPool(): void {
+    this.flashPool = [];
+    this.nextFlashIndex = 0;
+    for (let i = 0; i < SLICE_FLASH_POOL_SIZE; i++) {
+      const flash = this.add
+        .image(0, 0, TEX_GLOW)
+        .setDepth(DEPTH_JUICE)
+        .setBlendMode(Phaser.BlendModes.ADD)
+        .setVisible(false);
+      this.flashPool.push(flash);
+    }
+  }
+
+  /**
+   * `angle` est celui du geste : l'éclat s'aligne dessus. Un éclat toujours
+   * horizontal aurait suffi à éclairer, mais il aurait démenti la direction
+   * du coup — et c'est justement ce que le joueur vient de faire.
+   */
+  private spawnSliceFlash(x: number, y: number, angle: number, radius: number): void {
+    const flash = this.flashPool[this.nextFlashIndex];
+    this.nextFlashIndex = (this.nextFlashIndex + 1) % SLICE_FLASH_POOL_SIZE;
+    this.tweens.killTweensOf(flash);
+
+    const longueur = radius * 2.6;
+    const epaisseur = radius * 0.34;
+    flash
+      .setPosition(x, y)
+      .setRotation(angle)
+      .setDisplaySize(longueur, epaisseur)
+      .setAlpha(0.85)
+      .setVisible(true);
+
+    // L'éclat s'ÉTIRE en s'effaçant : la lumière file le long de la coupe au
+    // lieu de se dissiper sur place. Très court — au-delà de 200 ms l'œil
+    // n'y lit plus un éclat mais un objet, et la coupe paraît molle.
+    this.tweens.add({
+      targets: flash,
+      displayWidth: longueur * 1.75,
+      displayHeight: epaisseur * 0.35,
+      alpha: 0,
+      duration: SLICE_FLASH_MS,
+      ease: 'Cubic.easeOut',
+      onComplete: () => flash.setVisible(false),
+    });
+  }
+
   /** Pool de textes flottants (+10, Combo x2…) — aucune création en partie. */
   private createPopupPool(): void {
     this.popupPool = [];
@@ -742,7 +803,7 @@ export class GameScene extends Phaser.Scene {
           fontStyle: 'bold',
           color: '#ffffff',
           stroke: '#2d3a4a',
-          strokeThickness: 6,
+          strokeThickness: px(6),
         })
         .setOrigin(0.5)
         .setDepth(60)
@@ -767,7 +828,7 @@ export class GameScene extends Phaser.Scene {
       .setVisible(true);
     this.tweens.add({
       targets: popup,
-      y: y - 90,
+      y: y - px(90),
       alpha: 0,
       scale: 1,
       duration: 700,
@@ -931,14 +992,15 @@ export class GameScene extends Phaser.Scene {
     if (isCrit) {
       // Coup critique : popup doré, double jet de jus et son dédié
       this.juiceEmitter.emitParticleAt(fruit.x, fruit.y, JUICE_PARTICLE_COUNT);
-      this.showPopup(fruit.x, fruit.y - 20, `CRITIQUE ! +${awarded}`, '#ffd700', 46);
+      this.showPopup(fruit.x, fruit.y - px(20), `CRITIQUE ! +${awarded}`, '#ffd700', px(46));
       this.hitStop(HITSTOP_CRIT_MS);
       sfx.crit();
     } else {
-      this.showPopup(fruit.x, fruit.y - 20, `+${awarded}`, '#ffffff', 40);
+      this.showPopup(fruit.x, fruit.y - px(20), `+${awarded}`, '#ffffff', px(40));
     }
 
     sfx.slice();
+    this.spawnSliceFlash(fruit.x, fruit.y, sliceAngle, fruit.sliceRadius);
     this.spawnHalves(fruit, sliceAngle);
     fruit.kill();
   }
@@ -1241,7 +1303,7 @@ export class GameScene extends Phaser.Scene {
         color: '#ffe066',
         align: 'center',
         stroke: '#2d3a4a',
-        strokeThickness: 10,
+        strokeThickness: px(10),
       })
       .setOrigin(0.5)
       .setDepth(70)
@@ -1269,7 +1331,7 @@ export class GameScene extends Phaser.Scene {
   /** Combava doré tranché : score x2 temporaire + feedback doré appuyé. */
   private activateBonus(fruit: Fruit): void {
     this.scoreManager.activateMultiplier(BONUS_X2_FACTOR, BONUS_X2_DURATION_MS);
-    this.showPopup(fruit.x, fruit.y - 160, 'COMBAVA DORÉ !', '#ffd700', 48);
+    this.showPopup(fruit.x, fruit.y - px(160), 'COMBAVA DORÉ !', '#ffd700', px(48));
     sfx.bonus();
 
     // Gros jet de jus doré en plus du jus normal
