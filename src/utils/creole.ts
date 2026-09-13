@@ -1,3 +1,5 @@
+import { GESTURE_HUGE_MIN } from './constants';
+
 /**
  * Les exclamations du jeu, en créole réunionnais.
  *
@@ -13,8 +15,21 @@
 /** Quatre ou cinq fruits d'un seul geste. */
 export const COMBO_PETIT = 'Woulala !';
 
-/** Six fruits ou plus : le grand geste. */
+/** Six ou sept fruits : le grand geste. */
 export const COMBO_GRAND = 'Totoche !';
+
+/**
+ * Huit fruits ou plus : le geste dont on parle après la partie.
+ *
+ * Seule exclamation de ce fichier que Kevin n'a pas donnée spontanément : je
+ * l'ai proposée, il l'a validée le 13/09/2026. Elle n'est pas inventée pour
+ * autant — c'est l'une des trois interjections que le Wiktionnaire recense en
+ * créole réunionnais, et la seule qui marque l'étonnement.
+ *
+ * La règle du fichier tient toujours : on ne comble pas un trou tout seul, on
+ * propose et on attend le feu vert.
+ */
+export const COMBO_ENORME = 'Oté !';
 
 /** La grenade éclate au bout de sa frénésie. */
 export const FRENESIE = 'I pète fort !';
@@ -27,6 +42,10 @@ export const BOMBE = 'La plané';
 
 /**
  * L'exclamation qui convient à un combo de <paramref>fruits</paramref> fruits.
+ *
+ * TROIS PALIERS, et ils coïncident avec les trois paliers de présence : au
+ * dernier, le mot change ET la bannière grossit. C'est la gradation de Fruit
+ * Ninja, qui fait monter les noms et les tambours ensemble.
  *
  * LE SEUIL A CHANGÉ, et pour une raison mesurée. Il était à cinq, et trois
  * fruits suffisaient à déclencher une bannière : sur 22 gestes relevés à
@@ -44,5 +63,8 @@ export const BOMBE = 'La plané';
  * manque ici, et c'est une question à poser à Kevin, pas un trou à combler.
  */
 export function exclamationCombo(fruits: number): string {
+  if (fruits >= GESTURE_HUGE_MIN) {
+    return COMBO_ENORME;
+  }
   return fruits >= 6 ? COMBO_GRAND : COMBO_PETIT;
 }
