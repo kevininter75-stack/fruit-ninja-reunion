@@ -1,3 +1,4 @@
+import { rnd } from './rng';
 /**
  * Catalogue des fruits réunionnais.
  *
@@ -86,14 +87,62 @@ export function halfTextureKeys(variety: FruitVariety): { left: string; right: s
   return { left: `${variety.key}_half_left`, right: `${variety.key}_half_right` };
 }
 
-// Somme des poids précalculée pour le tirage pondéré
-const TOTAL_WEIGHT = FRUIT_VARIETIES.reduce((sum, v) => sum + v.weight, 0);
+// ------------------------------------------------------------------
+// Saisons réunionnaises
+// ------------------------------------------------------------------
 
-/** Tirage pondéré d'une variété (les petits fruits communs sortent plus souvent). */
-export function pickRandomVariety(): FruitVariety {
-  let roll = Math.random() * TOTAL_WEIGHT;
+/**
+ * Mois de pleine saison de chaque variété, à La Réunion — hémisphère sud,
+ * donc l'été va de novembre à mars.
+ *
+ * Ce n'est pas de la décoration : un letchi en décembre et un goyavier en juin
+ * sont des repères que tout le monde a ici. Le catalogue qui suit le vrai
+ * calendrier donne au jeu une texture que personne ne peut copier depuis
+ * ailleurs — et une raison de plus d'y revenir à un autre moment de l'année.
+ */
+const PEAK_MONTHS: Record<string, number[]> = {
+  litchi: [11, 12, 1],
+  goyavier: [5, 6, 7],
+  mangue_jose: [11, 12, 1, 2],
+  ananas_victoria: [9, 10, 11, 12],
+  fruit_de_la_passion: [5, 6, 7, 8],
+  corossol: [2, 3, 4, 5, 6],
+  carambole: [4, 5, 6, 7, 8],
+  pitaya: [12, 1, 2, 3],
+};
+
+/** En pleine saison, un fruit sort bien plus souvent. */
+const PEAK_MULTIPLIER = 2.4;
+/** Hors saison il se raréfie, mais ne disparaît jamais : un catalogue amputé
+ *  se remarquerait plus qu'il ne plairait. */
+const OFF_MULTIPLIER = 0.55;
+
+/** Multiplicateur de poids d'une variété pour un mois donné (1 = janvier). */
+export function seasonalMultiplier(key: string, month: number): number {
+  const peak = PEAK_MONTHS[key];
+  if (!peak) {
+    return 1;
+  }
+  return peak.includes(month) ? PEAK_MULTIPLIER : OFF_MULTIPLIER;
+}
+
+/**
+ * Tirage pondéré d'une variété : les petits fruits communs sortent plus
+ * souvent, et la saison en cours pèse par-dessus.
+ *
+ * Le mois est passé en paramètre plutôt que lu ici : le Défi du jour doit
+ * pouvoir servir exactement la même partie à tout le monde, or deux joueurs
+ * peuvent être à cheval sur un changement de mois.
+ */
+export function pickRandomVariety(month = new Date().getMonth() + 1): FruitVariety {
+  let total = 0;
   for (const variety of FRUIT_VARIETIES) {
-    roll -= variety.weight;
+    total += variety.weight * seasonalMultiplier(variety.key, month);
+  }
+
+  let roll = rnd() * total;
+  for (const variety of FRUIT_VARIETIES) {
+    roll -= variety.weight * seasonalMultiplier(variety.key, month);
     if (roll <= 0) {
       return variety;
     }

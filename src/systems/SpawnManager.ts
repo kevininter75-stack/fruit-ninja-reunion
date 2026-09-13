@@ -37,6 +37,7 @@ import {
   FRENZY_CROSS_FACTOR,
 } from '../utils/constants';
 import { pickRandomVariety, BONUS_VARIETY, FRENZY_VARIETY } from '../utils/fruitCatalog';
+import { rnd, rndFloat, rndBetween } from '../utils/rng';
 
 /** Paramètres de lancement calculés une fois par spawn (objet réutilisé). */
 interface LaunchParams {
@@ -148,7 +149,7 @@ export class SpawnManager {
       SPAWN_INTERVAL_MIN_MS,
       this.getIntensity()
     );
-    const jitter = Phaser.Math.FloatBetween(1 - SPAWN_INTERVAL_JITTER, 1 + SPAWN_INTERVAL_JITTER);
+    const jitter = rndFloat(1 - SPAWN_INTERVAL_JITTER, 1 + SPAWN_INTERVAL_JITTER);
     let interval = base * jitter;
     if (this.needsBreather) {
       interval *= SPAWN_BREATHER_FACTOR;
@@ -163,7 +164,7 @@ export class SpawnManager {
       return 'solo';
     }
     if (this.waveIndex <= SPAWN_WARMUP_WAVES) {
-      return Math.random() < 0.5 ? 'solo' : 'duo';
+      return rnd() < 0.5 ? 'solo' : 'duo';
     }
     const intensity = this.getIntensity();
     let total = 0;
@@ -178,7 +179,7 @@ export class SpawnManager {
       return w;
     });
 
-    let roll = Math.random() * total;
+    let roll = rnd() * total;
     for (let i = 0; i < ALL_SHAPES.length; i++) {
       roll -= weights[i];
       if (roll <= 0) {
@@ -197,7 +198,7 @@ export class SpawnManager {
       case 'duo':
         return 2;
       case 'volley':
-        return intensity > 0.7 ? Phaser.Math.Between(3, 4) : 3;
+        return intensity > 0.7 ? rndBetween(3, 4) : 3;
       case 'cluster':
         return 3 + Math.round(intensity * 2);
     }
@@ -228,7 +229,7 @@ export class SpawnManager {
       return 0;
     }
     const canDouble = this.getIntensity() >= BOMB_DOUBLE_INTENSITY && size >= 3;
-    return canDouble && Math.random() < 0.3 ? 2 : 1;
+    return canDouble && rnd() < 0.3 ? 2 : 1;
   }
 
   /**
@@ -269,7 +270,7 @@ export class SpawnManager {
     const bombSlots = new Set<number>();
     const firstBombSlot = size > 1 ? 1 : 0;
     while (bombSlots.size < bombCount && bombSlots.size < size) {
-      bombSlots.add(Phaser.Math.Between(firstBombSlot, size - 1));
+      bombSlots.add(rndBetween(firstBombSlot, size - 1));
     }
     if (bombCount > 0) {
       this.fruitsSinceBomb = 0;
@@ -278,7 +279,7 @@ export class SpawnManager {
     // Une grappe part d'une base commune : tous les fruits montent côte à côte
     const clusterBaseX =
       shape === 'cluster'
-        ? Phaser.Math.Between(
+        ? rndBetween(
             FRUIT_RADIUS * 2 + CLUSTER_SPREAD_PX,
             this.scene.scale.width - FRUIT_RADIUS * 2 - CLUSTER_SPREAD_PX
           )
@@ -301,7 +302,7 @@ export class SpawnManager {
         delay +=
           stagger > 0
             ? stagger
-            : Phaser.Math.Between(SPAWN_STAGGER_MIN_MS, SPAWN_STAGGER_MAX_MS);
+            : rndBetween(SPAWN_STAGGER_MIN_MS, SPAWN_STAGGER_MAX_MS);
         this.scene.time.delayedCall(delay, () => {
           if (this.running) {
             this.spawnOne(isBomb, clusterBaseX, offsetX);
@@ -353,10 +354,10 @@ export class SpawnManager {
     const width = this.scene.scale.width;
     const height = this.scene.scale.height;
     const p = this.launchParams;
-    const fromLeft = Math.random() < 0.5;
+    const fromLeft = rnd() < 0.5;
 
     p.x = fromLeft ? -FRENZY_VARIETY.radius : width + FRENZY_VARIETY.radius;
-    p.y = height * Phaser.Math.FloatBetween(0.64, 0.78);
+    p.y = height * rndFloat(0.64, 0.78);
     // Arc ample : elle monte franchement puis redescend, ce qui lui donne
     // près de deux secondes de présence utile à l'écran.
     p.velocityY = -Math.sqrt(2 * GRAVITY_Y * FRENZY_APEX_FRACTION * height);
@@ -389,7 +390,7 @@ export class SpawnManager {
     if (this.scene.time.now - this.startTime < BONUS_SAFE_TIME_MS) {
       return;
     }
-    if (Math.random() >= BONUS_CHANCE) {
+    if (rnd() >= BONUS_CHANCE) {
       return;
     }
     // Un seul combava actif à la fois pour préserver sa rareté
@@ -431,13 +432,13 @@ export class SpawnManager {
 
     p.x = isCluster
       ? Phaser.Math.Clamp(baseX + offsetX, FRUIT_RADIUS, width - FRUIT_RADIUS)
-      : Phaser.Math.Between(FRUIT_RADIUS * 2, width - FRUIT_RADIUS * 2);
+      : rndBetween(FRUIT_RADIUS * 2, width - FRUIT_RADIUS * 2);
     p.y = height + FRUIT_RADIUS;
 
     // Grappe : apex quasi identique pour tous → ils culminent ensemble
     const apex = isCluster
       ? 0.8 * height
-      : Phaser.Math.FloatBetween(APEX_FRACTION_MIN, APEX_FRACTION_MAX) * height;
+      : rndFloat(APEX_FRACTION_MIN, APEX_FRACTION_MAX) * height;
     p.velocityY = -Math.sqrt(2 * GRAVITY_Y * apex);
 
     if (isCluster) {
@@ -445,7 +446,7 @@ export class SpawnManager {
       p.velocityX = (baseX < width / 2 ? 1 : -1) * width * 0.04;
     } else {
       const towardCenter = p.x < width / 2 ? 1 : -1;
-      p.velocityX = towardCenter * Phaser.Math.Between(20, Math.round(width * LAUNCH_VX_FACTOR));
+      p.velocityX = towardCenter * rndBetween(20, Math.round(width * LAUNCH_VX_FACTOR));
     }
     return p;
   }
