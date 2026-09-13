@@ -49,6 +49,13 @@ export class Bomb extends Phaser.Physics.Arcade.Sprite {
 
   /** Désactive la bombe et la rend au pool. */
   kill(): void {
+    // Remise à neuf avant de rendre l'objet au pool. Le désamorçage à l'entrée
+    // du fruit spécial efface la bombe par un tween d'alpha et d'échelle :
+    // sans ce nettoyage, la bombe suivante tirée du pool sortirait invisible
+    // et rapetissée.
+    this.scene.tweens.killTweensOf(this);
+    this.setAlpha(1);
+    this.setScale(1);
     this.sheen.hide();
     this.disableBody(true, true);
   }

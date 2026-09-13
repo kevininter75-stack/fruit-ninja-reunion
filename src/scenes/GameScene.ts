@@ -482,6 +482,38 @@ export class GameScene extends Phaser.Scene {
     this.frenzyCounter.setPosition(grenade.x, grenade.y - grenade.sliceRadius - px(14));
   }
 
+  /**
+   * Désamorce les bombes encore en vol à l'entrée du fruit spécial.
+   *
+   * POURQUOI LES RETIRER plutôt que de les laisser. Pendant la frénésie, le
+   * joueur frappe en rafale un point fixe de l'écran : une bombe qui dérive
+   * dans cette zone est une fin de partie immédiate contre laquelle il n'a
+   * aucun recours, au moment précis où le jeu lui demande de ne plus viser.
+   * C'est aussi ce que fait la référence : pendant la Frenzy de Fruit Ninja,
+   * aucune bombe n'apparaît.
+   *
+   * Elles ne disparaissent pas d'un coup : la mèche s'éteint dans une gerbe
+   * d'étincelles et la bombe s'efface. Escamotée sans rien, elle passerait
+   * pour un défaut d'affichage.
+   */
+  private defuseBombs(): void {
+    for (const objet of this.bombs.getChildren()) {
+      const bombe = objet as Bomb;
+      if (!bombe.active) {
+        continue;
+      }
+      this.fuseEmitter.emitParticleAt(bombe.x, bombe.y, 10);
+      this.tweens.add({
+        targets: bombe,
+        alpha: 0,
+        scale: 0.6,
+        duration: 220,
+        ease: 'Quad.easeIn',
+        onComplete: () => bombe.kill(),
+      });
+    }
+  }
+
   /** Range halo et compteur (fin de frénésie, grenade manquée, fin de partie). */
   private hideFrenzyVisuals(): void {
     this.tweens.killTweensOf(this.frenzyAura);
@@ -537,6 +569,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     this.frenzyGrenade = grenade;
+    this.defuseBombs();
     this.frenzyAura
       .setPosition(grenade.x, grenade.y)
       .setDisplaySize(grenade.sliceRadius * FRENZY_AURA_SCALE, grenade.sliceRadius * FRENZY_AURA_SCALE)
@@ -1745,6 +1778,15 @@ export class GameScene extends Phaser.Scene {
     // En mode Chrono, un fruit manqué est sans conséquence ; un combava ou une
     // grenade manqués non plus (c'étaient des cadeaux, pas des obligations).
     if (this.gameEnded || this.mode === 'chrono' || fruit.isBonus || fruit.isFrenzy) {
+      return;
+    }
+    // Pendant le moment du fruit spécial, plus rien ne coûte de vie.
+    //
+    // Les salves sont déjà suspendues, mais les fruits partis AVANT l'entrée
+    // de la grenade continuent de tomber. Le joueur, lui, a les yeux sur la
+    // grenade : lui prendre une vie pour un fruit qu'on lui demande justement
+    // d'ignorer serait le punir d'avoir suivi le jeu.
+    if (this.frenzyGrenade !== null) {
       return;
     }
     sfx.lifeLost();

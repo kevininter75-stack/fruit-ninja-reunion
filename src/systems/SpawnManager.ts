@@ -356,7 +356,13 @@ export class SpawnManager {
             ? stagger
             : rndBetween(SPAWN_STAGGER_MIN_MS, SPAWN_STAGGER_MAX_MS);
         this.scene.time.delayedCall(delay, () => {
-          if (this.running) {
+          // La grenade peut entrer en scène APRÈS que cette salve a été
+          // décidée : maybeSpawnFrenzy est appelée à la FIN de spawnWave, alors
+          // que les lancers échelonnés sont déjà programmés. Sans cette
+          // vérification, les fruits ET LES BOMBES de la salve en cours
+          // tombaient en pleine frénésie — exactement ce que la suspension des
+          // salves cherchait à éviter.
+          if (this.running && !this.isFrenzyOnStage()) {
             this.spawnOne(isBomb, clusterBaseX, offsetX);
           }
         });
