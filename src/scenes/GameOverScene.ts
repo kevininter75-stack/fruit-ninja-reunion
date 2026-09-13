@@ -17,6 +17,7 @@ import { sfx } from '../systems/SfxManager';
 import { AnimatedBackground } from '../entities/AnimatedBackground';
 import { addVignette, fadeIn, fadeToScene } from '../utils/ui';
 import { prefersReducedMotion } from '../utils/settings';
+import { buildShareText, getStreak } from '../utils/dailyChallenge';
 
 /** Données passées par la GameScene à la fin d'une partie. */
 interface GameOverData {
@@ -287,6 +288,25 @@ export class GameOverScene extends Phaser.Scene {
   /** « Nouveau record ! » célébré, ou rappel du record courant du mode. */
   private createRecordLine(y: number, isNewRecord: boolean): void {
     const w = this.scale.width;
+
+    // Le Défi du jour affiche la SÉRIE plutôt que le record. C'est elle qui
+    // donne envie de revenir demain : un record se bat une fois, une série se
+    // perd si on saute un jour.
+    if (this.mode === 'daily') {
+      const serie = getStreak();
+      const libelle =
+        serie > 1 ? `Série de ${serie} jours 🔥` : 'Défi du jour relevé';
+      const ligne = this.add
+        .text(w / 2, y, libelle, {
+          fontFamily: GAME_FONT,
+          fontSize: '32px',
+          color: serie > 1 ? '#ffd76a' : '#fff3e0',
+        })
+        .setOrigin(0.5);
+      this.reveal(ligne, 5);
+      return;
+    }
+
     if (!isNewRecord) {
       const line = this.add
         .text(w / 2, y, `Record : ${getBestScore(this.mode)}`, {
@@ -355,19 +375,83 @@ export class GameOverScene extends Phaser.Scene {
     const h = this.scale.height;
     const portrait = h > w;
 
-    // Portrait : boutons empilés ; paysage : côte à côte
-    const replayX = portrait ? w / 2 : w / 2 - 150;
-    const replayY = portrait ? h * 0.78 : h * 0.83;
-    const menuX = portrait ? w / 2 : w / 2 + 150;
-    const menuY = portrait ? h * 0.88 : h * 0.83;
+    const defi = this.mode === 'daily';
+
+    // Portrait : boutons empilés ; paysage : côte à côte. Le Défi ajoute un
+    // troisième bouton, donc l'écartement se resserre pour qu'ils tiennent.
+    const ecart = defi ? 210 : 150;
+    const replayX = portrait ? w / 2 : w / 2 - ecart;
+    const replayY = portrait ? h * 0.76 : h * 0.83;
+    const menuX = portrait ? w / 2 : w / 2 + ecart;
+    const menuY = portrait ? h * 0.93 : h * 0.83;
 
     this.makeButton(replayX, replayY, 264, 78, 'Rejouer', 0xe0455a, 7, () => {
       sfx.click();
       fadeToScene(this, 'GameScene', { mode: this.mode });
     });
-    this.makeButton(menuX, menuY, 224, 70, 'Menu', 0x2d3a4a, 8, () => {
+
+    if (defi) {
+      this.makeButton(portrait ? w / 2 : w / 2, portrait ? h * 0.845 : h * 0.83,
+        236, 70, 'Partager', 0x2f7d5b, 8, () => {
+        sfx.click();
+        void this.shareResult();
+      });
+    }
+
+    this.makeButton(menuX, menuY, 224, 70, 'Menu', 0x2d3a4a, defi ? 9 : 8, () => {
       sfx.click();
       fadeToScene(this, 'MenuScene');
+    });
+  }
+
+  /**
+   * Partage le résultat du défi.
+   *
+   * navigator.share d'abord : sur téléphone, c'est la feuille de partage native
+   * du système, celle qui ouvre WhatsApp ou Messages directement. Le
+   * presse-papiers sert de repli sur ordinateur, où l'API n'existe presque
+   * jamais. Les deux échouent silencieusement si le navigateur refuse — un
+   * partage raté ne doit pas casser l'écran de fin.
+   */
+  private async shareResult(): Promise<void> {
+    const texte = buildShareText(this.finalScore, this.fruitsSliced);
+
+    try {
+      if (typeof navigator !== 'undefined' && navigator.share) {
+        await navigator.share({ text: texte });
+        return;
+      }
+    } catch {
+      // L'utilisateur a annulé la feuille de partage : ce n'est pas une erreur.
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(texte);
+      this.flashShareConfirmation('Copié !');
+    } catch {
+      this.flashShareConfirmation('Copie impossible');
+    }
+  }
+
+  /** Petit retour visuel : sans lui, on ne sait pas si le partage a marché. */
+  private flashShareConfirmation(message: string): void {
+    const note = this.add
+      .text(this.scale.width / 2, this.scale.height * 0.7, message, {
+        fontFamily: GAME_FONT,
+        fontSize: '30px',
+        color: '#9ff0c4',
+      })
+      .setOrigin(0.5)
+      .setDepth(300);
+
+    this.tweens.add({
+      targets: note,
+      alpha: 0,
+      y: note.y - 40,
+      duration: 1400,
+      ease: 'Sine.easeIn',
+      onComplete: () => note.destroy(),
     });
   }
 
