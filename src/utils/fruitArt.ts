@@ -252,6 +252,17 @@ function traceSilhouette(ctx: CanvasRenderingContext2D, variety: FruitVariety, s
     case 'carambole':
       traceStar(ctx, c, c, r, r * 0.44);
       break;
+    case 'goyavier':
+      // Presque sphérique, à peine bosselé : un goyavier est une petite bille.
+      traceLobed(ctx, c, c, r * 0.99, r, 3, 0.022);
+      break;
+    case 'pitaya':
+      // Ovoïde franc, nettement plus haut que large. Les bractées sont
+      // peintes par-dessus et ne font PAS partie de la silhouette : elles
+      // dépassent du corps, et les inclure dans le tracé de découpe donnerait
+      // des moitiés aux contours en dents de scie.
+      traceLobed(ctx, c, c, r * 0.68, r, 1, 0);
+      break;
     case 'grenade':
       // Sphère légèrement aplatie et un peu anguleuse, comme une vraie grenade
       traceLobed(ctx, c, c, r * 0.97, r * 0.94, 6, 0.025);
@@ -759,6 +770,110 @@ export function paintWhole(
       break;
     }
 
+    case 'goyavier': {
+      paintBody(ctx, variety, size, skin, () => {
+        // Peau lisse et cireuse : aucune écaille, juste une joue plus mûre
+        // d'un côté et un semis de pores clairs.
+        ctx.fillStyle = shadeAlpha(skin, 0.4, 0.3);
+        ctx.beginPath();
+        ctx.ellipse(c - r * 0.26, c - r * 0.2, r * 0.52, r * 0.46, -0.4, 0, TAU);
+        ctx.fill();
+        speckle(ctx, c, r, 34, shadeAlpha(skin, 0.5, 0.34), 1.2);
+      });
+
+      // Le calice : la petite couronne sèche à l'OPPOSÉ de la tige. C'est elle
+      // qui distingue un goyavier d'une cerise au premier coup d'œil.
+      ctx.strokeStyle = 'rgba(96, 68, 42, 0.85)';
+      ctx.lineWidth = 2.6;
+      ctx.lineCap = 'round';
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * TAU;
+        ctx.beginPath();
+        ctx.moveTo(c, c + r * 0.82);
+        ctx.lineTo(c + Math.cos(a) * r * 0.19, c + r * 0.82 + Math.sin(a) * r * 0.12);
+        ctx.stroke();
+      }
+      drawStem(ctx, c, c - r * 0.9, r * 0.24, 0.25);
+      break;
+    }
+
+    case 'pitaya': {
+      // Bractées : les grandes écailles qui débordent du corps. Dessinées
+      // AVANT lui pour qu'il en recouvre la base — peintes après, elles
+      // auraient l'air collées sur la peau.
+      // Une bractée : grande écaille charnue qui part de la peau et déborde
+      // largement. Sur un vrai fruit du dragon elles font près de la moitié de
+      // sa longueur — courtes, elles ressemblent à des flèches collées dessus.
+      const rx = r * 0.68;
+      const ry = r;
+      const bract = (angle: number, longueur: number, largeur: number): void => {
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        const bx = c + cos * rx * 0.82;
+        const by = c + sin * ry * 0.82;
+        const tx = c + cos * rx * (0.82 + longueur * 1.6);
+        const ty = c + sin * ry * (0.82 + longueur);
+        // Décalage latéral : la pointe se couche sur le côté, elle ne part pas
+        // droit dans l'axe. C'est ce qui donne le mouvement des écailles.
+        const nx = -sin * r * largeur;
+        const ny = cos * r * largeur;
+
+        const grad = ctx.createLinearGradient(bx, by, tx, ty);
+        grad.addColorStop(0, shade(skin, -0.18));
+        grad.addColorStop(0.45, shade(skin, 0.05));
+        grad.addColorStop(0.78, '#8fbf4a');
+        grad.addColorStop(1, '#d8e87a');
+        ctx.fillStyle = grad;
+
+        ctx.beginPath();
+        ctx.moveTo(bx + nx, by + ny);
+        ctx.quadraticCurveTo(
+          bx + nx * 1.15 + (tx - bx) * 0.45,
+          by + ny * 1.15 + (ty - by) * 0.45,
+          tx,
+          ty
+        );
+        ctx.quadraticCurveTo(
+          bx - nx * 1.15 + (tx - bx) * 0.45,
+          by - ny * 1.15 + (ty - by) * 0.45,
+          bx - nx,
+          by - ny
+        );
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(64, 88, 26, 0.5)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      };
+
+      // Cinq écailles DERRIÈRE le corps, réparties sur tout le pourtour.
+      for (let i = 0; i < 5; i++) {
+        bract((i / 5) * TAU + 0.3, 0.5, 0.2);
+      }
+      paintBody(ctx, variety, size, skin, () => {
+        // Le corps lui-même n'est pas uniforme : des nervures verticales plus
+        // sombres suivent l'ovoïde, comme sur un vrai fruit du dragon.
+        ctx.strokeStyle = shadeAlpha(skin, -0.3, 0.4);
+        ctx.lineWidth = 3;
+        for (let i = -2; i <= 2; i++) {
+          const x = c + i * r * 0.22;
+          ctx.beginPath();
+          ctx.moveTo(x, c - r * 0.88);
+          ctx.quadraticCurveTo(x + i * r * 0.06, c, x, c + r * 0.88);
+          ctx.stroke();
+        }
+      });
+
+      // Trois bractées de plus PAR-DESSUS le corps : elles se chevauchent, ce
+      // qui donne au fruit son épaisseur.
+      // Quatre écailles PAR-DESSUS, décalées d'un demi-pas : le chevauchement
+      // avec celles du dessous est ce qui donne son épaisseur au fruit.
+      for (let i = 0; i < 4; i++) {
+        bract((i / 4) * TAU + 0.3 + TAU / 10, 0.42, 0.17);
+      }
+      break;
+    }
+
     case 'grenade': {
       paintBody(ctx, variety, size, skin, () => {
         // Peau bicolore rouge/ocre et quelques méplats : la grenade n'est
@@ -1058,6 +1173,59 @@ function paintFleshDetails(
           ctx.stroke();
         }
       }
+      break;
+    }
+
+    case 'goyavier': {
+      // Chair rose pâle, et une couronne de petits pépins durs très serrés —
+      // ce sont eux qu'on croque, et c'est la signature de la coupe.
+      ctx.fillStyle = '#f6dccb';
+      ctx.beginPath();
+      ctx.ellipse(c, c, r * 0.92, r * 0.94, 0, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(226, 150, 120, 0.45)';
+      ctx.beginPath();
+      ctx.ellipse(c, c, r * 0.58, r * 0.6, 0, 0, TAU);
+      ctx.fill();
+      speckle(ctx, c, r * 0.58, 26, 'rgba(150, 108, 70, 0.9)', 2.1);
+      // Fines nervures du centre vers l'écorce
+      ctx.strokeStyle = 'rgba(214, 150, 122, 0.5)';
+      ctx.lineWidth = 1.6;
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * TAU;
+        ctx.beginPath();
+        ctx.moveTo(c + Math.cos(a) * r * 0.58, c + Math.sin(a) * r * 0.6);
+        ctx.lineTo(c + Math.cos(a) * r * 0.9, c + Math.sin(a) * r * 0.92);
+        ctx.stroke();
+      }
+      break;
+    }
+
+    case 'pitaya': {
+      // LA coupe du catalogue : chair d'un blanc franc, criblée de pépins
+      // noirs minuscules, cerclée d'un liseré fuchsia très fin. C'est le
+      // contraste le plus fort de tout le jeu — il doit rester net.
+      ctx.fillStyle = '#fbf8f7';
+      ctx.beginPath();
+      ctx.ellipse(c, c, r * 0.9, r * 0.94, 0, 0, TAU);
+      ctx.fill();
+
+      // Liseré de peau, fin : sur un vrai pitaya, la peau n'a presque pas
+      // d'épaisseur — un anneau large le ferait ressembler à une pastèque.
+      ctx.strokeStyle = 'rgba(214, 60, 110, 0.85)';
+      ctx.lineWidth = r * 0.09;
+      ctx.beginPath();
+      ctx.ellipse(c, c, r * 0.86, r * 0.9, 0, 0, TAU);
+      ctx.stroke();
+
+      // Pépins : nombreux, très petits, répartis sans amas.
+      speckle(ctx, c, r * 0.78, 78, 'rgba(28, 26, 30, 0.92)', 1.7);
+
+      // Reflet humide au centre : la chair d'un pitaya est gorgée d'eau.
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+      ctx.beginPath();
+      ctx.ellipse(c - r * 0.22, c - r * 0.26, r * 0.3, r * 0.22, -0.5, 0, TAU);
+      ctx.fill();
       break;
     }
 

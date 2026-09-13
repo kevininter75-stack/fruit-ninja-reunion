@@ -46,7 +46,24 @@
         return cv;
       }
 
-      const all = [...FRUIT_VARIETIES, BONUS_VARIETY, FRENZY_VARIETY];
+      // Filtre par clé : fruits-preview.html?only=pitaya n'affiche que cette
+      // variété, en haut de page. Sur une planche de dix fruits il fallait
+      // faire défiler pour juger le dernier, ce qui rendait toute comparaison
+      // pénible — et impossible à capturer d'un coup.
+      // ?zoom=2 double la taille de tracé, pour examiner un détail de peau.
+      const params = new URLSearchParams(location.search);
+      const only = params.get('only');
+      const zoom = Math.max(1, Math.min(4, Number(params.get('zoom')) || 1));
+
+      let all = [...FRUIT_VARIETIES, BONUS_VARIETY, FRENZY_VARIETY];
+      if (only) {
+        const filtre = all.filter((v) => v.key === only);
+        if (filtre.length > 0) {
+          all = filtre;
+        } else {
+          document.title = 'CLE INCONNUE';
+        }
+      }
       const CELL = 210;
       const ROW = CELL + 46;
       const sheet = document.getElementById('sheet');
