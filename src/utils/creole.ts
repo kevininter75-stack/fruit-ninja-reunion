@@ -12,10 +12,10 @@ import { GESTURE_HUGE_MIN } from './constants';
  * une question à lui poser, pas un trou à combler.
  */
 
-/** Quatre ou cinq fruits d'un seul geste. */
+/** Trois fruits d'un seul geste : la réussite ordinaire. */
 export const COMBO_PETIT = 'Woulala !';
 
-/** Six ou sept fruits : le grand geste. */
+/** Quatre à six fruits : le grand geste. */
 export const COMBO_GRAND = 'Totoche !';
 
 /**
@@ -58,28 +58,30 @@ export const CYCLONE = 'Cyclone y débarque !';
 /**
  * L'exclamation qui convient à un combo de <paramref>fruits</paramref> fruits.
  *
- * TROIS PALIERS, et ils coïncident avec les trois paliers de présence : au
- * dernier, le mot change ET la bannière grossit. C'est la gradation de Fruit
- * Ninja, qui fait monter les noms et les tambours ensemble.
+ * TROIS MOTS, TROIS PALIERS, ET C'EST LE MOT QUI CHANGE — pas la fréquence.
  *
- * LE SEUIL A CHANGÉ, et pour une raison mesurée. Il était à cinq, et trois
- * fruits suffisaient à déclencher une bannière : sur 22 gestes relevés à
- * intensité maximale, les combos se répartissaient en x1 45 %, x2 27 %,
- * x3 18 %, x6 9 % — et RIEN entre quatre et cinq. Le seuil tombait donc dans
- * un trou de la distribution, et deux bannières sur trois étaient des x3
- * disant tous « Woulala ». Le mot s'usait à force de servir.
+ * L'histoire de ce seuil vaut d'être gardée, parce qu'elle s'est trompée de
+ * levier une fois. Kevin avait signalé que « Woulala » revenait trop souvent
+ * et disait la même chose pour un x3 comme pour un x4, et proposait deux
+ * remèdes : « soit faire moins apparaître, soit s'adapter ». La première voie
+ * a été prise — seuil relevé à quatre fruits — et elle a échoué, pour une
+ * raison que la mesure montrait déjà : sur 22 gestes relevés à intensité
+ * maximale, la répartition était x1 45 %, x2 27 %, x3 18 %, x6 9 %, et RIEN
+ * entre quatre et cinq. Le seuil tombait dans un trou de la distribution. Il
+ * n'a donc pas rendu l'exclamation rare : il l'a fait disparaître. En jeu, on
+ * ne lisait plus un seul nom de combo en dehors de la grenade.
  *
- * Désormais un x3 ne crie plus du tout (cf. GESTURE_BANNER_MIN) : il se paie
- * et se voit, mais discrètement. L'exclamation est réservée à quatre fruits
- * et plus, et le grand mot à six.
+ * C'est la SECONDE voie qui était la bonne. Un x3 dit « Woulala », un x4 dit
+ * « Totoche », un x7 dit « Oté » : deux combos voisins ne disent plus jamais
+ * la même chose, ce qui était tout le reproche — et le jeu retrouve sa voix.
  *
- * DEUX MOTS RESTENT PEU pour couvrir de quatre à douze fruits. Fruit Ninja en
- * gradue six (Combo, Great, Awesome, Super, Hyper, Unbelievable). Il en
- * manque ici, et c'est une question à poser à Kevin, pas un trou à combler.
+ * Les paliers suivent la distribution réelle plutôt qu'une graduation
+ * régulière : trois est le combo courant, sept est le geste dont on parle
+ * après la partie, et l'espace entre les deux revient au mot du milieu.
  */
 export function exclamationCombo(fruits: number): string {
   if (fruits >= GESTURE_HUGE_MIN) {
     return COMBO_ENORME;
   }
-  return fruits >= 6 ? COMBO_GRAND : COMBO_PETIT;
+  return fruits >= 4 ? COMBO_GRAND : COMBO_PETIT;
 }

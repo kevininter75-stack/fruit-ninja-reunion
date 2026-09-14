@@ -617,17 +617,25 @@ export const CRIT_MULTIPLIER = 3;
 // Fruit Ninja). Célébré en grand à partir du seuil, avec bonus par fruit.
 export const GESTURE_COMBO_MIN = 3;
 /**
- * À partir de combien de fruits le jeu CRIE.
+ * À partir de combien de fruits le combo SECOUE l'écran.
  *
- * En deçà, le combo est bien payé et signalé — chiffre flottant, onde, son —
- * mais sans bannière plein écran, sans gel, sans secousse et sans exclamation
- * créole. Trois fruits d'un geste, c'est la réussite ORDINAIRE : la célébrer
- * comme un exploit use l'exploit.
+ * À ne pas confondre avec le fait d'être NOMMÉ : tout combo porte un nom dès
+ * trois fruits, c'est la définition même du combo chez Fruit Ninja (« three or
+ * more fruit in a single swiping motion »). Ce seuil-ci ne régit que l'impact
+ * physique — gel de l'image, coup de caméra, secousse, gerbe dorée.
  *
- * C'est la gradation de Fruit Ninja, qui réserve ses gros effets aux combos
- * élevés et se contente d'un petit « Combo Blitz +5 » à trois fruits.
+ * Il a d'abord servi à masquer les x3 entièrement, pour que « Woulala » cesse
+ * de servir à tout. C'était le mauvais levier : la distribution mesurée (x3
+ * 18 %, RIEN entre quatre et cinq, x6 9 %) fait que le seuil tombait dans un
+ * trou, et les noms de combo ont tout simplement disparu du jeu. La
+ * répétition se règle en faisant varier le MOT (cf. utils/creole.ts), pas en
+ * supprimant l'occasion de le dire.
+ *
+ * Reste qu'un x3 arrive toutes les quelques secondes : lui donner le gel et
+ * la secousse ferait trembler l'image en permanence. D'où ce palier, qui ne
+ * garde que la gradation qui avait du sens.
  */
-export const GESTURE_BANNER_MIN = 4;
+export const GESTURE_IMPACT_MIN = 4;
 /**
  * À partir de combien de fruits le jeu crie PLUS FORT.
  *
@@ -637,7 +645,7 @@ export const GESTURE_BANNER_MIN = 4;
  * deux, et ne s'inventant pas, la montée se joue ici sur la PRÉSENCE — même
  * mot, bannière plus grande, tenue plus longue, gel et secousse appuyés.
  */
-export const GESTURE_HUGE_MIN = 8;
+export const GESTURE_HUGE_MIN = 7;
 /**
  * Bonus par fruit d'un combo, versé en une fois à la fin du coup de sabre.
  *

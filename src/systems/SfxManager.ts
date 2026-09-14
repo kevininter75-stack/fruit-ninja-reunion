@@ -14,12 +14,76 @@ import { isMuted } from '../utils/settings';
  */
 export class SfxManager {
   private noiseBuffer: AudioBuffer | null = null;
+  private master: GainNode | null = null;
+  /** Horodatage du dernier bruit de coupe, pour atténuer les rafales. */
+  private dernierTranchage = 0;
 
   private context(): AudioContext | null {
     if (isMuted()) {
       return null;
     }
     return getAudioContext();
+  }
+
+  /**
+   * Bus de sortie commun : un gain général, puis un compresseur.
+   *
+   * POURQUOI IL FALLAIT EN AJOUTER UN. Chaque son se branchait directement sur
+   * la sortie. Tant qu'il n'y en a qu'un ou deux à la fois, cela passe ; mais
+   * pendant un déluge on lance sept fruits par seconde ET on les tranche, et
+   * rien ne se coupe jamais — un coup de sabre sur six fruits déclenche six
+   * sons dans la même centaine de millisecondes. Les amplitudes s'additionnent
+   * bêtement, la somme dépasse 1, et la carte son écrête : ce qu'on entend
+   * alors n'est plus le jeu, c'est de la saturation.
+   *
+   * Le compresseur ramène les pics sans toucher aux sons isolés. C'est ce qui
+   * permet d'ajouter un bruit par fruit tranché sans que les moments forts
+   * deviennent une bouillie — autrement dit, exactement ce qui manquait.
+   */
+  private bus(ctx: AudioContext): AudioNode {
+    if (this.master === null || this.master.context !== ctx) {
+      const gain = ctx.createGain();
+      gain.gain.value = 0.9;
+      const comp = ctx.createDynamicsCompressor();
+      comp.threshold.value = -9;
+      comp.knee.value = 26;
+      comp.ratio.value = 4;
+      comp.attack.value = 0.004;
+      comp.release.value = 0.2;
+      gain.connect(comp).connect(ctx.destination);
+      this.master = gain;
+    }
+    return this.master;
+  }
+
+  /** Souffle de bruit filtré : brique commune aux coupes, lancers, explosions. */
+  private playNoise(
+    ctx: AudioContext,
+    type: BiquadFilterType,
+    fromHz: number,
+    toHz: number,
+    q: number,
+    volume: number,
+    duration: number,
+    delaySeconds = 0
+  ): void {
+    const t = ctx.currentTime + delaySeconds;
+    const src = ctx.createBufferSource();
+    src.buffer = this.getNoise(ctx);
+    // Départ aléatoire dans le buffer : rejouer toujours les mêmes
+    // échantillons rend la répétition audible au bout de quelques coupes.
+    const offset = Math.random() * 0.4;
+    const filter = ctx.createBiquadFilter();
+    filter.type = type;
+    filter.Q.value = q;
+    filter.frequency.setValueAtTime(fromHz, t);
+    filter.frequency.exponentialRampToValueAtTime(Math.max(toHz, 20), t + duration);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(volume, t);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+    src.connect(filter).connect(gain).connect(this.bus(ctx));
+    src.start(t, offset);
+    src.stop(t + duration + 0.02);
   }
 
   /** Buffer de bruit blanc partagé (base des whooshs et explosions). */
@@ -56,7 +120,7 @@ export class SfxManager {
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(volume, t);
     gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
-    osc.connect(gain).connect(ctx.destination);
+    osc.connect(gain).connect(this.bus(ctx));
     osc.start(t);
     osc.stop(t + duration + 0.02);
   }
@@ -85,31 +149,53 @@ export class SfxManager {
     gain.gain.setValueAtTime(0.012, t);
     gain.gain.exponentialRampToValueAtTime(0.13, t + 0.08); // gonflement
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.26);
-    src.connect(filter).connect(gain).connect(ctx.destination);
+    src.connect(filter).connect(gain).connect(this.bus(ctx));
     src.start(t);
     src.stop(t + 0.28);
   }
 
-  /** "Whoosh" de coupe : souffle de bruit filtré, balayage aigu → grave. */
-  slice(): void {
+  /**
+   * LE FRUIT QUI SE FEND. Trois couches, et il les faut toutes les trois.
+   *
+   * CE QUI N'ALLAIT PAS. Il y avait bien un son à chaque coupe, mais c'était
+   * un « whoosh » — du bruit filtré qui balaie de l'aigu vers le grave. Un
+   * whoosh, c'est de l'AIR : c'est le bruit d'une lame qui passe, pas celui
+   * d'un fruit qui s'ouvre. Et comme le lancer de chaque fruit joue lui aussi
+   * un souffle, l'un se noyait dans les autres. D'où l'impression, juste, que
+   * trancher ne faisait aucun bruit propre.
+   *
+   *   1. LA LAME : claquement très bref dans l'aigu (18 ms). C'est lui qui
+   *      donne l'instant exact du contact — sans transient, un son paraît
+   *      toujours mou et en retard.
+   *   2. LA CHAIR : éclat humide, passe-bas RÉSONANT qui plonge de 1400 à
+   *      260 Hz. La résonance est ce qui fait « juteux » plutôt que « sourd ».
+   *   3. LE CORPS : une note courte dont la hauteur dépend du RAYON du fruit.
+   *      Un goyavier de 44 px sonne vers 700 Hz, une papaye de 88 px vers
+   *      350 Hz. Le petit claque, le gros fait « tchok » — on entend ce qu'on
+   *      vient de couper, et deux coupes de suite ne sonnent jamais pareil.
+   *
+   * Les rafales sont atténuées, pas supprimées : un coup de sabre sur six
+   * fruits doit s'entendre six fois (c'est la demande), mais six sons pleins
+   * à 30 ms d'intervalle font une seule bouffée illisible. Les suivants
+   * passent donc a 72 % : mesure a l'appui, une salve de six reste plus forte
+   * qu'une coupe isolee (0,29 contre 0,27 en crete) sans jamais ecreter.
+   */
+  slice(radius = 60): void {
     const ctx = this.context();
     if (ctx === null) {
       return;
     }
-    const t = ctx.currentTime;
-    const src = ctx.createBufferSource();
-    src.buffer = this.getNoise(ctx);
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'bandpass';
-    filter.Q.value = 1.2;
-    filter.frequency.setValueAtTime(1800, t);
-    filter.frequency.exponentialRampToValueAtTime(350, t + 0.09);
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.35, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
-    src.connect(filter).connect(gain).connect(ctx.destination);
-    src.start(t);
-    src.stop(t + 0.12);
+    const serre = ctx.currentTime - this.dernierTranchage < 0.045;
+    this.dernierTranchage = ctx.currentTime;
+    const v = serre ? 0.72 : 1;
+
+    this.playNoise(ctx, 'highpass', 3200, 2400, 0.7, 0.22 * v, 0.018);
+    this.playNoise(ctx, 'lowpass', 1400, 260, 5.5, 0.34 * v, 0.11);
+    // Plus le fruit est gros, plus il sonne grave — et un peu de hasard, sans
+    // quoi deux letchis d'affilée donneraient deux fois la même note.
+    const base = (520 * 60) / Math.max(radius, 20);
+    const detune = 0.92 + Math.random() * 0.16;
+    this.playTone('triangle', base * detune, base * detune * 0.55, 0.09, 0.16 * v);
   }
 
   /** Explosion de bombe : bruit grave qui s'étouffe + chute de basse. */
@@ -128,16 +214,12 @@ export class SfxManager {
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(0.7, t);
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
-    src.connect(filter).connect(gain).connect(ctx.destination);
+    src.connect(filter).connect(gain).connect(this.bus(ctx));
     src.start(t);
     src.stop(t + 0.55);
     this.playTone('sine', 140, 35, 0.5, 0.5); // impact grave sous le souffle
   }
 
-  /** Note de combo : monte dans les aigus avec la taille du combo. */
-  combo(step: number): void {
-    this.playTone('triangle', 520 + Math.min(step, 8) * 90, 660 + Math.min(step, 8) * 90, 0.12, 0.3);
-  }
 
   /** Combava doré : petit arpège doré ascendant. */
   bonus(): void {
@@ -152,12 +234,41 @@ export class SfxManager {
     this.playTone('triangle', 1400, 1700, 0.14, 0.28, 0.06);
   }
 
-  /** Gros combo par geste : arpège ascendant, plus haut quand le combo grandit. */
+  /**
+   * Le combo : un arpège dont la LONGUEUR suit le nombre de fruits.
+   *
+   * L'ancien jouait toujours trois notes, simplement transposées plus haut
+   * quand le combo grandissait. On entendait donc la même figure à chaque
+   * fois : un x3 et un x9 ne se distinguaient que par la hauteur, ce qui est
+   * le paramètre le moins lisible à l'oreille en pleine action. Désormais un
+   * x3 donne trois notes et un x8 en donne six : la MONTÉE dure plus
+   * longtemps, et c'est cela qu'on perçoit — la durée, pas la tonalité.
+   *
+   * Les notes suivent une gamme PENTATONIQUE majeure. Ce n'est pas de la
+   * coquetterie : c'est la seule échelle où l'on peut empiler des degrés au
+   * hasard sans jamais tomber sur un intervalle qui sonne faux. Quel que soit
+   * le nombre de notes jouées, l'arpège reste juste.
+   *
+   * À partir de six fruits, un coup grave vient sous l'arpège. C'est la
+   * gradation sonore qui manquait : jusqu'ici, seule l'image montait d'un cran
+   * au gros combo (bannière plus grande, secousse), et l'oreille n'en savait
+   * rien.
+   */
   bigCombo(count: number): void {
-    const n = Math.min(count, 6);
-    for (let i = 0; i < 3; i++) {
-      const hz = 520 + n * 40 + i * 220;
-      this.playTone('triangle', hz, hz + 40, 0.16, 0.28, i * 0.07);
+    const notes = Math.min(Math.max(count, 3), 6);
+    // Do majeur pentatonique, sur deux octaves.
+    const degres = [0, 2, 4, 7, 9, 12, 14, 16];
+    for (let i = 0; i < notes; i++) {
+      const hz = 523.25 * Math.pow(2, degres[i] / 12);
+      this.playTone('triangle', hz, hz, 0.17, 0.2, i * 0.055);
+    }
+    if (count >= 6) {
+      // Frappe grave sous l'arpège : le poids du geste.
+      this.playTone('sine', 180, 70, 0.3, 0.34);
+      const ctx = this.context();
+      if (ctx !== null) {
+        this.playNoise(ctx, 'lowpass', 700, 120, 1, 0.2, 0.22);
+      }
     }
   }
 

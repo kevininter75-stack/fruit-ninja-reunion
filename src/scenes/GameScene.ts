@@ -84,7 +84,7 @@ import {
   CRIT_CHANCE,
   CRIT_MULTIPLIER,
   GESTURE_COMBO_MIN,
-  GESTURE_BANNER_MIN,
+  GESTURE_IMPACT_MIN,
   GESTURE_HUGE_MIN,
   GESTURE_COMBO_BONUS,
   CYCLONE_AURA_SCALE,
@@ -1468,7 +1468,9 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    sfx.slice();
+    // Le rayon donne sa hauteur au son : un goyavier claque, une papaye fait
+    // un bruit sourd. C'est ce qui empeche deux coupes de suite de sonner pareil.
+    sfx.slice(fruit.sliceRadius);
     this.spawnSliceFlash(fruit.x, fruit.y, sliceAngle, fruit.sliceRadius);
     this.spawnHalves(fruit, sliceAngle);
     fruit.kill();
@@ -1506,7 +1508,7 @@ export class GameScene extends Phaser.Scene {
     this.juiceEmitter.setParticleTint(grenade.juiceColor);
     this.juiceEmitter.emitParticleAt(grenade.x, grenade.y, JUICE_PARTICLE_COUNT);
     this.spawnRing(grenade.x, grenade.y, 2.6, 0xff8fa3, 320);
-    sfx.slice();
+    sfx.slice(grenade.sliceRadius);
 
     // Sursaut du fruit : il encaisse visiblement. La pulsation permanente est
     // un tween sur `scale`, donc on secoue l'ANGLE pour ne pas les faire
@@ -1857,37 +1859,29 @@ export class GameScene extends Phaser.Scene {
     const n = gesture.comboCount;
     const awarded = this.scoreManager.addScore(n * GESTURE_COMBO_BONUS);
 
-    // Trois fruits d'un geste : la réussite ORDINAIRE. Elle se paie et se
-    // voit — chiffre flottant, onde, son — mais elle ne crie pas.
+    // TOUT COMBO A SON NOM, dès trois fruits. C'était l'erreur à corriger :
+    // le seuil était monté à quatre pour que « Woulala » cesse de servir à
+    // tout, et la mesure l'explique — sur 22 gestes relevés, la répartition
+    // était x1 45 %, x2 27 %, x3 18 %, x6 9 %, et RIEN entre quatre et cinq.
+    // Le seuil tombait donc dans un trou de la distribution : il ne rendait
+    // pas l'exclamation rare, il la faisait disparaître. En jeu, on ne lisait
+    // plus un seul nom de combo en dehors de la grenade.
     //
-    // Elle criait, et c'était le défaut : sur 22 gestes relevés à intensité
-    // maximale, deux bannières sur trois étaient des x3, disant toutes le même
-    // mot. Une exclamation qui sert à chaque geste réussi ne dit plus rien —
-    // et les vrais grands gestes n'ont alors plus rien de plus à offrir.
-    if (n < GESTURE_BANNER_MIN) {
-      // Deux objets plutôt qu'un seul texte « x3 +75 » : le nombre de fruits
-      // et les points gagnés sont deux informations différentes, elles ont
-      // donc droit à deux couleurs, deux tailles et deux places. C'est le
-      // principe de toute la refonte des récompenses.
-      this.showRewardBurst(gesture.lastX, gesture.lastY, [
-        { texte: `${n} FRUITS`, couleur: COLOR_COMBO, taille: px(42) },
-        { texte: `+${awarded}`, couleur: COLOR_POINTS, taille: px(34) },
-      ]);
-      sfx.bigCombo(n);
-      this.spawnRing(gesture.lastX, gesture.lastY, 4, 0xffe066, 380);
-      return;
-    }
-
-    // Trois paliers de PRÉSENCE pour deux mots. Au-delà de GESTURE_HUGE_MIN
-    // fruits, l'exclamation ne change pas mais tout le reste grossit : c'est
-    // le geste dont on parle après la partie, il doit s'entendre comme tel.
+    // La bonne réponse était l'autre branche de l'alternative : que le mot
+    // S'ADAPTE au lieu de se raréfier. Trois fruits, quatre à six, sept et
+    // plus disent maintenant trois choses différentes (cf. utils/creole.ts) —
+    // ce qui règle la répétition sans supprimer la voix du jeu.
     const enorme = n >= GESTURE_HUGE_MIN;
+    // L'IMPACT, lui, reste gradué. Un x3 est la réussite ordinaire : il se
+    // nomme, mais il ne fige pas le jeu et ne secoue pas l'écran. À trois
+    // fruits toutes les quelques secondes, un gel et une secousse à chaque
+    // fois donneraient une image qui tremble en permanence.
+    const appuye = n >= GESTURE_IMPACT_MIN;
 
     // L'exclamation créole tient le centre, SEULE. Le détail chiffré s'en
     // détache et part vivre ailleurs sur l'écran : c'est ce qui fait passer la
     // récompense d'un bloc unique à une gerbe de récompenses, comme dans la
-    // référence. Le bandeau y gagne aussi en lisibilité — une ligne au lieu
-    // de deux, au moment précis où l'écran est le plus chargé.
+    // référence.
     this.showBigBanner(exclamationCombo(n), enorme ? 1.3 : 1);
     this.showRewardBurst(gesture.lastX, gesture.lastY, [
       { texte: `${n} FRUITS`, couleur: COLOR_COMBO, taille: px(enorme ? 56 : 46) },
@@ -1896,15 +1890,20 @@ export class GameScene extends Phaser.Scene {
         ? [{ texte: 'EN PLEIN CYCLONE', couleur: COLOR_CYCLONE, taille: px(36) }]
         : []),
     ]);
+    // L'arpège s'allonge avec le combo, et un coup grave passe dessous à
+    // partir de six (cf. SfxManager.bigCombo).
     sfx.bigCombo(n);
+    this.spawnRing(gesture.lastX, gesture.lastY, 4 + n, 0xffe066, appuye ? 520 : 380);
 
-    // Ponctuation visuelle du combo : gel bref, caméra qui respire, onde
-    // partant du dernier fruit tranché, secousse croissante avec le combo.
+    if (!appuye) {
+      return;
+    }
+
+    // Ponctuation du gros combo : gel bref, caméra qui respire, secousse
+    // croissante, gerbe dorée le long du geste.
     this.hitStop(enorme ? Math.round(HITSTOP_COMBO_MS * 1.6) : HITSTOP_COMBO_MS);
     this.cameraPunch(enorme ? COMBO_PUNCH_ZOOM * 1.5 : COMBO_PUNCH_ZOOM, COMBO_PUNCH_MS);
-    this.spawnRing(gesture.lastX, gesture.lastY, 5 + n, 0xffe066, 520);
     this.shakeCamera(enorme ? 200 : 120, 0.002 + Math.min(n, 10) * 0.0009);
-    // Gerbe dorée le long du geste, proportionnée au nombre de fruits
     this.juiceEmitter.setParticleTint(0xffe066);
     this.juiceEmitter.emitParticleAt(gesture.lastX, gesture.lastY, JUICE_PARTICLE_COUNT * 2);
   }
