@@ -533,7 +533,13 @@ export type GameOverReason = 'lives' | 'bomb' | 'time';
 
 // Bombes
 export const TEX_BOMB = 'bomb';
-export const BOMB_RADIUS = px(64); // suit l'agrandissement des fruits (×1,2)
+/**
+ * Le pétard est le plus gros objet du jeu, devant la papaye cyclone (88).
+ * C'est délibéré et c'est même la seule chose qui doit l'être : il coûte la
+ * partie entière, donc il ne doit jamais pouvoir être confondu avec un fruit
+ * ni surgir sans qu'on l'ait vu venir. Passé de 64 à 72 à la demande de Kevin.
+ */
+export const BOMB_RADIUS = px(72);
 export const BOMB_POOL_SIZE = 8;
 export const BOMB_SAFE_TIME_MS = 5000; // aucune bombe dans les premières secondes
 export const BOMB_GAMEOVER_DELAY_MS = 700; // durée du flash avant l'écran de fin
@@ -620,6 +626,23 @@ export const BOMB_PHYSICS_SLOWMO = 2.4; // timeScale Arcade (>1 = plus lent) sur
 // Mèche qui crépite : étincelles émises au bout de la mèche des bombes en vol
 export const FUSE_SPARK_TINT = 0xffb347;
 export const FUSE_SPARK_EVERY = 2; // une salve d'étincelles toutes N frames
+
+/**
+ * LE SON DE LA MÈCHE, tant qu'un pétard est en vol.
+ *
+ * Un objet qui va vous tuer doit s'entendre avant d'être vu. C'est la seule
+ * information du jeu qui ne dépend pas de l'endroit où l'on regarde — et sur
+ * un écran où sept fruits volent en même temps, c'est précisément ce qui
+ * manquait.
+ *
+ * Deux couches, et la seconde fait tout le travail. Un souffle filtré tenu
+ * n'est pas une mèche : c'est une radio mal réglée, on l'a déjà appris avec
+ * la lame. Ce qui fait entendre une mèche, ce sont les CRÉPITEMENTS — de
+ * minuscules claquements irréguliers. Le souffle ne fait que les porter.
+ */
+export const MECHE_VOLUME = 0.055;
+/** Probabilité de crépitement par image (~3 par seconde et par pétard). */
+export const MECHE_CREPITEMENT = 0.05;
 
 // Coups critiques : une coupe sur ~11 rapporte gros, avec feedback appuyé
 export const CRIT_CHANCE = 0.09;

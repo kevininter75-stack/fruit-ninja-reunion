@@ -487,11 +487,16 @@ export class PreloadScene extends Phaser.Scene {
    * LE PÉTARD CHINOIS, à la place de la bombe noire.
    *
    * POURQUOI CE CHANGEMENT. Une bombe ronde à mèche est le vocabulaire du jeu
-   * de plateforme américain ; elle ne dit rien d'ici. Le pétard rouge et or,
-   * lui, est un objet que tout le monde connaît à La Réunion — c'est celui du
-   * Nouvel An chinois, et la communauté sino-réunionnaise fait partie de
-   * l'île depuis le XIXe siècle. Il explose, il a une mèche, il fait peur au
-   * bon moment : il remplit exactement le même office, en parlant créole.
+   * de plateforme américain ; elle ne dit rien d'ici. Le pétard, lui, est un
+   * objet que tout le monde connaît à La Réunion — c'est celui du Nouvel An
+   * chinois, et la communauté sino-réunionnaise fait partie de l'île depuis
+   * le XIXe siècle. Il explose, il a une mèche, il fait peur au bon moment :
+   * il remplit exactement le même office, en parlant créole.
+   *
+   * NOIR À CROIX ROUGE, et non rouge et or. Le rouge et or était le vrai
+   * pétard de fête ; c'est justement le problème — il ressemblait à quelque
+   * chose qu'on ramasse. Le noir barré de rouge ne se lit que d'une seule
+   * façon, et c'est la bonne pour un objet qui coûte la partie entière.
    *
    * CE QUI EST CONTRAINT, ET POURQUOI. Le corps doit tenir DANS le cercle de
    * détection (BOMB_RADIUS), jamais en dépasser. Un objet dessiné plus large
@@ -522,17 +527,18 @@ export class PreloadScene extends Phaser.Scene {
     const largeur = demiLargeur * 2;
     const hauteur = demiHauteur * 2;
 
-    // Corps rouge uni, puis galbe peint à la main par bandes verticales.
+    // Corps NOIR, galbe peint à la main par bandes verticales.
     //
     // POURQUOI PAS UN DÉGRADÉ. `fillGradientStyle` de Phaser ne s'applique PAS
     // à `fillRoundedRect` : le rectangle sort rempli de la dernière couleur
-    // unie posée. Constaté à l'écran — le pétard est ressorti entièrement
-    // doré, sans une trace de rouge. Des bandes verticales d'alpha croissant
-    // font le même travail et ne dépendent d'aucun comportement incertain.
+    // unie posée. Constaté à l'écran lors du premier jet, qui est ressorti
+    // entièrement doré. Des bandes verticales d'alpha croissant font le même
+    // travail et ne dépendent d'aucun comportement incertain.
+    //
     // Peint plus clair qu'il ne doit paraître : la teinte d'éclairage multiplie
-    // la couleur à l'affichage (cf. surfaceShading), et un rouge posé à sa
-    // valeur finale ressortirait brun.
-    g.fillStyle(0xdc4432, 1);
+    // la couleur à l'affichage (cf. surfaceShading). Un noir posé à sa valeur
+    // finale deviendrait une silhouette plate, sans volume.
+    g.fillStyle(0x2c2c34, 1);
     g.fillRoundedRect(gauche, haut, largeur, hauteur, px(10));
 
     // Les bandes sont rentrées verticalement du rayon des coins : sans cela
@@ -547,40 +553,52 @@ export class PreloadScene extends Phaser.Scene {
       const clarte = Math.sin(t * Math.PI) * 0.9 - Math.abs(t - 0.32) * 0.35;
       const x = gauche + t * (largeur - largeur / BANDES);
       if (clarte > 0) {
-        g.fillStyle(0xff8a6e, clarte * 0.42);
+        g.fillStyle(0x8d8da0, clarte * 0.3);
       } else {
-        g.fillStyle(0x5e0f0f, -clarte * 0.75);
+        g.fillStyle(0x000000, -clarte * 0.8);
       }
       g.fillRect(x, hautBande, largeur / BANDES + 1, hauteurBande);
     }
 
-    // Bagues dorées en haut et en bas, la signature du pétard. Volontairement
-    // fines : elles doivent souligner le rouge, pas le remplacer.
-    g.fillStyle(0xe8b33a, 1);
+    // Bagues d'un gris à peine plus clair, en haut et en bas. Elles ne se
+    // voient presque pas, et c'est le but : elles ne servent qu'à dire que
+    // l'objet est un CYLINDRE et non un rectangle posé à plat.
+    g.fillStyle(0x4a4a56, 1);
     g.fillRoundedRect(gauche, haut, largeur, px(11), px(5));
     g.fillRoundedRect(gauche, haut + hauteur - px(11), largeur, px(11), px(5));
-    g.fillStyle(0xfae08a, 0.7);
-    g.fillRect(gauche + px(4), haut + px(2), largeur - px(8), px(2));
-    g.fillRect(gauche + px(4), haut + hauteur - px(9), largeur - px(8), px(2));
 
-    // Motif doré au centre : un trait horizontal, un vertical, un losange.
-    // Assez pour évoquer un caractère peint sans prétendre en écrire un — un
-    // vrai caractère, illisible à cette taille et en rotation, ne serait
-    // qu'une tache de plus.
-    g.lineStyle(px(3), 0xe8b33a, 0.85);
-    g.beginPath();
-    g.moveTo(cx - demiLargeur * 0.42, cy - px(12));
-    g.lineTo(cx + demiLargeur * 0.42, cy - px(12));
-    g.moveTo(cx, cy - px(20));
-    g.lineTo(cx, cy + px(10));
-    g.strokePath();
-    g.fillStyle(0xe8b33a, 0.85);
-    g.fillTriangle(cx, cy + px(2), cx - px(7), cy + px(13), cx + px(7), cy + px(13));
+    // LA CROIX ROUGE. C'est elle, et elle seule, qui dit « ne touche pas ».
+    //
+    // En diagonale plutôt qu'en croix droite : une croix droite sur fond
+    // sombre se lit comme un signe médical, donc comme quelque chose qu'on
+    // ramasse. Un X est le seul signe que personne ne confond avec un bonus.
+    //
+    // Elle est bordée de noir avant d'être tracée en rouge : sur un corps
+    // sombre, un trait rouge pur perd son contour et bave. Le liseré le
+    // détache, exactement comme le contour sombre détache les fruits du ciel.
+    const brasX = demiLargeur * 0.52;
+    const brasY = demiHauteur * 0.34;
+    for (const [epaisseur, couleur, alpha] of [
+      [px(14), 0x14060a, 0.9],
+      [px(9), 0xe02434, 1],
+      [px(3), 0xff8f9a, 0.85],
+    ] as Array<[number, number, number]>) {
+      g.lineStyle(epaisseur, couleur, alpha);
+      g.beginPath();
+      g.moveTo(cx - brasX, cy - brasY);
+      g.lineTo(cx + brasX, cy + brasY);
+      g.moveTo(cx + brasX, cy - brasY);
+      g.lineTo(cx - brasX, cy + brasY);
+      g.strokePath();
+    }
 
-    // Contour sombre : sans lui, le rouge se noie dans un ciel de fin de
-    // journée qui est lui aussi chaud.
-    g.lineStyle(px(4), 0x3a0d0d, 0.85);
+    // Contour sombre, et un liseré clair par-dessus : le pétard est noir, or
+    // le décor comporte des montagnes noires. Sans ce liseré, sa silhouette
+    // disparaîtrait au moment précis où il passe devant elles.
+    g.lineStyle(px(5), 0x0a0a10, 0.9);
     g.strokeRoundedRect(gauche, haut, largeur, hauteur, px(10));
+    g.lineStyle(px(2), 0x9aa0b8, 0.55);
+    g.strokeRoundedRect(gauche + px(2), haut + px(2), largeur - px(4), hauteur - px(4), px(9));
 
     // Mèche tressée, qui part du haut du pétard vers la droite.
     g.lineStyle(px(6), 0xd9c49a, 1);

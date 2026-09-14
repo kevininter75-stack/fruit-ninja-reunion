@@ -850,18 +850,30 @@ export class GameScene extends Phaser.Scene {
   /** Fait crépiter la mèche de chaque bombe en vol (étincelles à son bout). */
   private updateFuseSparks(): void {
     this.frameCount++;
-    if (this.gameEnded || this.frameCount % FUSE_SPARK_EVERY !== 0) {
+    if (this.gameEnded) {
       return;
     }
+    // Le COMPTE se fait à chaque image, les étincelles une image sur deux.
+    // Le son de mèche doit être rafraîchi en continu : il porte sa propre
+    // extinction programmée, et l'espacer d'une image sur deux le ferait
+    // vaciller. Les étincelles, elles, n'ont pas besoin de cette cadence.
+    const etincelles = this.frameCount % FUSE_SPARK_EVERY === 0;
     const bombs = this.bombs.getChildren();
+    let enVol = 0;
     for (let i = 0; i < bombs.length; i++) {
       const bomb = bombs[i] as Bomb;
       if (!bomb.active) {
         continue;
       }
-      bomb.fuseTip(this.fuseTip);
-      this.fuseEmitter.emitParticleAt(this.fuseTip.x, this.fuseTip.y, 1);
+      enVol++;
+      if (etincelles) {
+        bomb.fuseTip(this.fuseTip);
+        this.fuseEmitter.emitParticleAt(this.fuseTip.x, this.fuseTip.y, 1);
+      }
     }
+    // On entend la mèche tant qu'un pétard est à l'écran, et elle s'éteint
+    // d'elle-même dès qu'il n'y en a plus (cf. SfxManager.meche).
+    sfx.meche(enVol);
   }
 
   private updateChrono(): void {

@@ -1,5 +1,6 @@
 import { getAudioContext } from '../utils/audioContext';
 import { isMuted } from '../utils/settings';
+import { MECHE_VOLUME, MECHE_CREPITEMENT } from '../utils/constants';
 
 /**
  * Effets sonores placeholder synthétisés en Web Audio — aucun fichier requis.
@@ -19,6 +20,8 @@ export class SfxManager {
   private dernierTranchage = 0;
   /** Horodatage du dernier souffle de lame : deux gestes ne se chevauchent pas. */
   private derniereLame = 0;
+  /** Voix continue de la mèche, créée au premier pétard puis réutilisée. */
+  private mecheGain: GainNode | null = null;
 
   private context(): AudioContext | null {
     if (isMuted()) {
@@ -293,6 +296,71 @@ export class SfxManager {
     src.connect(bande).connect(bois).connect(gain).connect(this.bus(ctx));
     src.start(t, Math.random() * 0.4);
     src.stop(t + duree + 0.02);
+  }
+
+  /**
+   * LA MÈCHE QUI SE CONSUME, tant qu'un pétard est en vol.
+   *
+   * C'est la seule information sonore du jeu qui ne dépend pas de l'endroit
+   * où l'on regarde. Sur un écran où sept fruits volent en même temps, le
+   * pétard pouvait entrer sans qu'on le voie ; maintenant il s'annonce.
+   *
+   * DEUX COUCHES, et la seconde fait tout le travail. Un souffle filtré tenu
+   * n'est pas une mèche : c'est une radio mal réglée — la leçon de la lame,
+   * et elle vaut ici aussi. Ce qui fait entendre une mèche, ce sont les
+   * CRÉPITEMENTS : de minuscules claquements irréguliers. Le souffle ne fait
+   * que les porter, et il reste très bas pour cette raison.
+   *
+   * Le volume suit le NOMBRE de pétards, mais pas proportionnellement : deux
+   * pétards ne doivent pas faire deux fois plus de bruit, seulement un peu
+   * plus. La racine carrée donne cette progression-là.
+   *
+   * ELLE S'ÉTEINT TOUTE SEULE, comme le souffle de lame : chaque appel
+   * reprogramme une extinction 250 ms plus loin. Le pétard sort de l'écran,
+   * la partie s'arrête, le joueur met en pause — la mèche se tait sans que
+   * personne ait à y penser. Une boucle sonore qu'on oublierait d'arrêter
+   * tournerait pour toujours ; ce risque-là n'existe pas.
+   */
+  meche(nombre: number): void {
+    const ctx = this.context();
+    if (ctx === null) {
+      return;
+    }
+    // `> 0` et non `<= 0` : la première forme rejette aussi NaN, la seconde le
+    // laisse passer. Un NaN arrivant jusqu'à setTargetAtTime fait lever une
+    // exception au moteur audio — et comme cet appel a lieu à chaque image,
+    // c'est toute la boucle de jeu qui s'arrêterait.
+    if (!(nombre > 0)) {
+      return; // l'extinction déjà programmée fait le reste
+    }
+    if (this.mecheGain === null || this.mecheGain.context !== ctx) {
+      const source = ctx.createBufferSource();
+      source.buffer = this.getNoise(ctx);
+      source.loop = true;
+      const bande = ctx.createBiquadFilter();
+      bande.type = 'bandpass';
+      bande.Q.value = 0.9;
+      bande.frequency.value = 2600; // aigu et fin : ça brûle, ça ne gronde pas
+      const gain = ctx.createGain();
+      gain.gain.value = 0;
+      source.connect(bande).connect(gain).connect(this.bus(ctx));
+      source.start();
+      this.mecheGain = gain;
+    }
+    const t = ctx.currentTime;
+    const cible = MECHE_VOLUME * Math.sqrt(Math.min(nombre, 4));
+    const g = this.mecheGain.gain;
+    const courant = g.value;
+    g.cancelScheduledValues(t);
+    g.setValueAtTime(courant, t);
+    g.setTargetAtTime(cible, t, 0.06);
+    g.setTargetAtTime(0, t + 0.25, 0.08);
+
+    // Les crépitements : c'est eux qu'on reconnaît, pas le souffle.
+    if (Math.random() < MECHE_CREPITEMENT * nombre) {
+      const h = 2600 + Math.random() * 3200;
+      this.playNoise(ctx, 'bandpass', h, h * 0.7, 7, 0.05 + Math.random() * 0.05, 0.02);
+    }
   }
 
   /** Explosion de bombe : bruit grave qui s'étouffe + chute de basse. */
