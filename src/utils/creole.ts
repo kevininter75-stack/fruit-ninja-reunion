@@ -31,8 +31,26 @@ export const COMBO_GRAND = 'Totoche !';
  */
 export const COMBO_ENORME = 'Oté !';
 
-/** Le piment cabri éclate au bout de sa frénésie. */
-export const FRENESIE = 'I pète fort !';
+/**
+ * Le piment cabri éclate au bout de sa frénésie.
+ *
+ * Mot de Kevin, donné le 14/09/2026. Il remplace « I pète fort ! », que Kevin
+ * avait donné lui aussi, du temps où ce fruit était une grenade.
+ *
+ * L'échange vaut mieux que l'ancien, et pas seulement parce que le fruit a
+ * changé : « pète » parlait de l'explosion, donc d'une chose que le joueur
+ * VOIT déjà — la gerbe, la secousse, l'onde de choc le disent trois fois.
+ * « Poik » parle du PIMENT, c'est-à-dire de la seule chose que l'image ne peut
+ * pas dire. Le texte ajoute enfin quelque chose au lieu de doubler le reste.
+ *
+ * Graphie reprise telle qu'il l'a écrite. Seule l'espace avant le point
+ * d'exclamation a été ajoutée, pour l'aligner sur les autres entrées du
+ * fichier : c'est de la typographie française, pas du créole.
+ *
+ * « I pète fort ! » n'est pas perdu pour autant — il est consigné ici, et
+ * disponible si un autre moment du jeu vient à manquer de voix.
+ */
+export const FRENESIE = 'I poik fort !';
 
 /** Nouveau record personnel. */
 export const RECORD = 'Lé doss !';
