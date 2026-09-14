@@ -17,9 +17,8 @@ export class SfxManager {
   private master: GainNode | null = null;
   /** Horodatage du dernier bruit de coupe, pour atténuer les rafales. */
   private dernierTranchage = 0;
-  /** Voix continue du souffle de lame (creee au premier geste, jamais arretee). */
-  private lameGain: GainNode | null = null;
-  private lameBande: BiquadFilterNode | null = null;
+  /** Horodatage du dernier souffle de lame : deux gestes ne se chevauchent pas. */
+  private derniereLame = 0;
 
   private context(): AudioContext | null {
     if (isMuted()) {
@@ -168,7 +167,7 @@ export class SfxManager {
    * trancher ne faisait aucun bruit propre.
    *
    * Le sifflement de lame, lui, a quitté cette méthode : il appartient au
-   * geste et se joue à part (cf. `lameVitesse()`). Ne reste ici que le fruit.
+   * geste et se joue à part (cf. `lame()`). Ne reste ici que le fruit.
    *
    *   1. LA PEAU QUI CÈDE : claquement de 12 ms vers 4 kHz. C'est lui qui
    *      donne l'instant exact du contact — sans transient, un son paraît
@@ -215,70 +214,85 @@ export class SfxManager {
   }
 
   /**
-   * LA LAME : UN BÂTON QUI FEND L'AIR, et qui dure tant que le geste dure.
+   * LA LAME : UN BÂTON QUI FEND L'AIR, une fois par coup de sabre.
    *
-   * DEUX ERREURS DANS LA VERSION PRÉCÉDENTE, et elles allaient ensemble.
+   * TROIS VERSIONS, ET CHACUNE CORRIGEAIT LA PRÉCÉDENTE — la troisième vaut
+   * d'être expliquée, parce qu'elle revient en partie sur la deuxième.
    *
-   *   ELLE ÉTAIT UN COUP, PAS UN MOUVEMENT. Un seul son déclenché à
-   *   l'ouverture du geste, puis plus rien — alors qu'un objet qui fend l'air
-   *   siffle pendant tout son passage, et d'autant plus fort qu'il va vite.
-   *   Un « clac » au départ ne peut pas raconter ça.
+   *   1. UN COUP SEC à l'ouverture du geste. Trop court : un objet qui fend
+   *      l'air siffle pendant tout son passage, pas seulement au départ.
+   *   2. UNE VOIX CONTINUE pilotée par la vitesse du doigt. Elle réglait la
+   *      durée, mais en créait une pire : un joueur qui tranche sans arrêt
+   *      maintenait le souffle en permanence, et du bruit filtré qui ne
+   *      s'arrête jamais, c'est très exactement le son d'une radio mal réglée.
+   *      C'est le mot qu'a employé Kevin, et c'est le bon.
+   *   3. CELLE-CI : une ENVELOPPE par coup de sabre. Forte à l'attaque puis
+   *      décroissante, et bornée à un peu plus d'un demi-tiers de seconde.
    *
-   *   ELLE ÉTAIT EN MÉTAL. Sa bande montait à 2,9 kHz et une pointe à 3,9 kHz
-   *   lui donnait un timbre d'acier. Or ce n'est pas une épée : c'est un bout
-   *   de bois qu'on fait claquer dans l'air. Le bois n'a pas ce sifflement
-   *   aigu — il donne un souffle plus bas, plus rond, sans sifflante.
+   * Ce qui manquait aux deux premières était la même chose : un souffle doit
+   * avoir un DÉBUT et une FIN. La deuxième avait un début et pas de fin, la
+   * première n'avait ni l'un ni l'autre. Une enveloppe, c'est les deux.
    *
-   * D'où cette voix CONTINUE. Une source de bruit qui tourne en boucle, dont
-   * la fréquence et le volume suivent en direct la vitesse du doigt. Vite : le
-   * souffle monte et s'ouvre. Lentement : il s'efface. Le son n'est plus
-   * déclenché, il est PILOTÉ — et c'est ce qui fait la différence entre un
-   * bruitage et un objet qui se déplace.
+   * Le balayage en cloche (620 Hz → jusqu'à 1,9 kHz → 420 Hz) fait le reste :
+   * le bâton s'approche, passe, s'éloigne. Une fréquence TENUE est justement
+   * ce qui fait entendre une porteuse ; une fréquence qui se déplace fait
+   * entendre un objet. Le passe-bas à 2,2 kHz enlève la sifflante — c'est lui
+   * qui fait le bois plutôt que l'acier.
    *
-   * Le passe-bas à 2,2 kHz est ce qui fait le bois plutôt que l'acier : il
-   * coupe la sifflante, et ne laisse que le souffle.
-   *
-   * PAS DE FERMETURE À APPELER. À chaque mise à jour, une extinction est
-   * programmée 130 ms plus tard ; tant que le geste continue, chaque appel la
-   * repousse. Si le joueur s'arrête, met en pause, perd la partie ou change de
-   * scène, le souffle s'éteint tout seul. Une boucle sonore qu'on oublierait
-   * d'arrêter tournerait pour toujours — ce risque-là n'existe pas ici.
+   * La vitesse du geste ne pilote plus le son en continu : elle en règle le
+   * volume et la durée AU DÉCLENCHEMENT. Un geste vif souffle plus fort et
+   * plus longtemps, mais il souffle une fois.
    */
-  lameVitesse(rapidite: number): void {
+  lame(rapidite: number): void {
     const ctx = this.context();
     if (ctx === null) {
       return;
     }
-    if (this.lameGain === null || this.lameGain.context !== ctx) {
-      const source = ctx.createBufferSource();
-      source.buffer = this.getNoise(ctx);
-      source.loop = true;
-      const bande = ctx.createBiquadFilter();
-      bande.type = 'bandpass';
-      bande.Q.value = 1.1; // large : un souffle, pas une note
-      bande.frequency.value = 400;
-      const bois = ctx.createBiquadFilter();
-      bois.type = 'lowpass';
-      bois.frequency.value = 2200; // c'est lui qui enlève l'acier
-      const gain = ctx.createGain();
-      gain.gain.value = 0;
-      source.connect(bande).connect(bois).connect(gain).connect(this.bus(ctx));
-      source.start();
-      this.lameBande = bande;
-      this.lameGain = gain;
+    // Deux coups de sabre ne peuvent pas se chevaucher. Sans ce plancher, un
+    // doigt qui zigzague rouvre des gestes très rapprochés et les souffles
+    // s'empilent — on retombe sur le mur de bruit qu'on cherche à éviter.
+    if (ctx.currentTime - this.derniereLame < 0.18) {
+      return;
     }
+    this.derniereLame = ctx.currentTime;
+
     const v = Math.min(Math.max(rapidite, 0), 1);
     const t = ctx.currentTime;
-    // Le souffle s'ouvre vers l'aigu avec la vitesse, sans jamais siffler.
-    this.lameBande?.frequency.setTargetAtTime(340 + v * 1150, t, 0.03);
-    const g = this.lameGain.gain;
-    // On fige la valeur courante avant de reprogrammer : sans cet ancrage, le
-    // moteur audio saute à la nouvelle consigne et le souffle craque.
-    const courant = g.value;
-    g.cancelScheduledValues(t);
-    g.setValueAtTime(courant, t);
-    g.setTargetAtTime(0.02 + v * 0.2, t, 0.025);
-    g.setTargetAtTime(0, t + 0.13, 0.05);
+    // Un geste dure quelques dixièmes de seconde ; le souffle ne doit pas lui
+    // survivre. Entre 0,34 et 0,56 s selon la vitesse, jamais au-delà.
+    const duree = 0.34 + v * 0.22;
+
+    const src = ctx.createBufferSource();
+    src.buffer = this.getNoise(ctx);
+    src.loop = true; // le buffer fait 0,5 s, le souffle peut aller plus loin
+
+    const bande = ctx.createBiquadFilter();
+    bande.type = 'bandpass';
+    bande.Q.value = 1.1; // large : un souffle, pas une note
+    // Le bâton s'approche puis s'éloigne : la fréquence monte, puis retombe.
+    // C'est ce dessin en cloche qui fait entendre quelque chose qui PASSE ;
+    // une fréquence tenue, c'est une porteuse de radio.
+    bande.frequency.setValueAtTime(620, t);
+    bande.frequency.exponentialRampToValueAtTime(1450 + v * 480, t + duree * 0.3);
+    bande.frequency.exponentialRampToValueAtTime(420, t + duree);
+
+    const bois = ctx.createBiquadFilter();
+    bois.type = 'lowpass';
+    bois.frequency.value = 2200; // c'est lui qui enlève l'acier
+
+    const gain = ctx.createGain();
+    // Calé par la mesure, pas à l'estime : à ce réglage le souffle sort à
+    // 0,075 de crête au plus vif, contre 0,28 pour un fruit qui éclate. Il
+    // s'entend donc nettement, mais reste au quart du bruit de coupe — c'est
+    // la coupe qui doit tenir le premier plan, pas le geste qui la porte.
+    const crete = 0.09 + v * 0.15;
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(crete, t + 0.03);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + duree);
+
+    src.connect(bande).connect(bois).connect(gain).connect(this.bus(ctx));
+    src.start(t, Math.random() * 0.4);
+    src.stop(t + duree + 0.02);
   }
 
   /** Explosion de bombe : bruit grave qui s'étouffe + chute de basse. */

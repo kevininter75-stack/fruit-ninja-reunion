@@ -41,7 +41,38 @@ import { music } from './MusicManager';
  * laisserait le jeu figé pour de bon. L'audio, lui, n'avait pas ce filet :
  * c'est là qu'il fallait agir.
  */
+/**
+ * Déverrouille l'audio au tout premier contact, quel qu'il soit.
+ *
+ * LE MENU ÉTAIT MUET, et ce n'était pas un problème de mixage. Les navigateurs
+ * refusent de faire sonner quoi que ce soit avant un geste du joueur :
+ * l'AudioContext naît SUSPENDU, et tant qu'il l'est, il ne sort rien du tout.
+ * Mesuré : crête 0 avec le contexte suspendu, 0,14 dès qu'il reprend.
+ *
+ * Or rien ne le réveillait sur l'écran d'accueil. Le contexte ne reprenait
+ * qu'à l'occasion d'un son joué — et le seul geste qui produit un son au menu
+ * est le coup de sabre qui choisit un mode, lequel lance aussitôt la partie.
+ * Le joueur n'entendait donc JAMAIS la musique du menu : elle tournait dans
+ * le vide, et redevenait audible seulement au retour d'une partie.
+ *
+ * Un simple effleurement suffit désormais. On écoute aussi le clavier pour le
+ * jeu ouvert sur un ordinateur, et `touchstart` en plus de `pointerdown` parce
+ * que les navigateurs anciens ne comptent pas toujours le second comme un
+ * geste qualifiant.
+ */
+function deverrouillerAudioAuPremierGeste(): void {
+  const reveiller = (): void => {
+    resumeAudio();
+    music.wake();
+  };
+  for (const evenement of ['pointerdown', 'touchstart', 'keydown']) {
+    window.addEventListener(evenement, reveiller, { once: true, passive: true });
+  }
+}
+
 export function installAppLifecycle(): void {
+  deverrouillerAudioAuPremierGeste();
+
   const endormir = (): void => {
     // L'ordre compte : couper l'ordonnanceur AVANT de suspendre le contexte.
     // L'inverse laisserait un tour de minuteur programmer des notes contre une

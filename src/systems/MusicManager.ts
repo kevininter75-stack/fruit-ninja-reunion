@@ -57,6 +57,8 @@ const ROULER_PARTIE = [0, 3, 6];
 const ROULER_MENU = [0, 3];
 
 const MUSIC_VOLUME = 0.2;
+/** En partie, la boucle monte d'un tiers : c'est ce qui dit que ca commence. */
+const MUSIC_VOLUME_PARTIE = 0.27;
 
 export class MusicManager {
   private started = false;
@@ -178,7 +180,7 @@ export class MusicManager {
     // fort en partie qu'au menu.
     if (patternStep % 2 === 1) {
       const fort = patternStep % 4 === 3;
-      this.playShaker(ctx, time, (fort ? 0.09 : 0.05) * (this.enPartie ? 1.5 : 1));
+      this.playShaker(ctx, time, (fort ? 0.09 : 0.05) * (this.enPartie ? 1.6 : 0.8));
     }
     // LE ROULÈR N'ENTRE QU'EN PARTIE. C'est ce qui distingue le menu du match :
     // même boucle, mais elle se met en marche quand on joue. Une musique qui
@@ -192,7 +194,7 @@ export class MusicManager {
     const motif = this.enPartie ? ROULER_PARTIE : ROULER_MENU;
     if (motif.includes(dansLaMesure)) {
       const fort = dansLaMesure === 0;
-      const ampleur = this.enPartie ? 1 : 0.62;
+      const ampleur = this.enPartie ? 1.1 : 0.55;
       this.playRouler(ctx, time, (fort ? 0.5 : 0.34) * ampleur);
     }
   }
@@ -275,9 +277,32 @@ export class MusicManager {
     membrane.stop(time + 0.32);
   }
 
-  /** Le roulèr passe du motif de menu à celui de la partie. */
+  /**
+   * Menu ou partie. Deux choses changent, et il faut les deux.
+   *
+   * Le motif du roulèr d'abord : deux frappes par mesure au menu, trois en
+   * partie. Le NIVEAU ensuite — et c'est lui qui manquait. Mesuré, la boucle
+   * du menu et celle du jeu sortaient à 0,0147 et 0,0152 de moyenne : 3 %
+   * d'écart, c'est-à-dire rien. On changeait le motif sans que personne ne
+   * puisse l'entendre.
+   *
+   * Le lancement d'une partie fait donc aussi monter la musique d'un tiers,
+   * en une demi-seconde. C'est court assez pour qu'on le rattache au geste, et
+   * assez long pour que ce ne soit pas un à-coup.
+   */
   setEnPartie(enPartie: boolean): void {
     this.enPartie = enPartie;
+    if (this.master === null || isMuted()) {
+      return;
+    }
+    const ctx = getAudioContext();
+    if (ctx === null) {
+      return;
+    }
+    this.master.gain.linearRampToValueAtTime(
+      enPartie ? MUSIC_VOLUME_PARTIE : MUSIC_VOLUME,
+      ctx.currentTime + 0.5
+    );
   }
 
   /**
