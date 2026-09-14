@@ -41,6 +41,21 @@ export const RECORD = 'Lé doss !';
 export const BOMBE = 'La plané';
 
 /**
+ * La papaye cyclone est tranchée : le déluge commence.
+ *
+ * Mot de Kevin, donné le 14/09/2026 (« par exemple : cyclone y débarque »).
+ * Il est repris tel qu'il l'a écrit, sans être « corrigé » vers une graphie
+ * créole plus académique — c'est lui qui parle la langue, et la règle en tête
+ * de ce fichier vaut dans les deux sens : on n'invente pas, et on ne récrit
+ * pas non plus.
+ *
+ * Le cyclone est d'ailleurs la seule métaphore juste ici. À La Réunion, c'est
+ * ce qui arrive d'un coup, remplit tout le ciel et repart — exactement ce que
+ * fait le déluge de fruits.
+ */
+export const CYCLONE = 'Cyclone y débarque !';
+
+/**
  * L'exclamation qui convient à un combo de <paramref>fruits</paramref> fruits.
  *
  * TROIS PALIERS, et ils coïncident avec les trois paliers de présence : au

@@ -17,7 +17,7 @@ import { applyShadingTint } from '../utils/surfaceShading';
 import { seedRandom, clearSeed } from '../utils/rng';
 import type { ScoreSnapshot } from '../systems/ScoreManager';
 import { dailySeed, saveTodayResult } from '../utils/dailyChallenge';
-import { exclamationCombo, FRENESIE } from '../utils/creole';
+import { exclamationCombo, FRENESIE, CYCLONE } from '../utils/creole';
 import {
   FRUIT_POOL_SIZE,
   HALF_POOL_SIZE,
@@ -87,6 +87,18 @@ import {
   GESTURE_BANNER_MIN,
   GESTURE_HUGE_MIN,
   GESTURE_COMBO_BONUS,
+  CYCLONE_AURA_SCALE,
+  CYCLONE_AURA_ALPHA_MIN,
+  CYCLONE_AURA_ALPHA_MAX,
+  CYCLONE_DURATION_MS,
+  CYCLONE_POINTS,
+  REWARD_STAGGER_MS,
+  REWARD_SPREAD_PX,
+  COLOR_POINTS,
+  COLOR_CRIT,
+  COLOR_COMBO,
+  COLOR_CYCLONE,
+  COLOR_BONUS,
   type GameMode,
   type GameOverReason,
   CROSS_SIZE_LIT,
@@ -211,6 +223,11 @@ export class GameScene extends Phaser.Scene {
   private frenzyZoomed = false;
   /** Mémoire de l'état précédent, pour détecter la FIN du déluge. */
   private delugeEnCours = false;
+  /** Papaye cyclone en vol, pour lui coller son halo (null sinon). */
+  private cyclonePapaye: Fruit | null = null;
+  private cycloneAura!: Phaser.GameObjects.Image;
+  /** Fruits tranchés depuis le début du déluge en cours : alimente le compteur. */
+  private delugeFruits = 0;
   private grading!: SceneGrading;
   private chronoEndTime = 0;
   /** Avancement à restaurer après une rotation d'écran, sinon null. */
@@ -410,6 +427,7 @@ export class GameScene extends Phaser.Scene {
     this.updateDeluge();
     this.updateHalvesShading();
     this.updateFrenzyAura();
+    this.updateCycloneAura();
     if (this.mode === 'chrono' && !this.gameEnded) {
       this.updateChrono();
     }
@@ -498,6 +516,15 @@ export class GameScene extends Phaser.Scene {
   private updateDeluge(): void {
     if (this.delugeEnCours && !this.spawnManager.isDeluge()) {
       this.grading.setMode(this.filledCrosses >= STARTING_LIVES - 1 ? 'danger' : 'normal');
+      // Bilan du déluge. Un moment fort a besoin d'une fin, sinon il s'éteint
+      // sans qu'on sache ce qu'il a rapporté — et le joueur n'a aucun repère
+      // pour faire mieux la fois suivante.
+      if (this.delugeFruits > 0 && !this.gameEnded) {
+        this.showRewardBurst(this.scale.width / 2, this.scale.height * 0.58, [
+          { texte: `${this.delugeFruits} FRUITS`, couleur: COLOR_CYCLONE, taille: px(48) },
+        ]);
+      }
+      this.delugeFruits = 0;
     }
     this.delugeEnCours = this.spawnManager.isDeluge();
   }
@@ -538,6 +565,19 @@ export class GameScene extends Phaser.Scene {
       .image(0, 0, TEX_GLOW)
       .setVisible(false)
       .setDepth(DEPTH_FRENZY_AURA)
+      .setBlendMode(Phaser.BlendModes.ADD);
+
+    // Halo DISTINCT pour la papaye cyclone, et non le même réutilisé. Les deux
+    // fruits spéciaux ne peuvent pas se croiser (le SpawnManager les espace),
+    // mais partager le sprite couplerait leurs cycles de vie : ranger le halo
+    // du cyclone appellerait hideFrenzyVisuals(), donc un dézoom de caméra qui
+    // n'a rien à faire là. Un sprite de plus coûte moins qu'un couplage.
+    this.cyclonePapaye = null;
+    this.cycloneAura = this.add
+      .image(0, 0, TEX_GLOW)
+      .setVisible(false)
+      .setDepth(DEPTH_FRENZY_AURA)
+      .setTint(0xff9a4a) // teinte chaude : le cyclone n'est pas la grenade
       .setBlendMode(Phaser.BlendModes.ADD);
 
     // Compteur UNIQUE qui suit la grenade : un popup par coup s'empilait en
@@ -598,6 +638,100 @@ export class GameScene extends Phaser.Scene {
     }
     this.frenzyAura.setPosition(grenade.x, grenade.y);
     this.frenzyCounter.setPosition(grenade.x, grenade.y - grenade.sliceRadius - px(14));
+  }
+
+  /**
+   * Colle le halo chaud sur la papaye cyclone tant qu'elle traverse l'écran.
+   *
+   * Même précaution que pour la grenade : on vérifie `isCyclone` en plus de
+   * `active`, parce que le fruit vient d'un POOL et qu'une papaye rendue au
+   * pool peut ressortir en letchi à la salve suivante. Sans ce test, le halo
+   * resterait collé sur un fruit parfaitement ordinaire.
+   *
+   * Aucun recadrage ici, à la différence de la grenade : le cyclone n'est PAS
+   * censé rester à l'écran. Il traverse, et le manquer est un vrai choix du
+   * joueur — c'est ce qui lui donne sa valeur.
+   */
+  private updateCycloneAura(): void {
+    const papaye = this.cyclonePapaye;
+    if (papaye === null || !papaye.active || !papaye.isCyclone) {
+      if (this.cycloneAura.visible) {
+        this.hideCycloneAura();
+      }
+      return;
+    }
+    this.cycloneAura.setPosition(papaye.x, papaye.y);
+  }
+
+  /** Range le halo du cyclone (fruit tranché, manqué, ou fin de partie). */
+  private hideCycloneAura(): void {
+    this.tweens.killTweensOf(this.cycloneAura);
+    this.cycloneAura.setVisible(false);
+    this.cyclonePapaye = null;
+  }
+
+  /**
+   * La papaye cyclone entre en scène. Pas de bandeau ici, volontairement :
+   * dans la référence, la banane de frénésie ne s'annonce pas — elle passe,
+   * et c'est au joueur de la voir. Annoncer la récompense avant qu'elle ne
+   * soit méritée lui retirerait tout son sel.
+   *
+   * Il reste trois signaux, et ils suffisent : une silhouette qu'on ne voit
+   * jamais autrement, une entrée par le côté, et un halo qui la suit.
+   */
+  private onCycloneIncoming(papaye: Fruit): void {
+    if (this.gameEnded) {
+      return;
+    }
+    this.cyclonePapaye = papaye;
+    this.cycloneAura
+      .setPosition(papaye.x, papaye.y)
+      .setDisplaySize(papaye.sliceRadius * CYCLONE_AURA_SCALE, papaye.sliceRadius * CYCLONE_AURA_SCALE)
+      .setVisible(true)
+      .setAlpha(CYCLONE_AURA_ALPHA_MIN);
+    this.tweens.killTweensOf(this.cycloneAura);
+    this.tweens.add({
+      targets: this.cycloneAura,
+      alpha: CYCLONE_AURA_ALPHA_MAX,
+      duration: 380,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+    this.spawnRing(papaye.x, papaye.y, 4, 0xff9a4a, 620);
+  }
+
+  /**
+   * La papaye cyclone est tranchée : le déluge commence SUR-LE-CHAMP.
+   *
+   * C'est la demande de Kevin, et c'est le modèle de Fruit Ninja : la frénésie
+   * ne se gagne pas au bout d'un mini-jeu, elle se cueille d'un coup de sabre.
+   * Elle vit donc à côté de la grenade sans faire double emploi — la grenade
+   * récompense l'endurance, le cyclone récompense l'œil.
+   *
+   * Les bombes en vol sont désamorcées comme pour la grenade : on va demander
+   * au joueur de balayer l'écran entier pendant six secondes, il ne peut pas
+   * viser en même temps.
+   */
+  private startCyclone(papaye: Fruit): void {
+    this.delugeFruits = 0;
+    this.defuseBombs();
+    this.hideCycloneAura();
+    this.spawnManager.startDeluge(CYCLONE_DURATION_MS);
+    this.grading.setMode('frenzy');
+
+    const gagne = this.scoreManager.addScore(CYCLONE_POINTS);
+    this.showBigBanner(`${CYCLONE}\n+${gagne}`, 1.15);
+
+    // Double onde chaude, secousse, gel bref : le vocabulaire du gros moment.
+    this.spawnRing(papaye.x, papaye.y, 7, 0xffd166, 420);
+    this.spawnRing(papaye.x, papaye.y, 14, 0xff7b3a, 820);
+    this.juiceEmitter.setParticleTint(papaye.juiceColor);
+    this.juiceEmitter.emitParticleAt(papaye.x, papaye.y, JUICE_PARTICLE_COUNT * 4);
+    this.shakeCamera(240, 0.006);
+    this.hitStop(HITSTOP_GRENADE_MS);
+    this.cameraPunch(COMBO_PUNCH_ZOOM * 1.4, COMBO_PUNCH_MS);
+    sfx.bonus();
   }
 
   /**
@@ -1043,29 +1177,92 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  /** Affiche un texte flottant qui monte et s'estompe (recycle le pool). */
-  private showPopup(x: number, y: number, message: string, color: string, fontSize: number): void {
+  /**
+   * Affiche un texte flottant qui monte et s'estompe (recycle le pool).
+   *
+   * `delayMs` est ce qui permet d'en faire apparaître PLUSIEURS à la suite
+   * sans les empiler sur la même image. Une cascade de 70 ms se lit ; cinq
+   * textes apparus à la même frame font une bouillie.
+   *
+   * Chaque popup part légèrement de travers et dérive un peu sur le côté.
+   * Sans cela, deux récompenses proches montent sur des rails parallèles et
+   * se lisent comme une seule ligne de texte cassée en deux.
+   */
+  private showPopup(
+    x: number,
+    y: number,
+    message: string,
+    color: string,
+    fontSize: number,
+    delayMs = 0
+  ): void {
     const popup = this.popupPool.find((p) => !p.visible);
     if (popup === undefined) {
       return; // pool saturé : on saute ce feedback plutôt que d'allouer
     }
+    // Bornage à l'écran : une récompense affichée hors cadre n'est pas une
+    // récompense. La marge suit la taille du texte, pas une valeur fixe.
+    const marge = fontSize * 2.2;
+    const cx = Phaser.Math.Clamp(x, marge, this.scale.width - marge);
+    const cy = Phaser.Math.Clamp(y, fontSize, this.scale.height - fontSize);
+    const derive = Phaser.Math.Between(-px(26), px(26));
     popup
       .setText(message)
       .setColor(color)
       .setFontSize(fontSize)
-      .setPosition(x, y)
-      .setAlpha(1)
+      .setPosition(cx, cy)
+      .setAngle(Phaser.Math.Between(-6, 6))
+      .setAlpha(delayMs > 0 ? 0 : 1)
       .setScale(0.6)
       .setVisible(true);
     this.tweens.add({
       targets: popup,
-      y: y - px(90),
-      alpha: 0,
+      x: cx + derive,
+      y: cy - px(90),
+      alpha: { from: 1, to: 0 },
       scale: 1,
+      delay: delayMs,
       duration: 700,
       ease: 'Cubic.easeOut',
       onComplete: () => popup.setVisible(false),
     });
+  }
+
+  /**
+   * Plusieurs récompenses d'un coup, dispersées autour du point du geste.
+   *
+   * CE QUI MANQUAIT, relevé par Kevin sur la vidéo de référence à 1 min 04 :
+   * cinq récompenses y cohabitent à l'écran — le combo, le critique, le bonus
+   * de fruit, le bonus de blitz — à cinq endroits, dans trois tailles et
+   * trois couleurs. Chez nous, tout arrivait en un seul bandeau centré. Un
+   * bandeau, si gros soit-il, reste UNE chose : l'œil le lit et passe.
+   *
+   * La dispersion alterne de part et d'autre du geste, en s'éloignant à
+   * chaque rang. Ce n'est pas une décoration : deux textes superposés ne se
+   * lisent ni l'un ni l'autre, et un simple décalage vertical les aurait fait
+   * passer pour les lignes d'un même paragraphe.
+   *
+   * Le décalage temporel fait le reste (cf. REWARD_STAGGER_MS) : la cascade
+   * donne l'impression que l'écran n'arrive plus à suivre, ce qui est
+   * exactement l'effet recherché.
+   */
+  private showRewardBurst(
+    x: number,
+    y: number,
+    recompenses: Array<{ texte: string; couleur: string; taille: number }>
+  ): void {
+    // L'écart vertical se DÉDUIT de la taille du texte précédent, il n'est pas
+    // constant : une valeur fixe suffisait pour deux petites lignes et faisait
+    // se chevaucher un « 9 FRUITS » en 56 px avec le « +225 » d'en dessous.
+    // Mesuré avant correction : 90 px d'écart pour un texte large de 230.
+    let dy = -px(26);
+    for (let i = 0; i < recompenses.length; i++) {
+      const { texte, couleur, taille } = recompenses[i];
+      const cote = i % 2 === 0 ? -1 : 1;
+      const dx = cote * REWARD_SPREAD_PX * (0.32 + i * 0.16);
+      this.showPopup(x + dx, y + dy, texte, couleur, taille, i * REWARD_STAGGER_MS);
+      dy -= taille * 1.3 + px(16);
+    }
   }
 
   private registerGameEvents(): void {
@@ -1073,6 +1270,7 @@ export class GameScene extends Phaser.Scene {
     this.events.on('lives-changed', this.onLivesChanged, this);
     this.events.on('life-gained', this.onLifeGained, this);
     this.events.on('frenzy-incoming', this.onFrenzyIncoming, this);
+    this.events.on('cyclone-incoming', this.onCycloneIncoming, this);
     this.events.on('fruit-missed', this.onFruitMissed, this);
     this.events.on('game-over', this.onLivesDepleted, this);
 
@@ -1217,6 +1415,13 @@ export class GameScene extends Phaser.Scene {
       this.activateBonus(fruit);
     }
 
+    // La papaye cyclone se tranche comme n'importe quel fruit — elle compte
+    // dans le combo, se fend en deux, rapporte ses points. C'est ce qu'elle
+    // DÉCLENCHE qui n'a rien d'ordinaire.
+    if (fruit.isCyclone) {
+      this.startCyclone(fruit);
+    }
+
     // Coup critique : bonus rare et appuyé (jamais sur le combava, déjà spécial)
     const isCrit = !fruit.isBonus && Math.random() < CRIT_CHANCE;
     // Un fruit vaut toujours le même prix. Tout le bénéfice d'un enchaînement
@@ -1236,11 +1441,31 @@ export class GameScene extends Phaser.Scene {
     if (isCrit) {
       // Coup critique : popup doré, double jet de jus et son dédié
       this.juiceEmitter.emitParticleAt(fruit.x, fruit.y, JUICE_PARTICLE_COUNT);
-      this.showPopup(fruit.x, fruit.y - px(20), `CRITIQUE ! +${awarded}`, '#ffd700', px(46));
+      this.showPopup(fruit.x, fruit.y - px(20), `CRITIQUE ! +${awarded}`, COLOR_CRIT, px(46));
       this.hitStop(HITSTOP_CRIT_MS);
       sfx.crit();
     } else {
-      this.showPopup(fruit.x, fruit.y - px(20), `+${awarded}`, '#ffffff', px(40));
+      this.showPopup(fruit.x, fruit.y - px(20), `+${awarded}`, COLOR_POINTS, px(34));
+    }
+
+    // Compteur de déluge : tous les quatre fruits, un troisième objet vient
+    // s'ajouter à l'écran, dans une troisième couleur et une troisième taille.
+    // C'est exactement ce qu'on voit à 1 min 04 de la vidéo de référence —
+    // plusieurs récompenses de natures différentes, simultanées, dispersées.
+    // Tous les quatre et pas à chaque fruit : à sept fruits par seconde, un
+    // popped par coupe redeviendrait un mur illisible.
+    if (this.spawnManager.isDeluge()) {
+      this.delugeFruits++;
+      if (this.delugeFruits % 4 === 0) {
+        this.showPopup(
+          fruit.x,
+          fruit.y - px(96),
+          `CYCLONE x${this.delugeFruits}`,
+          COLOR_CYCLONE,
+          px(44),
+          REWARD_STAGGER_MS
+        );
+      }
     }
 
     sfx.slice();
@@ -1547,7 +1772,13 @@ export class GameScene extends Phaser.Scene {
     this.spawnRing(grenade.x, grenade.y, 12, 0xff5c78, 750);
     this.hitStop(HITSTOP_GRENADE_MS);
     sfx.crit();
-    this.showBigBanner(`${FRENESIE}\n${slashes} coups  +${awarded}`);
+    // Même découpage que pour les combos : l'exclamation au centre, le détail
+    // chiffré dispersé autour du point d'explosion.
+    this.showBigBanner(FRENESIE);
+    this.showRewardBurst(grenade.x, grenade.y, [
+      { texte: `${slashes} COUPS`, couleur: COLOR_COMBO, taille: px(48) },
+      { texte: `+${awarded}`, couleur: COLOR_POINTS, taille: px(38) },
+    ]);
 
     this.hideFrenzyVisuals();
     grenade.kill();
@@ -1571,6 +1802,7 @@ export class GameScene extends Phaser.Scene {
     // où relancer, rien ne gêne la lecture. Cinq secondes de fruits par les
     // côtés, sans une seule bombe — la récompense de la grenade, et ce qui
     // manquait pour que la frénésie soit un sommet plutôt qu'une parenthèse.
+    this.delugeFruits = 0;
     this.spawnManager.startDeluge();
     this.grading.setMode('frenzy');
   }
@@ -1632,7 +1864,14 @@ export class GameScene extends Phaser.Scene {
     // mot. Une exclamation qui sert à chaque geste réussi ne dit plus rien —
     // et les vrais grands gestes n'ont alors plus rien de plus à offrir.
     if (n < GESTURE_BANNER_MIN) {
-      this.showPopup(gesture.lastX, gesture.lastY - px(30), `x${n}  +${awarded}`, '#ffe066', px(40));
+      // Deux objets plutôt qu'un seul texte « x3 +75 » : le nombre de fruits
+      // et les points gagnés sont deux informations différentes, elles ont
+      // donc droit à deux couleurs, deux tailles et deux places. C'est le
+      // principe de toute la refonte des récompenses.
+      this.showRewardBurst(gesture.lastX, gesture.lastY, [
+        { texte: `${n} FRUITS`, couleur: COLOR_COMBO, taille: px(42) },
+        { texte: `+${awarded}`, couleur: COLOR_POINTS, taille: px(34) },
+      ]);
       sfx.bigCombo(n);
       this.spawnRing(gesture.lastX, gesture.lastY, 4, 0xffe066, 380);
       return;
@@ -1643,9 +1882,19 @@ export class GameScene extends Phaser.Scene {
     // le geste dont on parle après la partie, il doit s'entendre comme tel.
     const enorme = n >= GESTURE_HUGE_MIN;
 
-    // L'exclamation creole passe AVANT le chiffre : c'est elle qu'on lit en
-    // premier, et c'est elle qui donne sa voix au jeu.
-    this.showBigBanner(`${exclamationCombo(n)}\nx${n}  +${awarded}`, enorme ? 1.3 : 1);
+    // L'exclamation créole tient le centre, SEULE. Le détail chiffré s'en
+    // détache et part vivre ailleurs sur l'écran : c'est ce qui fait passer la
+    // récompense d'un bloc unique à une gerbe de récompenses, comme dans la
+    // référence. Le bandeau y gagne aussi en lisibilité — une ligne au lieu
+    // de deux, au moment précis où l'écran est le plus chargé.
+    this.showBigBanner(exclamationCombo(n), enorme ? 1.3 : 1);
+    this.showRewardBurst(gesture.lastX, gesture.lastY, [
+      { texte: `${n} FRUITS`, couleur: COLOR_COMBO, taille: px(enorme ? 56 : 46) },
+      { texte: `+${awarded}`, couleur: COLOR_POINTS, taille: px(38) },
+      ...(this.spawnManager.isDeluge()
+        ? [{ texte: 'EN PLEIN CYCLONE', couleur: COLOR_CYCLONE, taille: px(36) }]
+        : []),
+    ]);
     sfx.bigCombo(n);
 
     // Ponctuation visuelle du combo : gel bref, caméra qui respire, onde
@@ -1706,7 +1955,10 @@ export class GameScene extends Phaser.Scene {
   /** Combava doré tranché : score x2 temporaire + feedback doré appuyé. */
   private activateBonus(fruit: Fruit): void {
     this.scoreManager.activateMultiplier(BONUS_X2_FACTOR, BONUS_X2_DURATION_MS);
-    this.showPopup(fruit.x, fruit.y - px(160), 'COMBAVA DORÉ !', '#ffd700', px(48));
+    this.showRewardBurst(fruit.x, fruit.y - px(120), [
+      { texte: 'COMBAVA DORÉ', couleur: COLOR_BONUS, taille: px(46) },
+      { texte: 'SCORE x2', couleur: COLOR_CRIT, taille: px(38) },
+    ]);
     sfx.bonus();
 
     // Gros jet de jus doré en plus du jus normal
@@ -1931,7 +2183,13 @@ export class GameScene extends Phaser.Scene {
   private onFruitMissed(fruit: Fruit): void {
     // En mode Chrono, un fruit manqué est sans conséquence ; un combava ou une
     // grenade manqués non plus (c'étaient des cadeaux, pas des obligations).
-    if (this.gameEnded || this.mode === 'chrono' || fruit.isBonus || fruit.isFrenzy) {
+    if (
+      this.gameEnded ||
+      this.mode === 'chrono' ||
+      fruit.isBonus ||
+      fruit.isFrenzy ||
+      fruit.isCyclone
+    ) {
       return;
     }
     // Pendant le déluge non plus : on déverse sept fruits par seconde, il est

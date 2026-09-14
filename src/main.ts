@@ -4,6 +4,7 @@ import { computeViewport } from './utils/viewport';
 import { GAME_FONT } from './utils/constants';
 import { installAppLifecycle } from './systems/appLifecycle';
 import { relayoutActiveScenes } from './utils/relayout';
+import { installLandscapeGate } from './systems/orientation';
 
 /**
  * Attend que la police d'affichage soit réellement disponible.
@@ -39,31 +40,6 @@ async function waitForFont(): Promise<void> {
 }
 
 /**
- * Demande le paysage, sans jamais bloquer le jeu s'il est refusé.
- *
- * OÙ ÇA MARCHE VRAIMENT. Dans l'application installée, c'est le SYSTÈME qui
- * impose l'orientation : `screenOrientation="sensorLandscape"` côté Android
- * (paysage dans les deux sens, le téléphone bascule seul) et `"orientation":
- * "landscape"` dans le manifeste PWA. Ces deux-là suffisent pour la cible.
- *
- * L'API du navigateur, elle, exige le plein écran et refuse presque toujours.
- * On tente quand même — c'est gratuit là où ça passe — et on absorbe le refus
- * sans bruit. Le jeu reste jouable en portrait dans un onglet ordinaire : un
- * portfolio s'ouvre depuis un lien, mieux vaut une partie dans le mauvais sens
- * qu'un mur « tournez votre téléphone ».
- */
-function demanderPaysage(): void {
-  const orientation = screen.orientation as ScreenOrientation & {
-    lock?: (o: string) => Promise<void>;
-  };
-  try {
-    void orientation?.lock?.('landscape').catch(() => undefined);
-  } catch {
-    // Navigateur sans l'API, ou refus synchrone : sans conséquence.
-  }
-}
-
-/**
  * Point d'entrée. Le jeu n'est instancié qu'une fois la police chargée : c'est
  * plus simple et plus sûr que de retarder le démarrage des scènes après coup.
  */
@@ -71,8 +47,10 @@ async function boot(): Promise<void> {
   await waitForFont();
   const game = new Phaser.Game(gameConfig);
 
-  // Fruit Ninja se joue à l'horizontale, et Kout Sab' aussi.
-  demanderPaysage();
+  // Fruit Ninja se joue à l'horizontale, et Kout Sab' aussi. La porte du
+  // paysage demande le verrouillage au premier toucher et, à défaut, retient
+  // le jeu derrière un voile plutôt que de basculer en portrait.
+  const portePaysage = installLandscapeGate(game);
 
   // Arrêt de tout ce qui doit s'arrêter quand le joueur quitte l'application.
   // Phaser met sa boucle en pause tout seul ; la musique, elle, tourne sur une
@@ -95,6 +73,15 @@ async function boot(): Promise<void> {
   let currentPortrait = computeViewport().isPortrait;
 
   const applyViewport = (): void => {
+    portePaysage.rafraichir();
+    // Retenu derrière le voile : on ne bascule SURTOUT pas en portrait. La
+    // partie reste telle quelle, en paysage, endormie — et elle repart intacte
+    // dès que l'appareil revient dans le bon sens. C'est ce qui remplace la
+    // reconstruction de scène, et c'est mieux : plus rien n'est perdu, pas
+    // même les fruits en vol.
+    if (portePaysage.estBloque()) {
+      return;
+    }
     const vp = computeViewport();
     if (vp.isPortrait !== currentPortrait) {
       currentPortrait = vp.isPortrait;

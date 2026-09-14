@@ -42,12 +42,22 @@ import {
   DELUGE_INTERVAL_MS,
   DELUGE_APEX_MIN,
   DELUGE_APEX_MAX,
-  DELUGE_CROSS_MIN,
-  DELUGE_CROSS_MAX,
+  DELUGE_TRAVEL_MIN,
+  DELUGE_TRAVEL_MAX,
+  CYCLONE_MIN_GAP_MS,
+  CYCLONE_MIN_GAP_CHRONO_MS,
+  CYCLONE_SAFE_TIME_MS,
+  CYCLONE_SAFE_TIME_CHRONO_MS,
+  SPECIAL_MIN_GAP_MS,
   FRENZY_APEX_FRACTION,
   FRENZY_CROSS_FACTOR,
 } from '../utils/constants';
-import { pickRandomVariety, BONUS_VARIETY, FRENZY_VARIETY } from '../utils/fruitCatalog';
+import {
+  pickRandomVariety,
+  BONUS_VARIETY,
+  FRENZY_VARIETY,
+  CYCLONE_VARIETY,
+} from '../utils/fruitCatalog';
 import { rnd, rndFloat, rndBetween } from '../utils/rng';
 
 /** Paramètres de lancement calculés une fois par spawn (objet réutilisé). */
@@ -119,8 +129,17 @@ export class SpawnManager {
   private lastFrenzyEndedAt = -Infinity;
   /** Mémoire de l'état précédent, pour détecter la FIN d'une frénésie. */
   private frenzyOnStage = false;
-  /** Fin du déluge qui suit l'explosion de la grenade (0 = pas de déluge). */
+  /** Fin du déluge (0 = pas de déluge en cours). */
   private delugeUntil = 0;
+  /** Dernier fruit cyclone lancé, pour tenir sa cadence d'environ une minute. */
+  private lastCycloneAt = -Infinity;
+  /**
+   * Dernier fruit spécial QUEL QU'IL SOIT — grenade ou cyclone. Les deux
+   * cadences sont indépendantes ; sans ce garde-fou commun elles finissent
+   * mathématiquement par coïncider, et le joueur reçoit deux frénésies coup
+   * sur coup. Une seule règle pour les deux mécaniques.
+   */
+  private lastSpecialAt = -Infinity;
   private readonly launchParams: LaunchParams = { x: 0, y: 0, velocityX: 0, velocityY: 0 };
 
   constructor(
@@ -144,6 +163,8 @@ export class SpawnManager {
     this.lastFrenzyEndedAt = -Infinity;
     this.frenzyOnStage = false;
     this.delugeUntil = 0;
+    this.lastCycloneAt = -Infinity;
+    this.lastSpecialAt = -Infinity;
     this.scheduleNextWave();
   }
 
@@ -156,6 +177,11 @@ export class SpawnManager {
     this.startTime = this.scene.time.now - elapsedMs;
     // Les vagues scriptées du début ne doivent pas se rejouer.
     this.waveIndex = Math.max(this.waveIndex, Math.round(fruitsSliced / 2));
+    // La difficulté est antidatée, mais pas les fruits spéciaux : sans cela,
+    // une reprise remettrait leurs compteurs à « jamais lancé » et offrirait un
+    // cyclone gratuit dans la seconde. On repart d'un écart plein.
+    this.lastCycloneAt = this.scene.time.now;
+    this.lastSpecialAt = this.scene.time.now;
   }
 
   /** Vrai pendant le déluge qui suit l'explosion de la grenade. */
@@ -172,11 +198,11 @@ export class SpawnManager {
    * être à plus d'une seconde, et ce temps mort aurait cassé l'enchaînement
    * juste après l'explosion.
    */
-  startDeluge(): void {
+  startDeluge(dureeMs = DELUGE_DURATION_MS): void {
     if (!this.running) {
       return;
     }
-    this.delugeUntil = this.scene.time.now + DELUGE_DURATION_MS;
+    this.delugeUntil = this.scene.time.now + dureeMs;
     if (this.timer !== null) {
       this.timer.remove();
       this.timer = null;
@@ -431,6 +457,7 @@ export class SpawnManager {
     // Une salve dense se paie d'un temps mort : c'est la respiration
     this.needsBreather = shape === 'volley' || shape === 'cluster';
     this.maybeSpawnBonus();
+    this.maybeSpawnCyclone();
     this.maybeSpawnFrenzy();
   }
 
@@ -452,8 +479,12 @@ export class SpawnManager {
     if (this.scoreManager.getScore() < this.nextFrenzyAt) {
       return;
     }
-    // Une seule grenade à la fois — deux frénésies simultanées seraient illisibles
-    if (this.isFrenzyOnStage()) {
+    // Un seul fruit spécial à la fois, et jamais deux coup sur coup : la
+    // grenade et le cyclone se partagent ce délai plancher.
+    if (this.scene.time.now - this.lastSpecialAt < SPECIAL_MIN_GAP_MS) {
+      return;
+    }
+    if (this.isFrenzyOnStage() || this.isCycloneOnStage() || this.isDeluge()) {
       return;
     }
     const grenade = this.fruits.get() as Fruit | null;
@@ -471,10 +502,65 @@ export class SpawnManager {
     // n'espacerait plus les grenades. Repartir du lancement rend le plancher
     // vrai dans tous les cas, et il ne fait que se décaler ensuite.
     this.lastFrenzyEndedAt = this.scene.time.now;
-    const p = this.computeSideLaunch();
+    this.lastSpecialAt = this.scene.time.now;
+    const p = this.computeSideLaunch(FRENZY_VARIETY.radius);
     grenade.launchAs(FRENZY_VARIETY, false, p.x, p.y, p.velocityX, p.velocityY, true);
     sfx.launch();
     this.scene.events.emit('frenzy-incoming', grenade);
+  }
+
+  /**
+   * La papaye cyclone : un seul coup de sabre, et le déluge commence.
+   *
+   * Sa cadence est PUREMENT TEMPORELLE, là où la grenade est déclenchée par
+   * un palier de score. Les deux règles sont volontairement différentes :
+   * la grenade récompense la performance, donc elle suit le score ; le
+   * cyclone est un cadeau, donc il suit l'horloge et arrive même au joueur
+   * qui rame. C'est cette différence qui justifie d'avoir deux fruits.
+   *
+   * Elle entre par le côté comme la grenade, mais elle ne se fige pas : elle
+   * TRAVERSE. Il faut aller la chercher, c'est ce qui fait sa valeur.
+   */
+  private maybeSpawnCyclone(): void {
+    const chrono = this.mode === 'chrono';
+    const depuisDebut = this.scene.time.now - this.startTime;
+    if (depuisDebut < (chrono ? CYCLONE_SAFE_TIME_CHRONO_MS : CYCLONE_SAFE_TIME_MS)) {
+      return;
+    }
+    const ecart = chrono ? CYCLONE_MIN_GAP_CHRONO_MS : CYCLONE_MIN_GAP_MS;
+    if (this.scene.time.now - this.lastCycloneAt < ecart) {
+      return;
+    }
+    if (this.scene.time.now - this.lastSpecialAt < SPECIAL_MIN_GAP_MS) {
+      return;
+    }
+    if (this.isFrenzyOnStage() || this.isCycloneOnStage() || this.isDeluge()) {
+      return;
+    }
+    const cyclone = this.fruits.get() as Fruit | null;
+    if (cyclone === null) {
+      return; // pool plein : on retentera à la salve suivante
+    }
+    this.lastCycloneAt = this.scene.time.now;
+    this.lastSpecialAt = this.scene.time.now;
+    // 0,85 de la largeur : il traverse franchement sans jamais devenir
+    // inattrapable — il reste environ deux secondes à l'écran.
+    const p = this.computeSideLaunch(CYCLONE_VARIETY.radius, 0.85);
+    cyclone.launchAs(CYCLONE_VARIETY, false, p.x, p.y, p.velocityX, p.velocityY, false, true);
+    sfx.launch();
+    this.scene.events.emit('cyclone-incoming', cyclone);
+  }
+
+  /** Vrai tant qu'une papaye cyclone est en vol (parcours du pool). */
+  private isCycloneOnStage(): boolean {
+    const children = this.fruits.getChildren();
+    for (let i = 0; i < children.length; i++) {
+      const fruit = children[i] as Fruit;
+      if (fruit.active && fruit.isCyclone) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
@@ -483,18 +569,27 @@ export class SpawnManager {
    * monde. Cette trajectoire à part est le premier signal que ce fruit n'est
    * pas un fruit ordinaire — on la repère avant même de l'avoir identifiée.
    */
-  private computeSideLaunch(): LaunchParams {
+  private computeSideLaunch(radius: number, traverse = Number.NaN): LaunchParams {
     const width = this.scene.scale.width;
     const height = this.scene.scale.height;
     const p = this.launchParams;
     const fromLeft = rnd() < 0.5;
 
-    p.x = fromLeft ? -FRENZY_VARIETY.radius : width + FRENZY_VARIETY.radius;
+    p.x = fromLeft ? -radius : width + radius;
     p.y = height * rndFloat(0.64, 0.78);
     // Arc ample : elle monte franchement puis redescend, ce qui lui donne
     // près de deux secondes de présence utile à l'écran.
     p.velocityY = -Math.sqrt(2 * GRAVITY_Y * FRENZY_APEX_FRACTION * height);
-    p.velocityX = (fromLeft ? 1 : -1) * width * FRENZY_CROSS_FACTOR;
+    if (Number.isNaN(traverse)) {
+      // La grenade : elle n'a pas besoin de traverser, on l'attrape au vol et
+      // elle se cale d'elle-même au premier coup (cf. settleGrenade).
+      p.velocityX = (fromLeft ? 1 : -1) * width * FRENZY_CROSS_FACTOR;
+    } else {
+      // Le cyclone : il traverse pour de bon, donc sa vitesse se déduit de la
+      // distance voulue et de sa durée de vol réelle.
+      const vol = this.dureeDeVol(p.y, p.velocityY, height + radius);
+      p.velocityX = ((fromLeft ? 1 : -1) * width * traverse) / vol;
+    }
     return p;
   }
 
@@ -519,12 +614,29 @@ export class SpawnManager {
       const depuisGauche = rnd() < 0.5;
       const variete = pickRandomVariety();
       const x = depuisGauche ? -variete.radius : width + variete.radius;
-      const y = height * rndFloat(0.62, 0.82);
+      const y = height * rndFloat(0.55, 0.85);
       const vy = -Math.sqrt(2 * GRAVITY_Y * rndFloat(DELUGE_APEX_MIN, DELUGE_APEX_MAX) * height);
-      const vx = (depuisGauche ? 1 : -1) * width * rndFloat(DELUGE_CROSS_MIN, DELUGE_CROSS_MAX);
+      // La vitesse horizontale se DÉDUIT de la distance qu'on veut lui faire
+      // parcourir : le fruit traverse vraiment l'écran, quel que soit l'arc
+      // qui vient d'être tiré (cf. DELUGE_TRAVEL_MIN dans constants.ts).
+      const vol = this.dureeDeVol(y, vy, height + variete.radius);
+      const distance = width * rndFloat(DELUGE_TRAVEL_MIN, DELUGE_TRAVEL_MAX);
+      const vx = ((depuisGauche ? 1 : -1) * distance) / vol;
       fruit.launchAs(variete, false, x, y, vx, vy);
     }
     sfx.launch();
+  }
+
+  /**
+   * Durée de vol d'un projectile, de `y0` jusqu'à la ligne `yFin`.
+   *
+   * Racine positive de y0 + vy0·t + ½·g·t² = yFin. `vy0` étant négatif (le
+   * fruit monte) et `yFin` sous le point de départ, le discriminant est
+   * toujours positif : pas de cas dégénéré à traiter.
+   */
+  private dureeDeVol(y0: number, vy0: number, yFin: number): number {
+    const c = y0 - yFin;
+    return (-vy0 + Math.sqrt(vy0 * vy0 - 2 * GRAVITY_Y * c)) / GRAVITY_Y;
   }
 
   /**

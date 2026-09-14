@@ -278,9 +278,27 @@ export const DELUGE_INTERVAL_MS = 220;
 /** Hauteur de l'arc des fruits du déluge, en fraction d'écran. */
 export const DELUGE_APEX_MIN = 0.42;
 export const DELUGE_APEX_MAX = 0.74;
-/** Vitesse de traversée, en fraction de largeur. */
-export const DELUGE_CROSS_MIN = 0.1;
-export const DELUGE_CROSS_MAX = 0.22;
+/**
+ * TRAVERSÉE : la part de la largeur qu'un fruit du déluge parcourt pendant
+ * TOUT son vol. Ce n'est pas une vitesse — c'est une distance, et c'est là
+ * toute la différence.
+ *
+ * L'ancien modèle donnait une vitesse en fraction de largeur par seconde
+ * (0,10 à 0,22). Mesuré sur un écran de 1368x720 : un fruit vole environ 2 s,
+ * il parcourait donc de 274 à 602 px sur 1368 — entre 20 et 44 % de l'écran.
+ * Autrement dit il entrait par la gauche et mourait dans le tiers gauche.
+ * C'est exactement le défaut relevé par Kevin : « les fruits restent trop sur
+ * les bords de l'écran ».
+ *
+ * En raisonnant en DISTANCE, on obtient ce que fait Fruit Ninja pendant sa
+ * frénésie : les fruits traversent vraiment, ceux de droite vont à gauche et
+ * inversement, et le joueur balaie tout l'écran au lieu de camper sur un bord.
+ * La vitesse s'en déduit à chaque lancer en divisant par la durée de vol
+ * réelle — donc l'arc choisi ne change plus la distance parcourue, et le
+ * résultat est le même en portrait, en paysage et sur n'importe quel format.
+ */
+export const DELUGE_TRAVEL_MIN = 0.7; // dépasse largement le milieu
+export const DELUGE_TRAVEL_MAX = 1.35; // ressort par le bord opposé
 // Zone où la grenade vient se caler à la première coupe, en fraction de la
 // hauteur : assez haut pour ne pas gêner le HUD, assez bas pour rester à portée.
 export const FRENZY_ZONE_TOP = 0.28;
@@ -519,7 +537,13 @@ export const DEPTH_JUICE = 40;
 export const CHRONO_DURATION_MS = 60_000;
 
 // Pool de textes de feedback flottants (+10, Combo x2…)
-export const POPUP_POOL_SIZE = 10;
+// Passé de 10 à 24 : les récompenses arrivent désormais par gerbes de deux
+// ou trois, et pendant un déluge plusieurs gerbes se chevauchent. À 10, le
+// pool saturait et showPopup renonçait silencieusement — on perdait
+// justement les récompenses des moments les plus intenses.
+// Mesuré en plein déluge, tous les fruits tranchés : 13 récompenses visibles
+// en même temps, en quatre couleurs et cinq tailles. 24 laisse la marge.
+export const POPUP_POOL_SIZE = 24;
 
 // ------------------------------------------------------------------
 // Phase 3 — Contenu réunionnais
@@ -634,3 +658,101 @@ export const DEPTH_VIGNETTE = 45; // au-dessus du jeu et du jus, sous le HUD (50
 // HUD en cartouches translucides arrondis
 export const HUD_PANEL_COLOR = 0x0b2a3a;
 export const HUD_PANEL_ALPHA = 0.4;
+
+// ------------------------------------------------------------------
+// Le fruit cyclone : la frénésie en un seul coup de sabre
+// ------------------------------------------------------------------
+/**
+ * POURQUOI UN DEUXIÈME FRUIT SPÉCIAL, alors que la grenade existe déjà.
+ *
+ * Fruit Ninja en a deux, et ils ne font pas le même métier. La grenade (leur
+ * pomegranate) est un MINI-JEU : on la frappe en boucle, elle récompense
+ * l'endurance du poignet. La banane de frénésie est un CADEAU : un seul coup
+ * de sabre, et le déluge commence. La première se mérite, la seconde se
+ * cueille — et c'est la seconde qui donne à la partie ses pics de folie.
+ *
+ * Il nous manquait la seconde. Notre déluge n'existait qu'au bout des quatre
+ * secondes de grenade, donc seulement pour qui tenait le rythme jusqu'au
+ * bout. Le fruit cyclone le rend accessible d'un geste.
+ *
+ * POURQUOI LA PAPAYE. Il fallait un fruit qu'on ne puisse pas confondre avec
+ * un fruit ordinaire — un fruit spécial qui ressemble à un fruit normal est
+ * un piège, pas une récompense. La papaye est déjà peinte dans fruitArt.ts
+ * (entière, en deux moitiés, face de coupe) mais elle a été RETIRÉE du
+ * catalogue ordinaire : elle ne peut donc jamais sortir comme fruit banal.
+ * Elle arrive en plus par le côté, avec un halo — trois signaux d'affilée.
+ */
+export const CYCLONE_DURATION_MS = 6000;
+
+/**
+ * Espacement entre deux fruits cyclone. Kevin : « peut-être une fois par
+ * minute ». C'est le bon ordre de grandeur pour le Classique, qui dure aussi
+ * longtemps que le joueur tient.
+ *
+ * Le Chrono, lui, ne dure que 60 secondes : au même espacement, une partie
+ * entière pourrait n'en voir aucun. On le resserre donc à 22 s, ce qui en
+ * donne un ou deux par partie — la proportion exacte du mode Arcade de Fruit
+ * Ninja, où la banane de frénésie passe deux à trois fois en une minute.
+ */
+export const CYCLONE_MIN_GAP_MS = 58_000;
+export const CYCLONE_MIN_GAP_CHRONO_MS = 22_000;
+/** Jamais en tout début de partie : on laisse le joueur entrer dans le jeu. */
+export const CYCLONE_SAFE_TIME_MS = 28_000;
+export const CYCLONE_SAFE_TIME_CHRONO_MS = 9_000;
+/**
+ * Délai plancher entre DEUX fruits spéciaux quelconques, grenade et cyclone
+ * confondus. Sans lui, les deux cadences étant indépendantes, elles finissent
+ * par tomber ensemble : deux frénésies coup sur coup, et le jeu n'a plus de
+ * relief. C'est une seule règle pour deux mécaniques, et c'est voulu.
+ */
+export const SPECIAL_MIN_GAP_MS = 14_000;
+/** Points rapportés par le fruit cyclone lui-même, en plus du déluge. */
+export const CYCLONE_POINTS = 50;
+
+// ------------------------------------------------------------------
+// Récompenses simultanées (façon Fruit Ninja)
+// ------------------------------------------------------------------
+/**
+ * Sur la vidéo de référence, à 1 min 04, CINQ récompenses sont à l'écran en
+ * même temps — « 13 fruit combo », « +10 critical », « +3 lime bonus »,
+ * « Berry Blast +5 », « Hyper Blitz +25 » — à cinq endroits différents, dans
+ * trois tailles et trois couleurs. C'est ce fourmillement qui donne à leur
+ * frénésie sa sensation d'abondance.
+ *
+ * Chez nous tout arrivait en un seul bandeau centré. Un bandeau, si gros
+ * soit-il, reste UNE chose : l'œil la lit et passe. Cinq objets qui
+ * apparaissent à 70 ms d'intervalle, eux, donnent l'impression que l'écran
+ * n'arrive plus à suivre — et c'est exactement l'effet recherché.
+ *
+ * Le décalage compte autant que le nombre : tout faire apparaître à la même
+ * image donne une bouillie illisible, tandis qu'une cascade se lit.
+ */
+export const REWARD_STAGGER_MS = 70;
+/** Rayon de dispersion des récompenses autour du point du geste. */
+export const REWARD_SPREAD_PX = px(150);
+
+/** Couleurs des récompenses, une par nature — la couleur dit le type. */
+export const COLOR_POINTS = '#ffffff';
+export const COLOR_CRIT = '#ffd700';
+export const COLOR_COMBO = '#ffe066';
+export const COLOR_CYCLONE = '#ff8c5a';
+export const COLOR_BONUS = '#8ef2c8';
+
+/**
+ * Taille du halo du cyclone, en multiples de son rayon — plus grand que celui
+ * de la grenade (FRENZY_AURA_SCALE), et pour une raison mesurée.
+ *
+ * À 2,8, le halo d'une papaye de 88 px de rayon ne dépassait la silhouette que
+ * de 40 %. Mesuré sur la couronne autour du fruit, image avec halo contre
+ * image sans : 2,1 niveaux d'écart moyen sur 255, soit 0,8 %. Autrement dit le
+ * halo existait dans le code et nulle part à l'écran — et sur un ciel de fin
+ * de journée, une lueur chaude en fusion additive est justement ce qui se voit
+ * le moins.
+ *
+ * Le halo est le seul des trois signaux du cyclone qui fonctionne quelle que
+ * soit la distance : la silhouette et la trajectoire demandent qu'on regarde
+ * déjà au bon endroit.
+ */
+export const CYCLONE_AURA_SCALE = 4.2;
+export const CYCLONE_AURA_ALPHA_MIN = 0.3;
+export const CYCLONE_AURA_ALPHA_MAX = 0.62;

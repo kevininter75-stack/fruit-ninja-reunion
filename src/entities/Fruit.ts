@@ -22,6 +22,13 @@ export class Fruit extends Phaser.Physics.Arcade.Sprite {
 
   /** Vrai pour la grenade : elle survit à la première coupe et s'emballe. */
   public isFrenzy = false;
+
+  /**
+   * Vrai pour la papaye cyclone : elle se tranche NORMALEMENT, en un coup —
+   * c'est ce qu'elle déclenche qui n'a rien de normal. Elle est donc l'exact
+   * inverse de la grenade, qui elle refuse de se couper.
+   */
+  public isCyclone = false;
   /** Frénésie amorcée : la grenade flotte et compte les coups reçus. */
   public frenzyActive = false;
   /** Nombre de coups encaissés pendant la frénésie. */
@@ -49,11 +56,13 @@ export class Fruit extends Phaser.Physics.Arcade.Sprite {
     y: number,
     velocityX: number,
     velocityY: number,
-    isFrenzy = false
+    isFrenzy = false,
+    isCyclone = false
   ): void {
     this.variety = variety;
     this.isBonus = isBonus;
     this.isFrenzy = isFrenzy;
+    this.isCyclone = isCyclone;
     this.frenzyActive = false;
     this.slashCount = 0;
     this.lastSlashAt = 0;
@@ -75,9 +84,9 @@ export class Fruit extends Phaser.Physics.Arcade.Sprite {
     // Cercle de collision centré sur le sprite (les fruits sont ~ronds)
     body.setCircle(this.sliceRadius, this.width / 2 - this.sliceRadius, this.height / 2 - this.sliceRadius);
 
-    // Le combava doré et la grenade pulsent pour attirer l'œil (une allocation
+    // Les trois fruits spéciaux pulsent pour attirer l'œil (une allocation
     // par spawn spécial — événement rare, pas de pression GC)
-    if (isBonus || isFrenzy) {
+    if (isBonus || isFrenzy || isCyclone) {
       this.scene.tweens.add({
         targets: this,
         scale: 1.15,

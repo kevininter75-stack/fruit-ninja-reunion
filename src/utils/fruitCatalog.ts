@@ -80,6 +80,30 @@ export const FRENZY_VARIETY: FruitVariety = {
   weight: 0, // jamais tirée au poids : spawn dédié dans le SpawnManager
 };
 
+/**
+ * Papaye cyclone : le fruit qui déclenche la frénésie d'un seul coup de sabre.
+ *
+ * POURQUOI LA PAPAYE, et pas un fruit du catalogue. Un fruit spécial qui
+ * ressemble à un fruit ordinaire est un piège : à la vitesse où l'on tranche,
+ * on ne lit pas un halo, on lit une silhouette. La papaye ne peut PAS être
+ * confondue — elle a été retirée du catalogue ordinaire (elle se confondait
+ * avec la mangue) et n'apparaît donc jamais autrement que comme fruit cyclone.
+ * Son dessin, lui, existe toujours dans fruitArt.ts : entière, en moitiés, et
+ * jusqu'à sa cavité de graines noires. Rien à peindre, tout à gagner.
+ *
+ * Elle est la plus grosse du jeu, et c'est délibéré : c'est le seul fruit
+ * qu'on doit repérer d'un coup d'œil au bord de l'écran.
+ */
+export const CYCLONE_VARIETY: FruitVariety = {
+  key: 'papaye',
+  displayName: 'Papaye cyclone',
+  radius: px(88),
+  skinColor: 0xf0a02c,
+  juiceColor: 0xff8c42,
+  fleshColor: 0xff9e5e,
+  weight: 0, // jamais tirée au poids : spawn dédié dans le SpawnManager
+};
+
 export function wholeTextureKey(variety: FruitVariety): string {
   return `${variety.key}_whole`;
 }
