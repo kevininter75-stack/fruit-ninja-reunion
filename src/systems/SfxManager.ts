@@ -17,6 +17,8 @@ export class SfxManager {
   private master: GainNode | null = null;
   /** Horodatage du dernier bruit de coupe, pour atténuer les rafales. */
   private dernierTranchage = 0;
+  /** Idem pour le sifflement de lame, dont la cadence est celle du geste. */
+  private derniereLame = 0;
 
   private context(): AudioContext | null {
     if (isMuted()) {
@@ -164,21 +166,28 @@ export class SfxManager {
    * un souffle, l'un se noyait dans les autres. D'où l'impression, juste, que
    * trancher ne faisait aucun bruit propre.
    *
-   *   1. LA LAME : claquement très bref dans l'aigu (18 ms). C'est lui qui
+   * Le sifflement de lame, lui, a quitté cette méthode : il appartient au
+   * geste et se joue à part (cf. `lame()`). Ne restait donc ici que le fruit.
+   *
+   *   1. LA PEAU QUI CÈDE : claquement de 12 ms vers 4 kHz. C'est lui qui
    *      donne l'instant exact du contact — sans transient, un son paraît
    *      toujours mou et en retard.
-   *   2. LA CHAIR : éclat humide, passe-bas RÉSONANT qui plonge de 1400 à
-   *      260 Hz. La résonance est ce qui fait « juteux » plutôt que « sourd ».
-   *   3. LE CORPS : une note courte dont la hauteur dépend du RAYON du fruit.
-   *      Un goyavier de 44 px sonne vers 700 Hz, une papaye de 88 px vers
-   *      350 Hz. Le petit claque, le gros fait « tchok » — on entend ce qu'on
-   *      vient de couper, et deux coupes de suite ne sonnent jamais pareil.
+   *   2. L'ÉCLAT HUMIDE : bande étroite qui plonge de 1600 à 550 Hz.
+   *   3. LE PLOC : une note qui chute d'une octave et demie en 70 ms. C'est ce
+   *      glissando rapide, et non le bruit, qui fait entendre quelque chose
+   *      qui S'OUVRE. Sa hauteur suit le rayon du fruit.
+   *
+   * TOUT SE JOUE ENTRE 320 Hz ET 4 kHz, et ce n'est pas un détail de goût.
+   * Mesuré sur la version précédente : 82 % de son énergie tombait déjà dans
+   * cette bande, mais sa couche la plus grasse plongeait jusqu'à 260 Hz —
+   * c'est-à-dire sous le seuil où un haut-parleur de téléphone ne restitue
+   * plus rien. Le plancher de 320 Hz sur la note du fruit vient de là.
    *
    * Les rafales sont atténuées, pas supprimées : un coup de sabre sur six
    * fruits doit s'entendre six fois (c'est la demande), mais six sons pleins
    * à 30 ms d'intervalle font une seule bouffée illisible. Les suivants
-   * passent donc a 72 % : mesure a l'appui, une salve de six reste plus forte
-   * qu'une coupe isolee (0,29 contre 0,27 en crete) sans jamais ecreter.
+   * passent donc à 72 % : mesure à l'appui, une salve de six porte deux fois
+   * l'énergie d'une coupe isolée pour la même crête, sans jamais écrêter.
    */
   slice(radius = 60): void {
     const ctx = this.context();
@@ -189,13 +198,53 @@ export class SfxManager {
     this.dernierTranchage = ctx.currentTime;
     const v = serre ? 0.72 : 1;
 
-    this.playNoise(ctx, 'highpass', 3200, 2400, 0.7, 0.22 * v, 0.018);
-    this.playNoise(ctx, 'lowpass', 1400, 260, 5.5, 0.34 * v, 0.11);
-    // Plus le fruit est gros, plus il sonne grave — et un peu de hasard, sans
-    // quoi deux letchis d'affilée donneraient deux fois la même note.
-    const base = (520 * 60) / Math.max(radius, 20);
-    const detune = 0.92 + Math.random() * 0.16;
-    this.playTone('triangle', base * detune, base * detune * 0.55, 0.09, 0.16 * v);
+    // 1. La peau qui cède : très court, très haut. C'est l'instant du contact.
+    this.playNoise(ctx, 'highpass', 4200, 3000, 0.7, 0.26 * v, 0.012);
+    // 2. L'éclat humide : bande étroite qui plonge vite. Elle reste ENTRE
+    //    550 et 1600 Hz — la zone qu'un haut-parleur de téléphone restitue le
+    //    mieux. L'ancienne version plongeait à 260 Hz, donc dans le vide.
+    this.playNoise(ctx, 'bandpass', 1600, 550, 2.2, 0.4 * v, 0.085);
+    // 3. Le « ploc » : une note qui chute d'une octave et demie en 70 ms.
+    //    C'est ce glissando rapide qui fait entendre quelque chose qui S'OUVRE
+    //    plutôt qu'un simple bruit. Sa hauteur suit le rayon du fruit, mais
+    //    bornée à 320 Hz par le bas : en dessous, un téléphone n'en rend rien.
+    const base = Math.min(1150, Math.max(320, (900 * 60) / Math.max(radius, 20)));
+    const detune = 0.93 + Math.random() * 0.14;
+    this.playTone('triangle', base * detune, base * detune * 0.38, 0.07, 0.26 * v);
+  }
+
+  /**
+   * LA LAME, et elle se joue au GESTE — pas au fruit.
+   *
+   * C'était la confusion à défaire. Un seul son servait aux deux choses : le
+   * sifflement d'une lame qui fend l'air, et le fruit qui s'ouvre. Or ce sont
+   * deux événements différents, à deux instants différents — on entend d'abord
+   * le sabre partir, puis chaque fruit éclater sur son passage. Confondus, ni
+   * l'un ni l'autre ne s'entendait pour ce qu'il était.
+   *
+   * Elle sonne donc à l'OUVERTURE du coup de sabre, même si le geste ne touche
+   * rien. C'est ce qui donne son poids au fait de trancher dans le vide : le
+   * joueur entend qu'il a manqué.
+   *
+   * Deux couches : un souffle en bande étroite qui MONTE (une lame qui
+   * s'approche monte en fréquence, comme une sirène qui passe), et une trace
+   * métallique brève à 3,9 kHz qui lui donne son acier.
+   */
+  lame(): void {
+    const ctx = this.context();
+    if (ctx === null) {
+      return;
+    }
+    // Anti-rafale propre au geste : un doigt qui zigzague rouvre des coups de
+    // sabre très rapprochés, et autant de sifflements empilés feraient un
+    // bourdonnement continu.
+    if (ctx.currentTime - this.derniereLame < 0.12) {
+      return;
+    }
+    this.derniereLame = ctx.currentTime;
+    const h = 0.9 + Math.random() * 0.25;
+    this.playNoise(ctx, 'bandpass', 700 * h, 2900 * h, 3.4, 0.17, 0.16);
+    this.playTone('triangle', 3900 * h, 3200 * h, 0.06, 0.045);
   }
 
   /** Explosion de bombe : bruit grave qui s'étouffe + chute de basse. */

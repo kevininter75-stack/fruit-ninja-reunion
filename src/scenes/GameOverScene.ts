@@ -17,6 +17,7 @@ import {
 } from '../utils/constants';
 import { getBestScore, saveBestScore } from '../utils/bestScore';
 import { sfx } from '../systems/SfxManager';
+import { music } from '../systems/MusicManager';
 import { AnimatedBackground } from '../entities/AnimatedBackground';
 import { addVignette, fadeIn, fadeToScene } from '../utils/ui';
 import { prefersReducedMotion } from '../utils/settings';
@@ -93,6 +94,9 @@ export class GameOverScene extends Phaser.Scene {
   }
 
   create(): void {
+    // Le match est fini : le rouler se retire, la boucle redevient celle du
+    // menu. Sans cela le tambour continuerait de battre sur l'ecran de fin.
+    music.setEnPartie(false);
     const w = this.scale.width;
     const h = this.scale.height;
     const portrait = h > w;

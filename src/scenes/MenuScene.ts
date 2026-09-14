@@ -66,6 +66,7 @@ export class MenuScene extends Phaser.Scene {
     new SceneGrading(this);
     new AnimatedBackground(this, true);
     music.ensureRunning();
+    music.setEnPartie(false);
 
     const title = this.add
       .text(w / 2, h * 0.15, portrait ? "Kout\nSab'" : "Kout Sab'", {

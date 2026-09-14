@@ -309,6 +309,8 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0)
       .setDepth(DEPTH_DARKEN);
     music.ensureRunning();
+    // Le rouler entre : la boucle du menu devient celle du match.
+    music.setEnPartie(true);
 
     // Pools de sprites : fruits, moitiés et bombes sont recyclés, jamais
     // détruits, pour éviter les allocations/GC en partie (60 FPS mobile).
@@ -721,7 +723,7 @@ export class GameScene extends Phaser.Scene {
     this.grading.setMode('frenzy');
 
     const gagne = this.scoreManager.addScore(CYCLONE_POINTS);
-    this.showBigBanner(`${CYCLONE}\n+${gagne}`, 1.15);
+    this.showBigBanner(`${CYCLONE}\n+${gagne}`, 1.15, papaye.x, papaye.y);
 
     // Double onde chaude, secousse, gel bref : le vocabulaire du gros moment.
     this.spawnRing(papaye.x, papaye.y, 7, 0xffd166, 420);
@@ -1364,6 +1366,10 @@ export class GameScene extends Phaser.Scene {
         gesture.strokeActive = true;
         gesture.strokeStart = now;
         gesture.comboCount = 0;
+        // Le sifflement de lame appartient au GESTE, pas au fruit : il sonne
+        // ici, à l'ouverture du coup de sabre, même si celui-ci ne touche
+        // rien. Trancher dans le vide s'entend, et c'est voulu.
+        sfx.lame();
       }
       gesture.lastFastTime = now;
 
@@ -1776,7 +1782,7 @@ export class GameScene extends Phaser.Scene {
     sfx.crit();
     // Même découpage que pour les combos : l'exclamation au centre, le détail
     // chiffré dispersé autour du point d'explosion.
-    this.showBigBanner(FRENESIE);
+    this.showBigBanner(FRENESIE, 1, grenade.x, grenade.y);
     this.showRewardBurst(grenade.x, grenade.y, [
       { texte: `${slashes} COUPS`, couleur: COLOR_COMBO, taille: px(48) },
       { texte: `+${awarded}`, couleur: COLOR_POINTS, taille: px(38) },
@@ -1882,7 +1888,7 @@ export class GameScene extends Phaser.Scene {
     // détache et part vivre ailleurs sur l'écran : c'est ce qui fait passer la
     // récompense d'un bloc unique à une gerbe de récompenses, comme dans la
     // référence.
-    this.showBigBanner(exclamationCombo(n), enorme ? 1.3 : 1);
+    this.showBigBanner(exclamationCombo(n), enorme ? 1.3 : 1, gesture.lastX, gesture.lastY);
     this.showRewardBurst(gesture.lastX, gesture.lastY, [
       { texte: `${n} FRUITS`, couleur: COLOR_COMBO, taille: px(enorme ? 56 : 46) },
       { texte: `+${awarded}`, couleur: COLOR_POINTS, taille: px(38) },
@@ -1918,9 +1924,17 @@ export class GameScene extends Phaser.Scene {
    * nombre de deux et ne s'inventent pas — la montée se joue donc sur la
    * PRÉSENCE : même mot, mais dit beaucoup plus fort.
    */
-  private showBigBanner(message: string, emphase = 1): void {
+  private showBigBanner(message: string, emphase = 1, x = Number.NaN, y = Number.NaN): void {
+    // Le mot s'affiche LÀ OÙ LE GESTE A EU LIEU, pas systématiquement au
+    // centre. Au centre, il racontait toujours la même histoire quelle que
+    // soit l'action ; à l'endroit du coup de sabre, il désigne ce qu'on vient
+    // de faire — et l'œil du joueur y est déjà, puisque c'est là qu'il vient
+    // de trancher. Le centre reste le défaut pour ce qui ne se passe nulle
+    // part en particulier : l'arrivée de la grenade, une vie regagnée.
+    const viseX = Number.isNaN(x) ? this.scale.width / 2 : x;
+    const viseY = Number.isNaN(y) ? this.scale.height * 0.34 : y - px(70);
     const banner = this.add
-      .text(this.scale.width / 2, this.scale.height * 0.34, message, {
+      .text(viseX, viseY, message, {
         fontFamily: GAME_FONT,
         fontSize: fontPx(Math.round(76 * emphase)),
         fontStyle: 'bold',
@@ -1933,6 +1947,15 @@ export class GameScene extends Phaser.Scene {
       .setDepth(70)
       .setScale(0.3)
       .setAngle(Phaser.Math.Between(-7, 7)); // léger décalage : moins figé
+    // Bornage APRÈS création : c'est la seule façon de connaître la largeur
+    // réelle du texte une fois rendu. « Cyclone y débarque ! » fait plus du
+    // tiers de l'écran — posé sur un geste près d'un bord, il en sortirait.
+    const demiL = banner.width / 2 + px(16);
+    const demiH = banner.height / 2 + px(12);
+    banner.setPosition(
+      Phaser.Math.Clamp(banner.x, demiL, this.scale.width - demiL),
+      Phaser.Math.Clamp(banner.y, demiH, this.scale.height - demiH)
+    );
     this.tweens.add({
       targets: banner,
       scale: 1,
