@@ -146,7 +146,17 @@ export const BOMB_SAFE_WAVES = 8; // aucune bombe avant la 9e vague
 // marque peu) et le SCORE (un bon joueur accélère lui-même la montée).
 // L'ancien système par paliers de score sautait d'un cran entier sur un seul
 // coup critique : l'accélération paraissait arbitraire.
-export const INTENSITY_RAMP_MS = 260_000; // Classique : plein régime vers 4 min 20
+/**
+ * Classique : plein régime vers 2 min 45.
+ *
+ * C'était 4 min 20, et c'était trop long — demande de Kevin, qui joue le jeu
+ * bien plus souvent que quiconque. Une partie ordinaire s'arrête bien avant
+ * quatre minutes : la courbe passait donc l'essentiel de son temps dans sa
+ * moitié douce, et le joueur ne voyait presque jamais ce pour quoi elle avait
+ * été écrite. Un tiers de moins, c'est la partie moyenne qui atteint enfin le
+ * haut de la rampe.
+ */
+export const INTENSITY_RAMP_MS = 165_000;
 
 /**
  * LA PHASE SANS FIN, après le plein régime.
@@ -161,7 +171,7 @@ export const INTENSITY_RAMP_MS = 260_000; // Classique : plein régime vers 4 mi
  * pente bien plus douce et un plancher absolu : il s'agit de ne jamais laisser
  * la partie s'installer, pas de la rendre injouable d'un coup.
  */
-export const OVERDRIVE_RAMP_MS = 240_000;
+export const OVERDRIVE_RAMP_MS = 170_000;
 /** Intervalle plancher absolu, en plein sur-régime. */
 export const SPAWN_INTERVAL_FLOOR_MS = 520;
 /** Densité de bombes en plein sur-régime (Fruit Ninja : environ une pour six). */
@@ -180,9 +190,11 @@ export const INTENSITY_RAMP_CHRONO_MS = 55_000; // Chrono (60 s) : montée plus 
  * Ninja utilise (la cadence y monte à mesure que l'on tranche), et elle reste
  * juste quel que soit le barème.
  *
- * 260 fruits : environ deux minutes et demie de jeu soutenu.
+ * 170 fruits, contre 260 : le moteur « fruits » est descendu dans la même
+ * proportion que le moteur « temps », sinon l'un aurait rattrapé l'autre et
+ * la rampe raccourcie n'aurait servi qu'aux joueurs lents.
  */
-export const INTENSITY_RAMP_FRUITS = 260;
+export const INTENSITY_RAMP_FRUITS = 170;
 
 // Intervalle bruité de ±18 % : sans ça le spawn est un métronome, et l'oreille
 // comme l'œil s'y habituent — le jeu perd toute tension.

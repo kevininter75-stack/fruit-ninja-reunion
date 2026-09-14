@@ -37,7 +37,7 @@ interface GameOverData {
 const REASON_DISPLAY: Record<GameOverReason, { title: string; subtitle: string; color: string }> = {
   lives: { title: 'GAME OVER', subtitle: 'Plus de vies !', color: '#ff6b6b' },
   // « La plané » — la formule que Kevin emploie quand c'est fichu.
-  bomb: { title: BOMBE, subtitle: 'Vous avez tranché une bombe…', color: '#ffb347' },
+  bomb: { title: BOMBE, subtitle: 'Vous avez tranché un pétard…', color: '#ffb347' },
   time: { title: 'TEMPS ÉCOULÉ', subtitle: 'Les 60 secondes sont passées !', color: '#7fd4f0' },
 };
 

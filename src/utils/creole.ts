@@ -37,7 +37,7 @@ export const FRENESIE = 'I pète fort !';
 /** Nouveau record personnel. */
 export const RECORD = 'Lé doss !';
 
-/** Bombe tranchée : la partie s'arrête net. */
+/** Pétard tranché : la partie s'arrête net. */
 export const BOMBE = 'La plané';
 
 /**

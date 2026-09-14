@@ -1,4 +1,4 @@
-import { suspendAudio, resumeAudio } from '../utils/audioContext';
+import { suspendAudio, resumeAudio, contexteActif } from '../utils/audioContext';
 import { music } from './MusicManager';
 
 /**
@@ -41,35 +41,6 @@ import { music } from './MusicManager';
  * laisserait le jeu figé pour de bon. L'audio, lui, n'avait pas ce filet :
  * c'est là qu'il fallait agir.
  */
-/**
- * Déverrouille l'audio au tout premier contact, quel qu'il soit.
- *
- * LE MENU ÉTAIT MUET, et ce n'était pas un problème de mixage. Les navigateurs
- * refusent de faire sonner quoi que ce soit avant un geste du joueur :
- * l'AudioContext naît SUSPENDU, et tant qu'il l'est, il ne sort rien du tout.
- * Mesuré : crête 0 avec le contexte suspendu, 0,14 dès qu'il reprend.
- *
- * Or rien ne le réveillait sur l'écran d'accueil. Le contexte ne reprenait
- * qu'à l'occasion d'un son joué — et le seul geste qui produit un son au menu
- * est le coup de sabre qui choisit un mode, lequel lance aussitôt la partie.
- * Le joueur n'entendait donc JAMAIS la musique du menu : elle tournait dans
- * le vide, et redevenait audible seulement au retour d'une partie.
- *
- * Un simple effleurement suffit désormais. On écoute aussi le clavier pour le
- * jeu ouvert sur un ordinateur, et `touchstart` en plus de `pointerdown` parce
- * que les navigateurs anciens ne comptent pas toujours le second comme un
- * geste qualifiant.
- */
-function deverrouillerAudioAuPremierGeste(): void {
-  const reveiller = (): void => {
-    resumeAudio();
-    music.wake();
-  };
-  for (const evenement of ['pointerdown', 'touchstart', 'keydown']) {
-    window.addEventListener(evenement, reveiller, { once: true, passive: true });
-  }
-}
-
 export function installAppLifecycle(): void {
   deverrouillerAudioAuPremierGeste();
 
@@ -102,3 +73,56 @@ export function installAppLifecycle(): void {
   document.addEventListener('freeze', endormir);
   document.addEventListener('resume', reveiller);
 }
+
+/**
+ * Déverrouille l'audio au tout premier contact, quel qu'il soit.
+ *
+ * LE MENU ÉTAIT MUET, et ce n'était pas un problème de mixage. Les navigateurs
+ * refusent de faire sonner quoi que ce soit avant un geste du joueur :
+ * l'AudioContext naît SUSPENDU, et tant qu'il l'est, il ne sort rien du tout.
+ * Mesuré : crête 0 avec le contexte suspendu, 0,14 dès qu'il reprend.
+ *
+ * Or rien ne le réveillait sur l'écran d'accueil. Le contexte ne reprenait
+ * qu'à l'occasion d'un son joué — et le seul geste qui produit un son au menu
+ * est le coup de sabre qui choisit un mode, lequel lance aussitôt la partie.
+ * Le joueur n'entendait donc JAMAIS la musique du menu : elle tournait dans
+ * le vide, et redevenait audible seulement au retour d'une partie.
+ *
+ * Un simple effleurement suffit désormais, où qu'il tombe. On écoute six
+ * sortes de gestes plutôt qu'une : les navigateurs ne s'accordent pas sur ce
+ * qui vaut autorisation, et il n'en coûte rien d'être large.
+ */
+function deverrouillerAudioAuPremierGeste(): void {
+  const reveiller = (): void => {
+    // Rien à faire tant que tout va bien : le coût d'un toucher est une
+    // comparaison de chaîne.
+    if (contexteActif()) {
+      return;
+    }
+    resumeAudio();
+    music.wake();
+  };
+  for (const evenement of GESTES) {
+    // En phase de CAPTURE : on passe avant Phaser, qui appelle stopPropagation
+    // sur certains touchers (les boutons du HUD le font explicitement).
+    //
+    // Et ON NE SE RETIRE JAMAIS. C'était le défaut de la version précédente :
+    // elle écoutait `{ once: true }`, donc elle ne tentait le déverrouillage
+    // qu'UNE SEULE FOIS. Or `resume()` échoue silencieusement dans plusieurs
+    // cas ordinaires — contexte créé la milliseconde d'avant, page pas encore
+    // au premier plan, moteur audio encore en train de s'initialiser. Après
+    // cet échec unique, plus rien ne réessayait et le menu restait muet POUR
+    // TOUJOURS. En jeu le défaut ne se voyait pas : `getAudioContext()`
+    // réveille le contexte à chaque son joué, et une partie en joue sans
+    // arrêt. Le menu, lui, n'en joue aucun — d'où un jeu qui a du son et un
+    // accueil silencieux.
+    //
+    // Les garder à demeure rattrape aussi toute suspension ultérieure qui
+    // aurait échappé aux évènements de cycle de vie : le toucher suivant
+    // remet le son, quoi qu'il se soit passé.
+    window.addEventListener(evenement, reveiller, true);
+  }
+}
+
+/** Les gestes que les navigateurs acceptent comme autorisation de jouer du son. */
+const GESTES = ['pointerdown', 'pointerup', 'touchstart', 'touchend', 'keydown', 'click'];

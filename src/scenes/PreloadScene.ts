@@ -483,37 +483,118 @@ export class PreloadScene extends Phaser.Scene {
   // ------------------------------------------------------------------
 
   /** Bombe placeholder : sphère noire, reflet, mèche et étincelle. */
+  /**
+   * LE PÉTARD CHINOIS, à la place de la bombe noire.
+   *
+   * POURQUOI CE CHANGEMENT. Une bombe ronde à mèche est le vocabulaire du jeu
+   * de plateforme américain ; elle ne dit rien d'ici. Le pétard rouge et or,
+   * lui, est un objet que tout le monde connaît à La Réunion — c'est celui du
+   * Nouvel An chinois, et la communauté sino-réunionnaise fait partie de
+   * l'île depuis le XIXe siècle. Il explose, il a une mèche, il fait peur au
+   * bon moment : il remplit exactement le même office, en parlant créole.
+   *
+   * CE QUI EST CONTRAINT, ET POURQUOI. Le corps doit tenir DANS le cercle de
+   * détection (BOMB_RADIUS), jamais en dépasser. Un objet dessiné plus large
+   * que sa zone de coupe se fait trancher « à côté » — impardonnable pour un
+   * objet dont le contact coûte la partie. Sa demi-diagonale est donc calculée
+   * pour rester sous le rayon, le joueur étant toujours avantagé.
+   *
+   * Le bout de mèche reste EXACTEMENT au même endroit qu'avant (r+17, 8) :
+   * c'est de là que Bomb.fuseTip fait crépiter les étincelles, et cette
+   * position est codée en dur dans l'entité.
+   *
+   * Peint clair, comme le reste : la teinte d'éclairage multiplie la couleur
+   * à l'affichage (cf. surfaceShading), donc un rouge peint à sa valeur finale
+   * ressortirait sombre et boueux.
+   */
   private createBombTexture(): void {
     const r = BOMB_RADIUS;
     const size = r * 2;
-    const bodyRadius = r - px(8); // marge pour laisser la mèche dans le canvas
     const g = this.make.graphics({ x: 0, y: 0 }, false);
 
-    // Corps sombre, SANS reflet peint.
-    //
-    // Il y en avait un : un disque plus clair en haut à gauche. Mais une
-    // bombe tourne à 120°/s, et un reflet peint tourne avec elle — on voyait
-    // donc la lumière faire le tour de la sphère. Le reflet vient désormais du
-    // calque additif, et le galbe de la teinte : ni l'un ni l'autre ne tourne.
-    //
-    // La teinte multipliant la couleur, le corps est peint un peu plus clair
-    // qu'il ne doit paraître : c'est l'équivalent, pour une couleur unie, du
-    // « peint sous pleine lumière » des fruits.
-    g.fillStyle(0x23232d, 1);
-    g.fillCircle(r, r + px(6), bodyRadius);
+    // Cylindre : nettement plus haut que large, comme un vrai pétard.
+    const demiLargeur = r * 0.42;
+    const demiHauteur = r * 0.66;
+    const cx = r;
+    const cy = r + px(6);
+    const gauche = cx - demiLargeur;
+    const haut = cy - demiHauteur;
+    const largeur = demiLargeur * 2;
+    const hauteur = demiHauteur * 2;
 
-    // Mèche stylisée
-    g.lineStyle(px(6), 0x8a6d4a, 1);
+    // Corps rouge uni, puis galbe peint à la main par bandes verticales.
+    //
+    // POURQUOI PAS UN DÉGRADÉ. `fillGradientStyle` de Phaser ne s'applique PAS
+    // à `fillRoundedRect` : le rectangle sort rempli de la dernière couleur
+    // unie posée. Constaté à l'écran — le pétard est ressorti entièrement
+    // doré, sans une trace de rouge. Des bandes verticales d'alpha croissant
+    // font le même travail et ne dépendent d'aucun comportement incertain.
+    // Peint plus clair qu'il ne doit paraître : la teinte d'éclairage multiplie
+    // la couleur à l'affichage (cf. surfaceShading), et un rouge posé à sa
+    // valeur finale ressortirait brun.
+    g.fillStyle(0xdc4432, 1);
+    g.fillRoundedRect(gauche, haut, largeur, hauteur, px(10));
+
+    // Les bandes sont rentrées verticalement du rayon des coins : sans cela
+    // elles dépasseraient de l'arrondi et le tube aurait les angles carrés.
+    const BANDES = 9;
+    const hautBande = haut + px(10);
+    const hauteurBande = hauteur - px(20);
+    for (let i = 0; i < BANDES; i++) {
+      const t = i / (BANDES - 1); // 0 à gauche, 1 à droite
+      // Cylindre éclairé depuis la gauche : sombre au bord gauche, clair au
+      // tiers, puis assombri vers le bord droit qui fuit.
+      const clarte = Math.sin(t * Math.PI) * 0.9 - Math.abs(t - 0.32) * 0.35;
+      const x = gauche + t * (largeur - largeur / BANDES);
+      if (clarte > 0) {
+        g.fillStyle(0xff8a6e, clarte * 0.42);
+      } else {
+        g.fillStyle(0x5e0f0f, -clarte * 0.75);
+      }
+      g.fillRect(x, hautBande, largeur / BANDES + 1, hauteurBande);
+    }
+
+    // Bagues dorées en haut et en bas, la signature du pétard. Volontairement
+    // fines : elles doivent souligner le rouge, pas le remplacer.
+    g.fillStyle(0xe8b33a, 1);
+    g.fillRoundedRect(gauche, haut, largeur, px(11), px(5));
+    g.fillRoundedRect(gauche, haut + hauteur - px(11), largeur, px(11), px(5));
+    g.fillStyle(0xfae08a, 0.7);
+    g.fillRect(gauche + px(4), haut + px(2), largeur - px(8), px(2));
+    g.fillRect(gauche + px(4), haut + hauteur - px(9), largeur - px(8), px(2));
+
+    // Motif doré au centre : un trait horizontal, un vertical, un losange.
+    // Assez pour évoquer un caractère peint sans prétendre en écrire un — un
+    // vrai caractère, illisible à cette taille et en rotation, ne serait
+    // qu'une tache de plus.
+    g.lineStyle(px(3), 0xe8b33a, 0.85);
     g.beginPath();
-    g.moveTo(r, px(16));
-    g.lineTo(r + px(14), px(8));
+    g.moveTo(cx - demiLargeur * 0.42, cy - px(12));
+    g.lineTo(cx + demiLargeur * 0.42, cy - px(12));
+    g.moveTo(cx, cy - px(20));
+    g.lineTo(cx, cy + px(10));
+    g.strokePath();
+    g.fillStyle(0xe8b33a, 0.85);
+    g.fillTriangle(cx, cy + px(2), cx - px(7), cy + px(13), cx + px(7), cy + px(13));
+
+    // Contour sombre : sans lui, le rouge se noie dans un ciel de fin de
+    // journée qui est lui aussi chaud.
+    g.lineStyle(px(4), 0x3a0d0d, 0.85);
+    g.strokeRoundedRect(gauche, haut, largeur, hauteur, px(10));
+
+    // Mèche tressée, qui part du haut du pétard vers la droite.
+    g.lineStyle(px(6), 0xd9c49a, 1);
+    g.beginPath();
+    g.moveTo(cx, haut + px(2));
+    g.lineTo(cx + px(8), px(14));
+    g.lineTo(cx + px(14), px(8));
     g.strokePath();
 
-    // Étincelle orange au bout de la mèche
+    // Étincelle au bout de la mèche — position inchangée (cf. Bomb.fuseTip).
     g.fillStyle(0xffb347, 1);
-    g.fillCircle(r + px(17), px(8), px(7));
+    g.fillCircle(cx + px(17), px(8), px(7));
     g.fillStyle(0xfff3b0, 1);
-    g.fillCircle(r + px(17), px(8), px(3));
+    g.fillCircle(cx + px(17), px(8), px(3));
 
     g.generateTexture(TEX_BOMB, size, size);
     g.destroy();

@@ -43,6 +43,16 @@ export function suspendAudio(): void {
   }
 }
 
+/**
+ * Vrai quand le contexte existe ET joue réellement.
+ *
+ * C'est la seule preuve qui vaille que le déverrouillage a abouti : un
+ * contexte peut exister, avoir reçu un `resume()`, et rester suspendu.
+ */
+export function contexteActif(): boolean {
+  return sharedContext !== null && sharedContext.state === 'running';
+}
+
 /** Rend l'audio au premier plan. Sans effet si le joueur n'a jamais joué de son. */
 export function resumeAudio(): void {
   enArrierePlan = false;
