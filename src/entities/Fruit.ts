@@ -20,16 +20,16 @@ export class Fruit extends Phaser.Physics.Arcade.Sprite {
   /** Vrai pour le combava doré (déclenche le score x2 à la coupe). */
   public isBonus = false;
 
-  /** Vrai pour la grenade : elle survit à la première coupe et s'emballe. */
+  /** Vrai pour le piment cabri : il survit à la première coupe et s'emballe. */
   public isFrenzy = false;
 
   /**
    * Vrai pour la papaye cyclone : elle se tranche NORMALEMENT, en un coup —
    * c'est ce qu'elle déclenche qui n'a rien de normal. Elle est donc l'exact
-   * inverse de la grenade, qui elle refuse de se couper.
+   * inverse du piment cabri, qui lui refuse de se couper.
    */
   public isCyclone = false;
-  /** Frénésie amorcée : la grenade flotte et compte les coups reçus. */
+  /** Frénésie amorcée : le piment flotte et compte les coups reçus. */
   public frenzyActive = false;
   /** Nombre de coups encaissés pendant la frénésie. */
   public slashCount = 0;
@@ -99,16 +99,16 @@ export class Fruit extends Phaser.Physics.Arcade.Sprite {
   }
 
   /**
-   * Amorce la frénésie de la grenade : elle sort de la simulation physique
-   * pour que la scène puisse la placer et la maintenir à un endroit
-   * atteignable pendant toute la frénésie.
+   * Amorce la frénésie du piment : il sort de la simulation physique pour
+   * que la scène puisse le placer et le maintenir à un endroit atteignable
+   * pendant toute la frénésie.
    *
    * `body.moves = false` est le point clé : sans cela le corps Arcade
    * continuerait d'intégrer sa vitesse et d'écraser la position à chaque
-   * frame, ce qui rendait la grenade incontrôlable — elle dérivait vers le
-   * haut jusqu'à sortir de l'écran, combo impossible à terminer.
+   * frame, ce qui rendait le piment incontrôlable — il dérivait vers le haut
+   * jusqu'à sortir de l'écran, combo impossible à terminer.
    * La détection de coupe lit la position du SPRITE (cf. SliceDetector), donc
-   * elle reste parfaitement tranchable une fois le corps figé.
+   * il reste parfaitement tranchable une fois le corps figé.
    */
   startFrenzy(): void {
     this.frenzyActive = true;
@@ -124,7 +124,7 @@ export class Fruit extends Phaser.Physics.Arcade.Sprite {
   /** Désactive le fruit et le rend au pool. */
   kill(): void {
     // Purge de TOUS les tweens visant ce sprite (pulsation, recadrage et
-    // flottement de la grenade) : un tween survivant continuerait de déplacer
+    // flottement du piment) : un tween survivant continuerait de déplacer
     // ou de redimensionner le prochain fruit tiré du pool.
     this.scene.tweens.killTweensOf(this);
     this.setScale(1);
@@ -152,7 +152,7 @@ export class Fruit extends Phaser.Physics.Arcade.Sprite {
     super.preUpdate(time, delta);
     this.sheen.sync(this, this.sliceRadius);
     if (this.frenzyActive) {
-      return; // grenade figée en frénésie : elle ne tombe pas, donc rien à manquer
+      return; // piment figé en frénésie : il ne tombe pas, donc rien à manquer
     }
     const body = this.body as Phaser.Physics.Arcade.Body;
     if (this.active && body.velocity.y > 0 && this.y > this.scene.scale.height + this.sliceRadius * 2) {

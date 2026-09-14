@@ -35,7 +35,7 @@ import { estTactile } from '../utils/viewport';
  * vers le portrait reconstruisait toute la scène active. Endormie, la partie
  * est simplement SUSPENDUE : `TimeStep.sleep()` coupe vraiment
  * requestAnimationFrame, donc `time.now` cesse d'avancer, donc les minuteurs
- * de spawn, la minuterie de la grenade et le chrono se figent d'eux-mêmes.
+ * de spawn, la minuterie du piment et le chrono se figent d'eux-mêmes.
  * On retrouve la partie exactement où on l'avait laissée — y compris les
  * fruits en vol, que la reconstruction perdait.
  *

@@ -124,9 +124,9 @@ export class SpawnManager {
   private fruitsSinceBomb = 0;
   /** Vrai si la salve précédente était dense → la suivante laisse souffler. */
   private needsBreather = false;
-  /** Prochain palier de score qui fera apparaître une grenade. */
+  /** Prochain palier de score qui fera apparaître un piment. */
   private nextFrenzyAt = FRENZY_SCORE_STEP;
-  /** Nombre de grenades déjà lancées : le palier s'éloigne à chacune. */
+  /** Nombre de piments déjà lancés : le palier s'éloigne à chacun. */
   private frenzyCount = 0;
   /** Fin de la dernière frénésie, pour le délai plancher entre deux. */
   private lastFrenzyEndedAt = -Infinity;
@@ -137,7 +137,7 @@ export class SpawnManager {
   /** Dernier fruit cyclone lancé, pour tenir sa cadence d'environ une minute. */
   private lastCycloneAt = -Infinity;
   /**
-   * Dernier fruit spécial QUEL QU'IL SOIT — grenade ou cyclone. Les deux
+   * Dernier fruit spécial QUEL QU'IL SOIT — piment ou cyclone. Les deux
    * cadences sont indépendantes ; sans ce garde-fou commun elles finissent
    * mathématiquement par coïncider, et le joueur reçoit deux frénésies coup
    * sur coup. Une seule règle pour les deux mécaniques.
@@ -211,7 +211,7 @@ export class SpawnManager {
 
   /**
    * Ouvre le déluge : cinq secondes de fruits par les côtés, sans une seule
-   * bombe. C'est la récompense de la grenade, et c'est ce qui manquait — la
+   * bombe. C'est la récompense du piment, et c'est ce qui manquait — la
    * frénésie était une parenthèse au lieu d'être un sommet.
    *
    * La salve en attente est annulée et reprogrammée aussitôt : elle pouvait
@@ -396,16 +396,16 @@ export class SpawnManager {
    * game over annule les lancers encore en attente.
    */
   private spawnWave(): void {
-    // Tant qu'une grenade est en scène, on suspend les lancers : la frénésie
+    // Tant qu'un piment est en scène, on suspend les lancers : la frénésie
     // doit être un moment à elle. Continuer à envoyer des fruits par-dessus
     // rendait la séquence illisible et injustement difficile.
-    // La condition s'auto-libère (grenade explosée ou tombée hors écran), donc
+    // La condition s'auto-libère (piment explosé ou tombé hors écran), donc
     // aucun drapeau à réinitialiser : impossible de rester bloqué.
     const frenzyEnScene = this.isFrenzyOnStage();
     if (this.frenzyOnStage && !frenzyEnScene) {
       // La frénésie vient de se terminer. On recale le palier sur le score
       // ATTEINT : sans cela, les points qu'elle vient de rapporter
-      // compteraient pour la grenade suivante, et une bonne frénésie en
+      // compteraient pour le piment suivante, et une bonne frénésie en
       // réarmerait presque immédiatement une autre.
       this.lastFrenzyEndedAt = this.scene.time.now;
       this.nextFrenzyAt = this.scoreManager.getScore() + this.frenzyStep();
@@ -416,7 +416,7 @@ export class SpawnManager {
     }
 
     // Le déluge remplace entièrement la salve ordinaire, et sort AVANT toute
-    // la mécanique de bombes, de bonus et de grenade : aucune de ces trois
+    // la mécanique de bombes, de bonus et de piment : aucune de ces trois
     // choses ne peut donc s'y glisser.
     if (this.isDeluge()) {
       this.spawnDelugeBurst();
@@ -474,7 +474,7 @@ export class SpawnManager {
             ? stagger
             : rndBetween(SPAWN_STAGGER_MIN_MS, SPAWN_STAGGER_MAX_MS);
         this.scene.time.delayedCall(delay, () => {
-          // La grenade peut entrer en scène APRÈS que cette salve a été
+          // Le piment peut entrer en scène APRÈS que cette salve a été
           // décidée : maybeSpawnFrenzy est appelée à la FIN de spawnWave, alors
           // que les lancers échelonnés sont déjà programmés. Sans cette
           // vérification, les fruits ET LES BOMBES de la salve en cours
@@ -495,7 +495,7 @@ export class SpawnManager {
   }
 
   /**
-   * Grenade de frénésie : déclenchée par PALIER DE SCORE (et non au hasard),
+   * Piment de frénésie : déclenchée par PALIER DE SCORE (et non au hasard),
    * comme le pomegranate de Fruit Ninja. Elle récompense donc la progression
    * et arrive à un moment que le joueur finit par anticiper.
    */
@@ -513,15 +513,15 @@ export class SpawnManager {
       return;
     }
     // Un seul fruit spécial à la fois, et jamais deux coup sur coup : la
-    // grenade et le cyclone se partagent ce délai plancher.
+    // piment et le cyclone se partagent ce délai plancher.
     if (this.scene.time.now - this.lastSpecialAt < SPECIAL_MIN_GAP_MS) {
       return;
     }
     if (this.isFrenzyOnStage() || this.isCycloneOnStage() || this.isDeluge()) {
       return;
     }
-    const grenade = this.fruits.get() as Fruit | null;
-    if (grenade === null) {
+    const piment = this.fruits.get() as Fruit | null;
+    if (piment === null) {
       return; // pool plein : on retentera à la salve suivante, palier conservé
     }
     this.frenzyCount += 1;
@@ -532,26 +532,26 @@ export class SpawnManager {
     // Le délai plancher démarre dès le LANCEMENT, pas seulement à la fin.
     // La fin est détectée au tic de salve suivant ; si une frénésie très
     // courte tombait entre deux tics, la transition serait manquée et rien
-    // n'espacerait plus les grenades. Repartir du lancement rend le plancher
+    // n'espacerait plus les piments. Repartir du lancement rend le plancher
     // vrai dans tous les cas, et il ne fait que se décaler ensuite.
     this.lastFrenzyEndedAt = this.scene.time.now;
     this.lastSpecialAt = this.scene.time.now;
     const p = this.computeSideLaunch(FRENZY_VARIETY.radius);
-    grenade.launchAs(FRENZY_VARIETY, false, p.x, p.y, p.velocityX, p.velocityY, true);
+    piment.launchAs(FRENZY_VARIETY, false, p.x, p.y, p.velocityX, p.velocityY, true);
     sfx.launch();
-    this.scene.events.emit('frenzy-incoming', grenade);
+    this.scene.events.emit('frenzy-incoming', piment);
   }
 
   /**
    * La papaye cyclone : un seul coup de sabre, et le déluge commence.
    *
-   * Sa cadence est PUREMENT TEMPORELLE, là où la grenade est déclenchée par
+   * Sa cadence est PUREMENT TEMPORELLE, là où le piment est déclenché par
    * un palier de score. Les deux règles sont volontairement différentes :
-   * la grenade récompense la performance, donc elle suit le score ; le
+   * le piment récompense la performance, donc il suit le score ; le
    * cyclone est un cadeau, donc il suit l'horloge et arrive même au joueur
    * qui rame. C'est cette différence qui justifie d'avoir deux fruits.
    *
-   * Elle entre par le côté comme la grenade, mais elle ne se fige pas : elle
+   * Elle entre par le côté comme le piment, mais elle ne se fige pas : elle
    * TRAVERSE. Il faut aller la chercher, c'est ce qui fait sa valeur.
    */
   private maybeSpawnCyclone(): void {
@@ -629,10 +629,10 @@ export class SpawnManager {
   }
 
   /**
-   * Lancement latéral, réservé à la grenade : elle entre par un BORD de
-   * l'écran et le traverse en arc, au lieu de jaillir du bas comme tout le
-   * monde. Cette trajectoire à part est le premier signal que ce fruit n'est
-   * pas un fruit ordinaire — on la repère avant même de l'avoir identifiée.
+   * Lancement latéral, réservé au piment : il entre par un BORD de l'écran
+   * et le traverse en arc, au lieu de jaillir du bas comme tout le monde.
+   * Cette trajectoire à part est le premier signal que ce fruit n'est pas un
+   * fruit ordinaire — on le repère avant même de l'avoir identifié.
    */
   private computeSideLaunch(radius: number, traverse = Number.NaN): LaunchParams {
     const width = this.scene.scale.width;
@@ -648,8 +648,8 @@ export class SpawnManager {
     const sommet = height * rndFloat(SIDE_SOMMET_MIN, SIDE_SOMMET_MAX);
     p.velocityY = -Math.sqrt(2 * GRAVITY_Y * Math.max(p.y - sommet, height * 0.2));
     if (Number.isNaN(traverse)) {
-      // La grenade : elle n'a pas besoin de traverser, on l'attrape au vol et
-      // elle se cale d'elle-même au premier coup (cf. settleGrenade).
+      // Le piment : il n'a pas besoin de traverser, on l'attrape au vol et il
+      // se cale de lui-même au premier coup (cf. settlePiment).
       p.velocityX = (fromLeft ? 1 : -1) * width * FRENZY_CROSS_FACTOR;
     } else {
       // Le cyclone : il traverse pour de bon, donc sa vitesse se déduit de la
@@ -710,16 +710,16 @@ export class SpawnManager {
   }
 
   /**
-   * Écart de score jusqu'à la prochaine grenade. Il s'éloigne à chaque
+   * Écart de score jusqu'à la prochaine piment. Il s'éloigne à chaque
    * frénésie, parce que le joueur marque de plus en plus vite : à palier
-   * constant, la grenade se rapprocherait dans le temps sans jamais que rien
+   * constant, le piment se rapprocherait dans le temps sans jamais que rien
    * ne le demande.
    */
   private frenzyStep(): number {
     return Math.round(FRENZY_SCORE_STEP * (1 + this.frenzyCount * FRENZY_STEP_GROWTH));
   }
 
-  /** Vrai tant qu'une grenade de frénésie est en jeu (parcours du pool). */
+  /** Vrai tant qu'un piment de frénésie est en jeu (parcours du pool). */
   private isFrenzyOnStage(): boolean {
     const children = this.fruits.getChildren();
     for (let i = 0; i < children.length; i++) {

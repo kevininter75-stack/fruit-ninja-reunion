@@ -66,18 +66,32 @@ export const BONUS_VARIETY: FruitVariety = {
 };
 
 /**
- * Grenade : fruit rare de « frénésie ». Elle ne se coupe pas en deux du
- * premier coup — on la tranche en boucle pendant quelques secondes avant
- * qu'elle n'éclate (cf. FRENZY_* dans constants.ts).
+ * Piment cabri : le fruit rare de « frénésie ». Il ne se coupe pas en deux du
+ * premier coup — on le tranche en boucle pendant quelques secondes avant
+ * qu'il n'éclate (cf. FRENZY_* dans constants.ts).
+ *
+ * IL A REMPLACÉ UNE GRENADE, et l'échange est tout bénéfice. La grenade était
+ * l'emprunt le plus visible à Fruit Ninja, qui en a fait son fruit de
+ * frénésie ; elle ne pousse pas ici et ne dit rien de l'île. Le piment cabri,
+ * lui, est sur toutes les tables de La Réunion — et son nom même annonce ce
+ * qu'il fait au joueur.
+ *
+ * Il se distingue par TROIS choses à la fois, et il en faut trois : une
+ * silhouette conique et crochue que rien d'autre n'a, un pédoncule vert qui
+ * est le seul point de couleur froide du fruit, et une chair CREUSE à la
+ * coupe là où la grenade en montrait des centaines de grains.
  */
 export const FRENZY_VARIETY: FruitVariety = {
-  key: 'grenade',
-  displayName: 'Grenade',
+  key: 'piment_cabri',
+  displayName: 'Piment cabri',
   radius: px(70),
-  skinColor: 0xb5243b,
-  juiceColor: 0xd63b52,
-  fleshColor: 0xe8455f,
-  weight: 0, // jamais tirée au poids : spawn dédié dans le SpawnManager
+  // Écarlate franchement orangé : le letchi occupe déjà le rouge rosé, et
+  // deux rouges voisins sur des fruits qui comptent tous les deux seraient
+  // une confusion de plus à la vitesse où ils traversent.
+  skinColor: 0xe03418,
+  juiceColor: 0xff6a3d,
+  fleshColor: 0xfbe3c8,
+  weight: 0, // jamais tiré au poids : spawn dédié dans le SpawnManager
 };
 
 /**

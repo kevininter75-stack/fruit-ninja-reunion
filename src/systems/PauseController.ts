@@ -8,7 +8,7 @@ import { GAME_FONT, fontPx, px } from '../utils/constants';
  *
  * Elle fige TOUT par l'horloge de la scène plutôt qu'en arrêtant chaque
  * système un par un. `time.paused` gèle les minuteurs de spawn, la minuterie
- * d'explosion de la grenade, le minuteur de reprise du hit-stop — et, parce
+ * d'explosion du piment, le minuteur de reprise du hit-stop — et, parce
  * que le chrono se lit sur `time.now`, il s'arrête de lui-même. Pas de
  * compensation à calculer, donc pas de dérive possible.
  *

@@ -40,7 +40,7 @@ import {
   TEX_CROSS,
   HITSTOP_CRIT_MS,
   HITSTOP_COMBO_MS,
-  HITSTOP_GRENADE_MS,
+  HITSTOP_PIMENT_MS,
   HITSTOP_BOMB_MS,
   HALF_SQUASH_X,
   HALF_SQUASH_Y,
@@ -179,13 +179,13 @@ export class GameScene extends Phaser.Scene {
   private frameCount = 0;
   private flashRect!: Phaser.GameObjects.Rectangle;
   private infoText!: Phaser.GameObjects.Text; // compte à rebours (mode Chrono uniquement)
-  /** Halo doré collé à la grenade tant qu'elle est en scène. */
+  /** Halo doré collé au piment tant qu'il est en scène. */
   private frenzyAura!: Phaser.GameObjects.Image;
-  /** Compteur de coups affiché au-dessus de la grenade. */
+  /** Compteur de coups affiché au-dessus du piment. */
   private frenzyCounter!: Phaser.GameObjects.Text;
-  /** Grenade suivie par le halo (null quand il n'y en a pas). */
-  private frenzyGrenade: Fruit | null = null;
-  /** Pool d'ondes de choc (effets de la grenade). */
+  /** Piment suivie par le halo (null quand il n'y en a pas). */
+  private frenzyPiment: Fruit | null = null;
+  /** Pool d'ondes de choc (effets du piment). */
   private rings!: Phaser.GameObjects.Group;
   private lifeCrosses: Phaser.GameObjects.Image[] = []; // strikes peints (mode Classique)
   private livesLabel?: Phaser.GameObjects.Text; // « 3 / 3 » sous les croix
@@ -283,7 +283,7 @@ export class GameScene extends Phaser.Scene {
 
     // Bornes du monde : la caméra ne peut plus montrer ce qui n'existe pas.
     //
-    // Le recadrage de la frénésie suit la grenade à mi-chemin, et la grenade
+    // Le recadrage de la frénésie suit le piment à mi-chemin, et le piment
     // entre par un BORD de l'écran. À un zoom de 1,22 la demi-largeur visible
     // vaut 0,41 W ; visée à 0,25 W, la caméra débordait donc de 0,16 W à
     // gauche du décor — on voyait le vide.
@@ -557,12 +557,12 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Prépare les effets réservés à la grenade : le halo (un seul sprite
+   * Prépare les effets réservés au piment : le halo (un seul sprite
    * repositionné) et le pool d'ondes de choc. Tout est créé une fois ici pour
    * qu'aucune allocation n'ait lieu au moment de l'action.
    */
   private createFrenzyEffects(): void {
-    this.frenzyGrenade = null;
+    this.frenzyPiment = null;
     this.frenzyAura = this.add
       .image(0, 0, TEX_GLOW)
       .setVisible(false)
@@ -579,11 +579,11 @@ export class GameScene extends Phaser.Scene {
       .image(0, 0, TEX_GLOW)
       .setVisible(false)
       .setDepth(DEPTH_FRENZY_AURA)
-      .setTint(0xff9a4a) // teinte chaude : le cyclone n'est pas la grenade
+      .setTint(0xff9a4a) // teinte chaude : le cyclone n'est pas le piment
       .setBlendMode(Phaser.BlendModes.ADD);
 
-    // Compteur UNIQUE qui suit la grenade : un popup par coup s'empilait en
-    // un tas illisible, puisque la grenade est presque immobile en frénésie.
+    // Compteur UNIQUE qui suit le piment : un popup par coup s'empilait en
+    // un tas illisible, puisque le piment est presque immobile en frénésie.
     this.frenzyCounter = this.add
       .text(0, 0, '', {
         fontFamily: GAME_FONT,
@@ -609,48 +609,48 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Colle le halo doré sur la grenade tant qu'elle est en scène. Un seul
+   * Colle le halo doré sur le piment tant qu'il est en scène. Un seul
    * sprite réutilisé, repositionné chaque frame : aucune allocation.
    */
   private updateFrenzyAura(): void {
-    const grenade = this.frenzyGrenade;
+    const piment = this.frenzyPiment;
     // `isFrenzy` en plus de `active` : les fruits viennent d'un POOL, et une
-    // grenade rendue au pool peut être relancée en fruit ordinaire dès la
-    // salve suivante. Elle redeviendrait alors active, et cette condition la
+    // piment rendu au pool peut être relancé en fruit ordinaire dès la
+    // salve suivante. Il redeviendrait alors actif, et cette condition le
     // croirait encore en scène — halo collé sur un fruit banal, et surtout
     // aucune sortie de frénésie. Le test dit maintenant ce qu'il veut dire :
-    // l'objet suivi est-il toujours LA grenade ?
-    if (grenade === null || !grenade.active || !grenade.isFrenzy) {
+    // l'objet suivi est-il toujours LA piment ?
+    if (piment === null || !piment.active || !piment.isFrenzy) {
       if (this.frenzyAura.visible || this.frenzyZoomed) {
         this.hideFrenzyVisuals();
       }
       return;
     }
-    // Filet de sécurité indépendant des animations : une grenade en frénésie
+    // Filet de sécurité indépendant des animations : un piment en frénésie
     // ne peut JAMAIS sortir de l'écran, quoi qu'il arrive à ses tweens. C'est
     // la garantie que le combo reste toujours terminable — le bug d'origine
-    // était une grenade qui dérivait hors champ, spawn gelé, combo perdu.
-    if (grenade.frenzyActive) {
-      const marge = grenade.sliceRadius + FRENZY_SETTLE_MARGIN;
-      const x = Phaser.Math.Clamp(grenade.x, marge, this.scale.width - marge);
-      const y = Phaser.Math.Clamp(grenade.y, marge, this.scale.height - marge);
-      if (x !== grenade.x || y !== grenade.y) {
-        grenade.setPosition(x, y);
+    // était un piment qui dérivait hors champ, spawn gelé, combo perdu.
+    if (piment.frenzyActive) {
+      const marge = piment.sliceRadius + FRENZY_SETTLE_MARGIN;
+      const x = Phaser.Math.Clamp(piment.x, marge, this.scale.width - marge);
+      const y = Phaser.Math.Clamp(piment.y, marge, this.scale.height - marge);
+      if (x !== piment.x || y !== piment.y) {
+        piment.setPosition(x, y);
       }
     }
-    this.frenzyAura.setPosition(grenade.x, grenade.y);
-    this.frenzyCounter.setPosition(grenade.x, grenade.y - grenade.sliceRadius - px(14));
+    this.frenzyAura.setPosition(piment.x, piment.y);
+    this.frenzyCounter.setPosition(piment.x, piment.y - piment.sliceRadius - px(14));
   }
 
   /**
    * Colle le halo chaud sur la papaye cyclone tant qu'elle traverse l'écran.
    *
-   * Même précaution que pour la grenade : on vérifie `isCyclone` en plus de
+   * Même précaution que pour le piment : on vérifie `isCyclone` en plus de
    * `active`, parce que le fruit vient d'un POOL et qu'une papaye rendue au
    * pool peut ressortir en letchi à la salve suivante. Sans ce test, le halo
    * resterait collé sur un fruit parfaitement ordinaire.
    *
-   * Aucun recadrage ici, à la différence de la grenade : le cyclone n'est PAS
+   * Aucun recadrage ici, à la différence du piment : le cyclone n'est PAS
    * censé rester à l'écran. Il traverse, et le manquer est un vrai choix du
    * joueur — c'est ce qui lui donne sa valeur.
    */
@@ -708,10 +708,10 @@ export class GameScene extends Phaser.Scene {
    *
    * C'est la demande de Kevin, et c'est le modèle de Fruit Ninja : la frénésie
    * ne se gagne pas au bout d'un mini-jeu, elle se cueille d'un coup de sabre.
-   * Elle vit donc à côté de la grenade sans faire double emploi — la grenade
+   * Elle vit donc à côté du piment sans faire double emploi — le piment
    * récompense l'endurance, le cyclone récompense l'œil.
    *
-   * Les bombes en vol sont désamorcées comme pour la grenade : on va demander
+   * Les bombes en vol sont désamorcées comme pour le piment : on va demander
    * au joueur de balayer l'écran entier pendant six secondes, il ne peut pas
    * viser en même temps.
    */
@@ -731,7 +731,7 @@ export class GameScene extends Phaser.Scene {
     this.juiceEmitter.setParticleTint(papaye.juiceColor);
     this.juiceEmitter.emitParticleAt(papaye.x, papaye.y, JUICE_PARTICLE_COUNT * 4);
     this.shakeCamera(240, 0.006);
-    this.hitStop(HITSTOP_GRENADE_MS);
+    this.hitStop(HITSTOP_PIMENT_MS);
     this.cameraPunch(COMBO_PUNCH_ZOOM * 1.4, COMBO_PUNCH_MS);
     sfx.bonus();
   }
@@ -768,13 +768,13 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  /** Range halo et compteur (fin de frénésie, grenade manquée, fin de partie). */
+  /** Range halo et compteur (fin de frénésie, piment manquée, fin de partie). */
   private hideFrenzyVisuals(): void {
     this.tweens.killTweensOf(this.frenzyAura);
     this.tweens.killTweensOf(this.frenzyCounter);
     this.frenzyAura.setVisible(false);
     this.frenzyCounter.setVisible(false);
-    this.frenzyGrenade = null;
+    this.frenzyPiment = null;
     // Surtout pas de dézoom si la partie s'achève : le drame de la bombe a
     // son propre zoom, qu'on écraserait.
     if (!this.gameEnded) {
@@ -784,7 +784,7 @@ export class GameScene extends Phaser.Scene {
 
   /**
    * Onde de choc circulaire à un point donné : le vocabulaire visuel réservé
-   * à la grenade. Recyclée depuis un pool ; si le pool est vide on saute
+   * au piment. Recyclée depuis un pool ; si le pool est vide on saute
    * l'effet plutôt que d'allouer en pleine partie.
    */
   private spawnRing(x: number, y: number, toScale: number, tint: number, durationMs: number): void {
@@ -814,25 +814,25 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * La grenade entre en scène : bandeau, halo qui la suit, onde de choc et
+   * Le piment entre en scène : bandeau, halo qui la suit, onde de choc et
    * pulsation. C'est cette mise en scène — plus que le fruit lui-même — qui
    * dit au joueur « celui-ci n'est pas comme les autres ».
    */
-  private onFrenzyIncoming(grenade: Fruit): void {
+  private onFrenzyIncoming(piment: Fruit): void {
     if (this.gameEnded) {
       return;
     }
-    this.frenzyGrenade = grenade;
+    this.frenzyPiment = piment;
     this.defuseBombs();
     this.frenzyAura
-      .setPosition(grenade.x, grenade.y)
-      .setDisplaySize(grenade.sliceRadius * FRENZY_AURA_SCALE, grenade.sliceRadius * FRENZY_AURA_SCALE)
+      .setPosition(piment.x, piment.y)
+      .setDisplaySize(piment.sliceRadius * FRENZY_AURA_SCALE, piment.sliceRadius * FRENZY_AURA_SCALE)
       .setVisible(true)
       // Fusion additive : au-delà de ~0,3 le halo sature en blanc et efface
-      // la grenade elle-même, ce qui est exactement l'inverse du but.
+      // le piment elle-même, ce qui est exactement l'inverse du but.
       .setAlpha(0.22);
-    // Le halo respire tant que la grenade est là (tween relancé à chaque
-    // apparition : une seule grenade à la fois, donc pas d'empilement)
+    // Le halo respire tant que le piment est là (tween relancé à chaque
+    // apparition : une seule piment à la fois, donc pas d'empilement)
     this.tweens.killTweensOf(this.frenzyAura);
     this.tweens.add({
       targets: this.frenzyAura,
@@ -842,8 +842,8 @@ export class GameScene extends Phaser.Scene {
       repeat: -1,
       ease: 'Sine.easeInOut',
     });
-    this.spawnRing(grenade.x, grenade.y, 4.5, 0xffd166, 700);
-    this.showBigBanner('GRENADE !');
+    this.spawnRing(piment.x, piment.y, 4.5, 0xffd166, 700);
+    this.showBigBanner('PIMENT CABRI !');
     sfx.crit();
   }
 
@@ -987,7 +987,7 @@ export class GameScene extends Phaser.Scene {
     this.pause = new PauseController(
       this,
       () => fadeToScene(this, 'MenuScene'),
-      () => !this.gameEnded && this.frenzyGrenade === null
+      () => !this.gameEnded && this.frenzyPiment === null
     );
     this.pause.create();
   }
@@ -1420,9 +1420,9 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    // La grenade ne se coupe pas : elle encaisse et s'emballe (cf. onGrenadeHit)
+    // Le piment ne se coupe pas : il encaisse et s'emballe (cf. onPimentHit)
     if (fruit.isFrenzy) {
-      this.onGrenadeHit(fruit, now);
+      this.onPimentHit(fruit, now);
       return;
     }
 
@@ -1499,45 +1499,45 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Coup porté à la grenade. Le premier amorce la frénésie (elle se fige en
+   * Coup porté au piment. Le premier amorce la frénésie (il se fige en
    * l'air et un compte à rebours démarre) ; les suivants incrémentent le
    * compteur, borné par un temps de garde pour qu'un doigt traînant dessus
    * ne mitraille pas le score à 60 coups/seconde.
    */
-  private onGrenadeHit(grenade: Fruit, now: number): void {
-    if (!grenade.frenzyActive) {
-      grenade.startFrenzy();
-      this.settleGrenade(grenade);
-      this.enterFrenzyZoom(grenade);
-      grenade.lastSlashAt = now;
-      grenade.slashCount = 1;
-      // Pas de bandeau ici : il masquerait la grenade au moment précis où le
+  private onPimentHit(piment: Fruit, now: number): void {
+    if (!piment.frenzyActive) {
+      piment.startFrenzy();
+      this.settlePiment(piment);
+      this.enterFrenzyZoom(piment);
+      piment.lastSlashAt = now;
+      piment.slashCount = 1;
+      // Pas de bandeau ici : il masquerait le piment au moment précis où le
       // joueur doit la voir. Le compteur qui s'allume suffit à dire « vas-y ».
       this.frenzyCounter.setText('x1').setVisible(true).setScale(1);
       sfx.crit();
-      this.spawnRing(grenade.x, grenade.y, 5, 0xffffff, 500);
+      this.spawnRing(piment.x, piment.y, 5, 0xffffff, 500);
       // Fin de frénésie programmée : un seul timer, quoi qu'il arrive
-      this.time.delayedCall(FRENZY_DURATION_MS, () => this.explodeGrenade(grenade));
+      this.time.delayedCall(FRENZY_DURATION_MS, () => this.explodePiment(piment));
       return;
     }
-    if (now - grenade.lastSlashAt < FRENZY_HIT_COOLDOWN_MS) {
+    if (now - piment.lastSlashAt < FRENZY_HIT_COOLDOWN_MS) {
       return;
     }
-    grenade.lastSlashAt = now;
-    grenade.slashCount += 1;
+    piment.lastSlashAt = now;
+    piment.slashCount += 1;
 
     // Retour immédiat à chaque coup : jus, onde, sursaut et compteur qui grimpe
-    this.juiceEmitter.setParticleTint(grenade.juiceColor);
-    this.juiceEmitter.emitParticleAt(grenade.x, grenade.y, JUICE_PARTICLE_COUNT);
-    this.spawnRing(grenade.x, grenade.y, 2.6, 0xff8fa3, 320);
-    sfx.slice(grenade.sliceRadius);
+    this.juiceEmitter.setParticleTint(piment.juiceColor);
+    this.juiceEmitter.emitParticleAt(piment.x, piment.y, JUICE_PARTICLE_COUNT);
+    this.spawnRing(piment.x, piment.y, 2.6, 0xff8fa3, 320);
+    sfx.slice(piment.sliceRadius);
 
     // Sursaut du fruit : il encaisse visiblement. La pulsation permanente est
     // un tween sur `scale`, donc on secoue l'ANGLE pour ne pas les faire
     // lutter l'un contre l'autre.
     this.tweens.add({
-      targets: grenade,
-      angle: grenade.angle + Phaser.Math.Between(-16, 16),
+      targets: piment,
+      angle: piment.angle + Phaser.Math.Between(-16, 16),
       duration: 90,
       yoyo: true,
       ease: 'Sine.easeOut',
@@ -1548,7 +1548,7 @@ export class GameScene extends Phaser.Scene {
     this.cameraPunch(FRENZY_HIT_PUNCH, 80);
 
     // Le compteur enfle à chaque coup : la montée se voit sans encombrer
-    this.frenzyCounter.setText(`x${grenade.slashCount}`).setVisible(true).setScale(1.35);
+    this.frenzyCounter.setText(`x${piment.slashCount}`).setVisible(true).setScale(1.35);
     this.tweens.killTweensOf(this.frenzyCounter);
     this.tweens.add({
       targets: this.frenzyCounter,
@@ -1559,18 +1559,18 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Resserre la caméra sur la grenade pour la durée de la frénésie.
+   * Resserre la caméra sur le piment pour la durée de la frénésie.
    *
-   * Le recentrage n'est que PARTIEL (FRENZY_PAN_RATIO) : viser la grenade en
-   * plein centre sortirait le HUD du cadre quand elle est près d'un bord.
+   * Le recentrage n'est que PARTIEL (FRENZY_PAN_RATIO) : viser le piment en
+   * plein centre sortirait le HUD du cadre quand il est près d'un bord.
    * Le geste de coupe raisonne en coordonnées monde, donc le zoom ne décale
    * pas le doigt (cf. handleSliceMove).
    */
-  private enterFrenzyZoom(grenade: Fruit): void {
+  private enterFrenzyZoom(piment: Fruit): void {
     this.cancelPunchReturn();
     this.frenzyZoomed = true;
-    const cibleX = this.scale.width / 2 + (grenade.x - this.scale.width / 2) * FRENZY_PAN_RATIO;
-    const cibleY = this.scale.height / 2 + (grenade.y - this.scale.height / 2) * FRENZY_PAN_RATIO;
+    const cibleX = this.scale.width / 2 + (piment.x - this.scale.width / 2) * FRENZY_PAN_RATIO;
+    const cibleY = this.scale.height / 2 + (piment.y - this.scale.height / 2) * FRENZY_PAN_RATIO;
     this.grading.setMode('frenzy');
     this.zoomCamera(FRENZY_ZOOM, FRENZY_ZOOM_MS, 'Sine.easeOut');
     this.panCamera(cibleX, cibleY, FRENZY_ZOOM_MS, 'Sine.easeOut');
@@ -1594,7 +1594,7 @@ export class GameScene extends Phaser.Scene {
    * infime qui fait qu'un coup CLAQUE au lieu de simplement se produire.
    * On fige la physique ET les tweens ; l'horloge de la scène, elle, continue
    * de tourner, ce qui permet au minuteur de reprise de se déclencher (et
-   * n'altère ni le chrono ni la minuterie d'explosion de la grenade).
+   * n'altère ni le chrono ni la minuterie d'explosion du piment).
    *
    * Un gel en cours n'est jamais empilé : deux coups rapprochés donneraient
    * un blocage cumulé, perçu comme une saccade et non comme une frappe.
@@ -1682,7 +1682,7 @@ export class GameScene extends Phaser.Scene {
         // Le zoom de repos est relu MAINTENANT, et non au départ du coup.
         //
         // C'ÉTAIT LE BUG. Il était capturé à l'appel : un coup porté à la
-        // grenade capturait 1,22, et si la frénésie se terminait dans les
+        // piment capturait 1,22, et si la frénésie se terminait dans les
         // 80 ms qui suivaient, ce retour périmé se déclenchait APRÈS le
         // dézoom et ramenait la caméra à 1,22. Elle y restait jusqu'au combo
         // suivant — d'où un dézoom qui échouait une fois sur deux, puis se
@@ -1690,7 +1690,7 @@ export class GameScene extends Phaser.Scene {
         //
         // Or un coup porté dans les 80 dernières millisecondes d'une frénésie
         // n'a rien d'un cas rare : c'est le comportement NORMAL du joueur, qui
-        // frappe la grenade jusqu'à l'explosion.
+        // frappe le piment jusqu'à l'explosion.
         this.zoomCamera(this.restingZoom(), dureeMs * 1.6, 'Sine.easeInOut');
       }
     });
@@ -1700,12 +1700,12 @@ export class GameScene extends Phaser.Scene {
    * Zoom auquel la caméra doit revenir une fois l'effet en cours terminé.
    *
    * Il se lit sur l'ÉTAT DU CADRAGE, et surtout pas sur la présence d'une
-   * grenade à l'écran. Ce sont deux choses différentes : la grenade est
+   * piment à l'écran. Ce sont deux choses différentes : le piment est
    * suivie dès son ENTRÉE, alors que le zoom ne s'engage qu'au premier COUP
    * porté. Entre les deux — pendant toute la traversée de l'écran — lire la
-   * grenade faisait croire à un repos de 1,22 alors que la caméra était à 1 :
+   * piment faisait croire à un repos de 1,22 alors que la caméra était à 1 :
    * un simple combo suffisait alors à zoomer sans raison, et le zoom restait
-   * tant que la grenade n'avait pas quitté l'écran.
+   * tant que le piment n'avait pas quitté l'écran.
    */
   private restingZoom(): number {
     return this.frenzyZoomed ? FRENZY_ZOOM : 1;
@@ -1724,21 +1724,21 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * La grenade « s'installe » : elle glisse vers une position confortable puis
+   * Le piment « s'installe » : il glisse vers une position confortable puis
    * y flotte doucement jusqu'à l'explosion.
    *
-   * Sans ce recadrage, une grenade frappée près du sommet de son arc restait
-   * collée au bord haut de l'écran (voire en sortait), et le combo devenait
-   * impossible à terminer. La zone est bornée en x ET en y pour qu'elle soit
+   * Sans ce recadrage, un piment frappé près du sommet de son arc restait
+   * collé au bord haut de l'écran (voire en sortait), et le combo devenait
+   * impossible à terminer. La zone est bornée en x ET en y pour qu'il soit
    * toujours entièrement visible et à portée du doigt.
    */
-  private settleGrenade(grenade: Fruit): void {
+  private settlePiment(piment: Fruit): void {
     const w = this.scale.width;
     const h = this.scale.height;
-    const marge = grenade.sliceRadius + FRENZY_SETTLE_MARGIN;
-    const cibleX = Phaser.Math.Clamp(grenade.x, marge, w - marge);
+    const marge = piment.sliceRadius + FRENZY_SETTLE_MARGIN;
+    const cibleX = Phaser.Math.Clamp(piment.x, marge, w - marge);
     const cibleY = Phaser.Math.Clamp(
-      grenade.y,
+      piment.y,
       Math.max(marge, h * FRENZY_ZONE_TOP),
       h * FRENZY_ZONE_BOTTOM
     );
@@ -1746,18 +1746,18 @@ export class GameScene extends Phaser.Scene {
     // On ne purge pas les tweens du sprite : la pulsation d'échelle lancée au
     // spawn doit continuer, et elle ne touche pas aux mêmes propriétés.
     this.tweens.add({
-      targets: grenade,
+      targets: piment,
       x: cibleX,
       y: cibleY,
       duration: 280,
       ease: 'Back.easeOut', // arrivée franche : on sent qu'elle se cale
       onComplete: () => {
-        if (!grenade.active || !grenade.frenzyActive) {
+        if (!piment.active || !piment.frenzyActive) {
           return;
         }
         // Léger flottement sur place : vivant, mais elle ne s'échappe plus
         this.tweens.add({
-          targets: grenade,
+          targets: piment,
           y: cibleY - FRENZY_BOB_PX,
           duration: 900,
           yoyo: true,
@@ -1769,49 +1769,49 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Fin de la frénésie : la grenade éclate, rapporte ses points et emporte
+   * Fin de la frénésie : le piment éclate, rapporte ses points et emporte
    * tous les fruits encore en vol (qui marquent normalement, eux aussi).
    * Les bombes ne sont pas touchées — l'explosion ne doit pas tuer le joueur.
    */
-  private explodeGrenade(grenade: Fruit): void {
-    if (!grenade.active || !grenade.frenzyActive) {
-      return; // grenade déjà rendue au pool (manquée, ou partie relancée)
+  private explodePiment(piment: Fruit): void {
+    if (!piment.active || !piment.frenzyActive) {
+      return; // piment déjà rendue au pool (manquée, ou partie relancée)
     }
     if (this.gameEnded) {
-      // Partie finie pendant la frénésie : on rend la grenade au pool sans
-      // fanfare, sinon elle resterait en scène et gèlerait le spawn.
-      grenade.kill();
+      // Partie finie pendant la frénésie : on rend le piment au pool sans
+      // fanfare, sinon il resterait en scène et gèlerait le spawn.
+      piment.kill();
       return;
     }
-    const slashes = grenade.slashCount;
+    const slashes = piment.slashCount;
     const awarded = this.scoreManager.addScore(slashes * FRENZY_POINTS_PER_SLASH);
 
     // Gerbe généreuse au point d'explosion
-    this.juiceEmitter.setParticleTint(grenade.juiceColor);
-    this.juiceEmitter.emitParticleAt(grenade.x, grenade.y, JUICE_PARTICLE_COUNT * 5);
-    this.spawnSplat(grenade.x, grenade.y, grenade.juiceColor);
+    this.juiceEmitter.setParticleTint(piment.juiceColor);
+    this.juiceEmitter.emitParticleAt(piment.x, piment.y, JUICE_PARTICLE_COUNT * 5);
+    this.spawnSplat(piment.x, piment.y, piment.juiceColor);
     this.shakeCamera(260, 0.008);
     // Double onde : une rapide et serrée, une lente et large — le souffle
-    this.spawnRing(grenade.x, grenade.y, 6, 0xffffff, 380);
-    this.spawnRing(grenade.x, grenade.y, 12, 0xff5c78, 750);
-    this.hitStop(HITSTOP_GRENADE_MS);
+    this.spawnRing(piment.x, piment.y, 6, 0xffffff, 380);
+    this.spawnRing(piment.x, piment.y, 12, 0xff5c78, 750);
+    this.hitStop(HITSTOP_PIMENT_MS);
     sfx.crit();
     // Même découpage que pour les combos : l'exclamation au centre, le détail
     // chiffré dispersé autour du point d'explosion.
-    this.showBigBanner(FRENESIE, 1, grenade.x, grenade.y);
-    this.showRewardBurst(grenade.x, grenade.y, [
+    this.showBigBanner(FRENESIE, 1, piment.x, piment.y);
+    this.showRewardBurst(piment.x, piment.y, [
       { texte: `${slashes} COUPS`, couleur: COLOR_COMBO, taille: px(48) },
       { texte: `+${awarded}`, couleur: COLOR_POINTS, taille: px(38) },
     ]);
 
     this.hideFrenzyVisuals();
-    grenade.kill();
+    piment.kill();
 
     // Souffle : tous les fruits en vol sont tranchés dans la foulée
     const children = this.fruits.getChildren();
     for (let i = 0; i < children.length; i++) {
       const other = children[i] as Fruit;
-      if (!other.active || other === grenade) {
+      if (!other.active || other === piment) {
         continue;
       }
       this.fruitsSliced++;
@@ -1823,12 +1823,12 @@ export class GameScene extends Phaser.Scene {
     }
 
     // PAS DE DÉLUGE ICI, et c'est délibéré depuis que la papaye cyclone
-    // existe. La grenade en déclenchait un, du temps où elle était le seul
+    // existe. Le piment en déclenchait un, du temps où il était le seul
     // fruit spécial du jeu ; les deux se sont retrouvés à faire la même
     // chose, et la frénésie perdait sa rareté à sortir deux fois plus souvent.
     //
-    // Chacun son métier : la grenade paie le combo de coups qu'on vient de lui
-    // porter — c'est déjà une récompense complète, et elle a la sienne. Le
+    // Chacun son métier : le piment paie le combo de coups qu'on vient de lui
+    // porter — c'est déjà une récompense complète, et il a la sienne. Le
     // déluge appartient au cyclone, qui n'a que ça à offrir.
   }
 
@@ -1887,7 +1887,7 @@ export class GameScene extends Phaser.Scene {
     // était x1 45 %, x2 27 %, x3 18 %, x6 9 %, et RIEN entre quatre et cinq.
     // Le seuil tombait donc dans un trou de la distribution : il ne rendait
     // pas l'exclamation rare, il la faisait disparaître. En jeu, on ne lisait
-    // plus un seul nom de combo en dehors de la grenade.
+    // plus un seul nom de combo en dehors du piment.
     //
     // La bonne réponse était l'autre branche de l'alternative : que le mot
     // S'ADAPTE au lieu de se raréfier. Trois fruits, quatre à six, sept et
@@ -1946,7 +1946,7 @@ export class GameScene extends Phaser.Scene {
     // soit l'action ; à l'endroit du coup de sabre, il désigne ce qu'on vient
     // de faire — et l'œil du joueur y est déjà, puisque c'est là qu'il vient
     // de trancher. Le centre reste le défaut pour ce qui ne se passe nulle
-    // part en particulier : l'arrivée de la grenade, une vie regagnée.
+    // part en particulier : l'arrivée du piment, une vie regagnée.
     const viseX = Number.isNaN(x) ? this.scale.width / 2 : x;
     const viseY = Number.isNaN(y) ? this.scale.height * 0.34 : y - px(70);
     const banner = this.add
@@ -2221,7 +2221,7 @@ export class GameScene extends Phaser.Scene {
 
   private onFruitMissed(fruit: Fruit): void {
     // En mode Chrono, un fruit manqué est sans conséquence ; un combava ou une
-    // grenade manqués non plus (c'étaient des cadeaux, pas des obligations).
+    // piment manqués non plus (c'étaient des cadeaux, pas des obligations).
     if (
       this.gameEnded ||
       this.mode === 'chrono' ||
@@ -2245,10 +2245,10 @@ export class GameScene extends Phaser.Scene {
     // Pendant le moment du fruit spécial, plus rien ne coûte de vie.
     //
     // Les salves sont déjà suspendues, mais les fruits partis AVANT l'entrée
-    // de la grenade continuent de tomber. Le joueur, lui, a les yeux sur la
-    // grenade : lui prendre une vie pour un fruit qu'on lui demande justement
+    // du piment continuent de tomber. Le joueur, lui, a les yeux sur la
+    // piment : lui prendre une vie pour un fruit qu'on lui demande justement
     // d'ignorer serait le punir d'avoir suivi le jeu.
-    if (this.frenzyGrenade !== null) {
+    if (this.frenzyPiment !== null) {
       return;
     }
     sfx.lifeLost();

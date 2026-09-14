@@ -162,6 +162,34 @@ function traceMango(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: nu
 }
 
 /** Silhouette en poire allongée de la papaye. */
+/**
+ * Le piment cabri : epaule large en haut, pointe en bas, et une COURBURE.
+ *
+ * La courbure n'est pas un ornement. Un cone parfaitement droit se lit comme
+ * une carotte ou un cornet ; c'est le leger crochet vers la pointe qui dit
+ * << piment >> au premier coup d'oeil, meme a la taille d'une vignette.
+ *
+ * Largeur volontairement genereuse (0,46 du rayon). Un vrai piment cabri est
+ * plus fin, mais le calque de reflet est un disque centre : trop etroit, la
+ * lueur additive deborderait de chaque cote de la silhouette. Le meme piege
+ * avait ete rencontre sur la carambole.
+ */
+function tracePiment(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number): void {
+  const w = r * 0.46;
+  const h = r * 0.92;
+  const haut = cy - h;
+  const pointe = cy + h;
+  const crochet = w * 0.34; // la pointe fuit vers la droite
+  ctx.moveTo(cx - w * 0.58, haut + h * 0.08);
+  // Flanc gauche, jusqu'a la pointe
+  ctx.bezierCurveTo(cx - w * 1.04, haut + h * 0.55, cx - w * 0.92, cy + h * 0.4, cx + crochet - w * 0.2, pointe);
+  // Flanc droit, en remontant vers l'epaule
+  ctx.bezierCurveTo(cx + crochet + w * 0.5, cy + h * 0.34, cx + w * 1.02, haut + h * 0.58, cx + w * 0.58, haut + h * 0.08);
+  // Epaule bombee sous le pedoncule
+  ctx.bezierCurveTo(cx + w * 0.34, haut - h * 0.07, cx - w * 0.34, haut - h * 0.07, cx - w * 0.58, haut + h * 0.08);
+  ctx.closePath();
+}
+
 function tracePear(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number): void {
   const rx = r * 0.6;
   const ry = r * 0.95;
@@ -265,6 +293,9 @@ function traceSilhouette(ctx: CanvasRenderingContext2D, variety: FruitVariety, s
       // dépassent du corps, et les inclure dans le tracé de découpe donnerait
       // des moitiés aux contours en dents de scie.
       traceLobed(ctx, c, c, r * 0.68, r, 1, 0);
+      break;
+    case 'piment_cabri':
+      tracePiment(ctx, c, c, r);
       break;
     case 'grenade':
       // Sphère légèrement aplatie et un peu anguleuse, comme une vraie grenade
@@ -1028,6 +1059,67 @@ export function paintWhole(
       break;
     }
 
+    case 'piment_cabri': {
+      paintBody(ctx, variety, size, skin, () => {
+        // Maturite le long du fruit : un piment cabri ne murit pas d'un bloc.
+        // Il tire vers l'orange a l'epaule et fonce vers la pointe, qui est la
+        // derniere a rougir. C'est ce degrade longitudinal, plus que la forme,
+        // qui empeche de le confondre avec le letchi -- lui est rose-rouge et
+        // uniforme, celui-ci est ecarlate et degrade.
+        const maturite = ctx.createLinearGradient(0, c - r * 0.9, 0, c + r * 0.95);
+        maturite.addColorStop(0, 'rgba(255, 150, 46, 0.5)');
+        maturite.addColorStop(0.45, 'rgba(226, 52, 24, 0)');
+        maturite.addColorStop(1, 'rgba(122, 14, 20, 0.55)');
+        ctx.fillStyle = maturite;
+        ctx.fillRect(0, 0, size, size);
+
+        // Deux sillons longitudinaux, tres discrets : la peau d'un piment
+        // n'est pas un tube lisse, elle se creuse legerement sur sa longueur.
+        ctx.strokeStyle = 'rgba(110, 16, 18, 0.22)';
+        ctx.lineWidth = 3;
+        for (const dx of [-0.2, 0.22]) {
+          ctx.beginPath();
+          ctx.moveTo(c + dx * r, c - r * 0.72);
+          ctx.quadraticCurveTo(c + dx * r * 1.5, c, c + dx * r * 0.5, c + r * 0.72);
+          ctx.stroke();
+        }
+      });
+
+      // LE PEDONCULE VERT, et il compte autant que la forme. C'est le seul
+      // element vert du fruit, sur un corps entierement rouge : a la vitesse
+      // ou le piment traverse l'ecran, c'est ce point de couleur opposee que
+      // l'oeil accroche en premier.
+      const pedY = c - r * 0.9;
+      ctx.strokeStyle = '#4f7a2e';
+      ctx.lineWidth = Math.max(4, r * 0.13);
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(c, pedY + r * 0.1);
+      ctx.quadraticCurveTo(c + r * 0.1, pedY - r * 0.18, c + r * 0.02, pedY - r * 0.3);
+      ctx.stroke();
+      // Le calice : les petits lobes qui coiffent l'epaule.
+      ctx.fillStyle = '#5c8a34';
+      ctx.strokeStyle = '#385c20';
+      ctx.lineWidth = 2.5;
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(c - r * 0.26, pedY + r * 0.14);
+      for (const [dx, dy] of [
+        [-0.3, -0.02],
+        [-0.14, 0.1],
+        [0, 0.02],
+        [0.15, 0.11],
+        [0.3, -0.01],
+        [0.26, 0.15],
+      ] as const) {
+        ctx.lineTo(c + dx * r, pedY + dy * r);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      break;
+    }
+
     case 'grenade': {
       paintShadedBody(ctx, variety, size, skinMaterial(skin, 0.5, 0.3, 0, [255, 140, 140]), null, () => {
         // Peau bicolore rouge/ocre et quelques méplats : la grenade n'est
@@ -1406,6 +1498,40 @@ function paintFleshDetails(
       ctx.beginPath();
       ctx.ellipse(c - r * 0.22, c - r * 0.26, r * 0.3, r * 0.22, -0.5, 0, TAU);
       ctx.fill();
+      break;
+    }
+
+    case 'piment_cabri': {
+      // Un piment coupe est CREUX : une cavite pale, un placenta qui descend
+      // au centre, et des graines plates accrochees dessus. C'est exactement
+      // l'inverse de la grenade qu'il remplace, dont la coupe etait pleine de
+      // centaines de grains -- et c'est tant mieux, les deux ne se
+      // confondront jamais.
+      ctx.fillStyle = 'rgba(255, 246, 226, 0.55)';
+      ctx.beginPath();
+      ctx.ellipse(c, c + r * 0.05, r * 0.26, r * 0.68, 0, 0, TAU);
+      ctx.fill();
+      // Le placenta, nervure centrale d'ou pendent les graines.
+      ctx.strokeStyle = 'rgba(232, 196, 120, 0.8)';
+      ctx.lineWidth = Math.max(3, r * 0.06);
+      ctx.beginPath();
+      ctx.moveTo(c, c - r * 0.6);
+      ctx.quadraticCurveTo(c + r * 0.08, c, c + r * 0.02, c + r * 0.6);
+      ctx.stroke();
+      // Graines plates et rondes, alternees de part et d'autre du placenta.
+      for (let i = 0; i < 9; i++) {
+        const t = i / 8;
+        const gy = c - r * 0.52 + t * r * 1.08;
+        const cote = i % 2 === 0 ? -1 : 1;
+        const gx = c + cote * r * 0.13 + r * 0.02;
+        ctx.fillStyle = '#f0dc9a';
+        ctx.beginPath();
+        ctx.ellipse(gx, gy, r * 0.075, r * 0.058, cote * 0.3, 0, TAU);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(150, 112, 40, 0.55)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
       break;
     }
 

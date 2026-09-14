@@ -181,7 +181,7 @@ export const INTENSITY_RAMP_CHRONO_MS = 55_000; // Chrono (60 s) : montée plus 
  * Nombre de fruits tranchés qui suffit à saturer l'intensité.
  *
  * C'était un SCORE (4200 points), et c'était fragile pour la même raison que
- * le palier de la grenade : le score n'est pas une mesure de progression, il
+ * le palier du piment : le score n'est pas une mesure de progression, il
  * dépend des combos, du combava qui double tout, et d'une frénésie qui verse
  * plusieurs centaines de points d'un coup. Le moindre rééquilibrage du barème
  * déplaçait donc la difficulté sans que personne ne l'ait demandé.
@@ -230,37 +230,38 @@ export const EXTRA_LIFE_SCORE_STEP = 1000;
 export const EXTRA_LIFE_FALLBACK_POINTS = 50;
 
 // ------------------------------------------------------------------
-// La grenade : le fruit rare qui déclenche un gros combo
+// Le piment : le fruit rare qui déclenche un gros combo
 // ------------------------------------------------------------------
-// Reprise du « pomegranate » de Fruit Ninja. Elle apparaît à des paliers de
-// score, se fige en l'air à la première coupe, puis on la tranche autant de
+// Le piment cabri tient le rôle que Fruit Ninja donne à son « pomegranate ».
+// Il apparaît à des paliers de score, se fige en l'air à la première coupe,
+// puis on le tranche autant de
 // fois que possible pendant quelques secondes avant qu'elle n'éclate : chaque
 // coup rapporte, et l'explosion emporte tous les fruits à l'écran.
 /**
- * Cadence de la grenade.
+ * Cadence du piment.
  *
- * LE DÉFAUT. Le palier était FIXE : une grenade tous les 700 points, pour
+ * LE DÉFAUT. Le palier était FIXE : un piment tous les 700 points, pour
  * toujours. Mais le rythme de score, lui, ne l'est pas — les salves
  * grossissent, les combos paient plus, le combava double tout, et la frénésie
  * elle-même rapporte gros. Un palier constant en POINTS devient donc un
- * intervalle de plus en plus court en SECONDES : la grenade, événement rare
+ * intervalle de plus en plus court en SECONDES : le piment, événement rare
  * en début de partie, finissait par revenir sans arrêt.
  *
  * Pire, les points de la frénésie comptaient pour le palier suivant : une
  * bonne frénésie réarmait presque immédiatement la prochaine.
  *
  * TROIS CORRECTIONS, qui se complètent :
- *   le palier CROÎT à chaque grenade (FRENZY_STEP_GROWTH) ;
+ *   le palier CROÎT à chaque piment (FRENZY_STEP_GROWTH) ;
  *   il est recalé sur le score à la FIN de la frénésie, donc ce qu'elle
  *     rapporte ne compte jamais pour la suivante ;
  *   un délai plancher en temps réel (FRENZY_MIN_GAP_MS) garantit l'espacement
  *     quoi qu'il arrive. C'est la seule des trois qui ne puisse pas être
  *     débordée par un joueur qui marque plus vite que prévu.
  */
-export const FRENZY_SCORE_STEP = 700; // un palier de score = une grenade
-/** Chaque grenade recule le palier suivant de 55 %. */
+export const FRENZY_SCORE_STEP = 700; // un palier de score = un piment
+/** Chaque piment recule le palier suivant de 55 %. */
 export const FRENZY_STEP_GROWTH = 0.55;
-/** Deux grenades ne peuvent jamais être séparées de moins de 25 s. */
+/** Deux piments ne peuvent jamais être séparés de moins de 25 s. */
 export const FRENZY_MIN_GAP_MS = 25_000;
 export const FRENZY_SAFE_TIME_MS = 15_000; // jamais en tout début de partie
 export const FRENZY_DURATION_MS = 4000; // durée de la frénésie une fois amorcée
@@ -268,15 +269,15 @@ export const FRENZY_HIT_COOLDOWN_MS = 70; // borne le compteur (~14 coups/s max)
 export const FRENZY_POINTS_PER_SLASH = 5;
 
 /**
- * LE DÉLUGE, juste après l'explosion de la grenade.
+ * LE DÉLUGE, juste après l'explosion du piment.
  *
  * Relevé sur Fruit Ninja (mode Arcade, 45-90 s de la vidéo) : leur frénésie
  * est un DÉLUGE de fruits entrant par les côtés, sans une seule bombe, qui
  * fait tripler le rendement — 7,7 points/s avant, 26 points/s pendant. Un
  * combo de douze fruits d'un seul geste y devient possible.
  *
- * La nôtre faisait exactement l'inverse : la grenade arrivait SEULE, tous les
- * lancers suspendus pour qu'elle reste lisible. La lisibilité était le bon
+ * La nôtre faisait exactement l'inverse : le piment arrivait SEUL, tous les
+ * lancers suspendus pour qu'il reste lisible. La lisibilité était le bon
  * choix pendant qu'on la frappe ; ce qui manquait, c'était la récompense
  * après. L'explosion tranche déjà tout ce qui vole — l'écran est donc net au
  * moment précis où le déluge commence, et rien ne gêne la lecture.
@@ -345,15 +346,15 @@ export const DELUGE_CALM_MS = 2600;
  */
 export const DELUGE_TRAVEL_MIN = 0.7; // dépasse largement le milieu
 export const DELUGE_TRAVEL_MAX = 1.35; // ressort par le bord opposé
-// Zone où la grenade vient se caler à la première coupe, en fraction de la
+// Zone où le piment vient se caler à la première coupe, en fraction de la
 // hauteur : assez haut pour ne pas gêner le HUD, assez bas pour rester à portée.
 export const FRENZY_ZONE_TOP = 0.28;
 export const FRENZY_ZONE_BOTTOM = 0.68;
 export const FRENZY_SETTLE_MARGIN = px(24); // marge au bord, en plus du rayon
 export const FRENZY_BOB_PX = px(12); // amplitude du flottement sur place
-// Zoom de frénésie : la caméra se resserre sur la grenade le temps du combo.
+// Zoom de frénésie : la caméra se resserre sur le piment le temps du combo.
 // Volontairement modeste — au-delà, le HUD sort du cadre et on perd de vue
-// le reste de la scène. La caméra ne se recentre qu'à MOITIÉ sur la grenade
+// le reste de la scène. La caméra ne se recentre qu'à MOITIÉ sur le piment
 // pour la même raison.
 export const FRENZY_ZOOM = 1.22;
 export const FRENZY_ZOOM_MS = 280;
@@ -361,10 +362,10 @@ export const FRENZY_PAN_RATIO = 0.5;
 // Petites pulsations de caméra qui ponctuent l'action
 export const COMBO_PUNCH_ZOOM = 1.06; // à la célébration d'un combo de swipe
 export const COMBO_PUNCH_MS = 130;
-export const FRENZY_HIT_PUNCH = 1.03; // à chaque coup porté à la grenade
-// Entrée latérale : la grenade traverse l'écran depuis un bord, en arc.
+export const FRENZY_HIT_PUNCH = 1.03; // à chaque coup porté au piment
+// Entrée latérale : le piment traverse l'écran depuis un bord, en arc.
 /**
- * Sommet de l'arc des fruits SPÉCIAUX entrant par le côté (grenade, cyclone),
+ * Sommet de l'arc des fruits SPÉCIAUX entrant par le côté (piment, cyclone),
  * en fraction de hauteur depuis le haut. Même raisonnement que pour le déluge,
  * et même raison d'y venir : la papaye cyclone est le plus gros fruit du jeu
  * (88 px de rayon) et culminait à 65 px du haut — son sommet passait donc sous
@@ -374,7 +375,7 @@ export const SIDE_SOMMET_MIN = 0.2;
 export const SIDE_SOMMET_MAX = 0.32;
 export const FRENZY_CROSS_FACTOR = 0.14; // vitesse de traversée, en fraction de largeur
 
-// Halo et ondes de choc : le vocabulaire visuel réservé à la grenade
+// Halo et ondes de choc : le vocabulaire visuel réservé au piment
 export const TEX_RING = 'ring';
 export const RING_POOL_SIZE = 8;
 export const DEPTH_FRENZY_AURA = 4; // sous les moitiés (5) et les fruits (6)
@@ -433,7 +434,7 @@ export const COLOR_TRAIL_SPARK = 0xfff3c4; // éclat central, chaud
 // de simplement se produire. Durées proportionnées à l'importance du coup.
 export const HITSTOP_CRIT_MS = 45;
 export const HITSTOP_COMBO_MS = 70;
-export const HITSTOP_GRENADE_MS = 95;
+export const HITSTOP_PIMENT_MS = 95;
 export const HITSTOP_BOMB_MS = 130;
 
 // Squash & stretch : les moitiés jaillissent étirées dans l'axe de la coupe
@@ -748,16 +749,16 @@ export const HUD_PANEL_ALPHA = 0.4;
 // Le fruit cyclone : la frénésie en un seul coup de sabre
 // ------------------------------------------------------------------
 /**
- * POURQUOI UN DEUXIÈME FRUIT SPÉCIAL, alors que la grenade existe déjà.
+ * POURQUOI UN DEUXIÈME FRUIT SPÉCIAL, alors que le piment existe déjà.
  *
- * Fruit Ninja en a deux, et ils ne font pas le même métier. La grenade (leur
+ * Fruit Ninja en a deux, et ils ne font pas le même métier. Le piment (leur
  * pomegranate) est un MINI-JEU : on la frappe en boucle, elle récompense
  * l'endurance du poignet. La banane de frénésie est un CADEAU : un seul coup
  * de sabre, et le déluge commence. La première se mérite, la seconde se
  * cueille — et c'est la seconde qui donne à la partie ses pics de folie.
  *
  * Il nous manquait la seconde. Notre déluge n'existait qu'au bout des quatre
- * secondes de grenade, donc seulement pour qui tenait le rythme jusqu'au
+ * secondes de piment, donc seulement pour qui tenait le rythme jusqu'au
  * bout. Le fruit cyclone le rend accessible d'un geste.
  *
  * POURQUOI LA PAPAYE. Il fallait un fruit qu'on ne puisse pas confondre avec
@@ -785,7 +786,7 @@ export const CYCLONE_MIN_GAP_CHRONO_MS = 22_000;
 export const CYCLONE_SAFE_TIME_MS = 28_000;
 export const CYCLONE_SAFE_TIME_CHRONO_MS = 9_000;
 /**
- * Délai plancher entre DEUX fruits spéciaux quelconques, grenade et cyclone
+ * Délai plancher entre DEUX fruits spéciaux quelconques, piment et cyclone
  * confondus. Sans lui, les deux cadences étant indépendantes, elles finissent
  * par tomber ensemble : deux frénésies coup sur coup, et le jeu n'a plus de
  * relief. C'est une seule règle pour deux mécaniques, et c'est voulu.
@@ -825,7 +826,7 @@ export const COLOR_BONUS = '#8ef2c8';
 
 /**
  * Taille du halo du cyclone, en multiples de son rayon — plus grand que celui
- * de la grenade (FRENZY_AURA_SCALE), et pour une raison mesurée.
+ * du piment (FRENZY_AURA_SCALE), et pour une raison mesurée.
  *
  * À 2,8, le halo d'une papaye de 88 px de rayon ne dépassait la silhouette que
  * de 40 %. Mesuré sur la couronne autour du fruit, image avec halo contre

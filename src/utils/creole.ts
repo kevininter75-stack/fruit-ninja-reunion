@@ -31,7 +31,7 @@ export const COMBO_GRAND = 'Totoche !';
  */
 export const COMBO_ENORME = 'Oté !';
 
-/** La grenade éclate au bout de sa frénésie. */
+/** Le piment cabri éclate au bout de sa frénésie. */
 export const FRENESIE = 'I pète fort !';
 
 /** Nouveau record personnel. */
@@ -69,7 +69,7 @@ export const CYCLONE = 'Cyclone y débarque !';
  * maximale, la répartition était x1 45 %, x2 27 %, x3 18 %, x6 9 %, et RIEN
  * entre quatre et cinq. Le seuil tombait dans un trou de la distribution. Il
  * n'a donc pas rendu l'exclamation rare : il l'a fait disparaître. En jeu, on
- * ne lisait plus un seul nom de combo en dehors de la grenade.
+ * ne lisait plus un seul nom de combo en dehors du fruit spécial.
  *
  * C'est la SECONDE voie qui était la bonne. Un x3 dit « Woulala », un x4 dit
  * « Totoche », un x7 dit « Oté » : deux combos voisins ne disent plus jamais
