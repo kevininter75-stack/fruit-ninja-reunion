@@ -576,12 +576,44 @@ export class SpawnManager {
     }
     this.lastCycloneAt = this.scene.time.now;
     this.lastSpecialAt = this.scene.time.now;
-    // 0,85 de la largeur : il traverse franchement sans jamais devenir
-    // inattrapable — il reste environ deux secondes à l'écran.
-    const p = this.computeSideLaunch(CYCLONE_VARIETY.radius, 0.85);
+    // TROIS ENTRÉES POSSIBLES, tirées au sort : la gauche, la droite, ou le
+    // bas comme n'importe quel fruit. Avec les seuls côtés, l'œil finissait
+    // par n'attendre le cyclone qu'aux bords — et la surprise, qui est tout
+    // son intérêt, s'usait. Le bas le rend imprévisible sans le rendre injuste,
+    // puisqu'il reste le plus gros et le seul à porter un halo.
+    const parLeBas = rnd() < 0.34;
+    const p = parLeBas
+      ? this.computeCycloneFromBottom()
+      : // 0,85 de la largeur : il traverse franchement sans jamais devenir
+        // inattrapable — il reste environ deux secondes à l'écran.
+        this.computeSideLaunch(CYCLONE_VARIETY.radius, 0.85);
     cyclone.launchAs(CYCLONE_VARIETY, false, p.x, p.y, p.velocityX, p.velocityY, false, true);
     sfx.launch();
     this.scene.events.emit('cyclone-incoming', cyclone);
+  }
+
+  /**
+   * Le cyclone lancé par le BAS, comme un fruit ordinaire.
+   *
+   * Son arc est calculé sur le même principe que partout ailleurs : on vise
+   * un SOMMET, jamais une montée, pour qu'il ne sorte pas par le haut. Il
+   * monte plus haut qu'un fruit banal et dérive moins, de façon à rester
+   * atteignable — c'est un cadeau, il ne doit pas être une loterie.
+   */
+  private computeCycloneFromBottom(): LaunchParams {
+    const width = this.scene.scale.width;
+    const height = this.scene.scale.height;
+    const p = this.launchParams;
+    const rayon = CYCLONE_VARIETY.radius;
+
+    // Jamais collé à un bord : il faut la place de l'attraper des deux côtés.
+    p.x = rndBetween(Math.round(width * 0.2), Math.round(width * 0.8));
+    p.y = height + rayon;
+    const sommet = height * rndFloat(SIDE_SOMMET_MIN, SIDE_SOMMET_MAX);
+    p.velocityY = -Math.sqrt(2 * GRAVITY_Y * (p.y - sommet));
+    // Dérive douce vers le centre, comme les grappes : il reste dans le champ.
+    p.velocityX = (p.x < width / 2 ? 1 : -1) * width * rndFloat(0.05, 0.12);
+    return p;
   }
 
   /** Vrai tant qu'une papaye cyclone est en vol (parcours du pool). */

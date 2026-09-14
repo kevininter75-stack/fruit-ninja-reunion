@@ -17,8 +17,9 @@ export class SfxManager {
   private master: GainNode | null = null;
   /** Horodatage du dernier bruit de coupe, pour atténuer les rafales. */
   private dernierTranchage = 0;
-  /** Idem pour le sifflement de lame, dont la cadence est celle du geste. */
-  private derniereLame = 0;
+  /** Voix continue du souffle de lame (creee au premier geste, jamais arretee). */
+  private lameGain: GainNode | null = null;
+  private lameBande: BiquadFilterNode | null = null;
 
   private context(): AudioContext | null {
     if (isMuted()) {
@@ -167,7 +168,7 @@ export class SfxManager {
    * trancher ne faisait aucun bruit propre.
    *
    * Le sifflement de lame, lui, a quitté cette méthode : il appartient au
-   * geste et se joue à part (cf. `lame()`). Ne restait donc ici que le fruit.
+   * geste et se joue à part (cf. `lameVitesse()`). Ne reste ici que le fruit.
    *
    *   1. LA PEAU QUI CÈDE : claquement de 12 ms vers 4 kHz. C'est lui qui
    *      donne l'instant exact du contact — sans transient, un son paraît
@@ -214,37 +215,70 @@ export class SfxManager {
   }
 
   /**
-   * LA LAME, et elle se joue au GESTE — pas au fruit.
+   * LA LAME : UN BÂTON QUI FEND L'AIR, et qui dure tant que le geste dure.
    *
-   * C'était la confusion à défaire. Un seul son servait aux deux choses : le
-   * sifflement d'une lame qui fend l'air, et le fruit qui s'ouvre. Or ce sont
-   * deux événements différents, à deux instants différents — on entend d'abord
-   * le sabre partir, puis chaque fruit éclater sur son passage. Confondus, ni
-   * l'un ni l'autre ne s'entendait pour ce qu'il était.
+   * DEUX ERREURS DANS LA VERSION PRÉCÉDENTE, et elles allaient ensemble.
    *
-   * Elle sonne donc à l'OUVERTURE du coup de sabre, même si le geste ne touche
-   * rien. C'est ce qui donne son poids au fait de trancher dans le vide : le
-   * joueur entend qu'il a manqué.
+   *   ELLE ÉTAIT UN COUP, PAS UN MOUVEMENT. Un seul son déclenché à
+   *   l'ouverture du geste, puis plus rien — alors qu'un objet qui fend l'air
+   *   siffle pendant tout son passage, et d'autant plus fort qu'il va vite.
+   *   Un « clac » au départ ne peut pas raconter ça.
    *
-   * Deux couches : un souffle en bande étroite qui MONTE (une lame qui
-   * s'approche monte en fréquence, comme une sirène qui passe), et une trace
-   * métallique brève à 3,9 kHz qui lui donne son acier.
+   *   ELLE ÉTAIT EN MÉTAL. Sa bande montait à 2,9 kHz et une pointe à 3,9 kHz
+   *   lui donnait un timbre d'acier. Or ce n'est pas une épée : c'est un bout
+   *   de bois qu'on fait claquer dans l'air. Le bois n'a pas ce sifflement
+   *   aigu — il donne un souffle plus bas, plus rond, sans sifflante.
+   *
+   * D'où cette voix CONTINUE. Une source de bruit qui tourne en boucle, dont
+   * la fréquence et le volume suivent en direct la vitesse du doigt. Vite : le
+   * souffle monte et s'ouvre. Lentement : il s'efface. Le son n'est plus
+   * déclenché, il est PILOTÉ — et c'est ce qui fait la différence entre un
+   * bruitage et un objet qui se déplace.
+   *
+   * Le passe-bas à 2,2 kHz est ce qui fait le bois plutôt que l'acier : il
+   * coupe la sifflante, et ne laisse que le souffle.
+   *
+   * PAS DE FERMETURE À APPELER. À chaque mise à jour, une extinction est
+   * programmée 130 ms plus tard ; tant que le geste continue, chaque appel la
+   * repousse. Si le joueur s'arrête, met en pause, perd la partie ou change de
+   * scène, le souffle s'éteint tout seul. Une boucle sonore qu'on oublierait
+   * d'arrêter tournerait pour toujours — ce risque-là n'existe pas ici.
    */
-  lame(): void {
+  lameVitesse(rapidite: number): void {
     const ctx = this.context();
     if (ctx === null) {
       return;
     }
-    // Anti-rafale propre au geste : un doigt qui zigzague rouvre des coups de
-    // sabre très rapprochés, et autant de sifflements empilés feraient un
-    // bourdonnement continu.
-    if (ctx.currentTime - this.derniereLame < 0.12) {
-      return;
+    if (this.lameGain === null || this.lameGain.context !== ctx) {
+      const source = ctx.createBufferSource();
+      source.buffer = this.getNoise(ctx);
+      source.loop = true;
+      const bande = ctx.createBiquadFilter();
+      bande.type = 'bandpass';
+      bande.Q.value = 1.1; // large : un souffle, pas une note
+      bande.frequency.value = 400;
+      const bois = ctx.createBiquadFilter();
+      bois.type = 'lowpass';
+      bois.frequency.value = 2200; // c'est lui qui enlève l'acier
+      const gain = ctx.createGain();
+      gain.gain.value = 0;
+      source.connect(bande).connect(bois).connect(gain).connect(this.bus(ctx));
+      source.start();
+      this.lameBande = bande;
+      this.lameGain = gain;
     }
-    this.derniereLame = ctx.currentTime;
-    const h = 0.9 + Math.random() * 0.25;
-    this.playNoise(ctx, 'bandpass', 700 * h, 2900 * h, 3.4, 0.17, 0.16);
-    this.playTone('triangle', 3900 * h, 3200 * h, 0.06, 0.045);
+    const v = Math.min(Math.max(rapidite, 0), 1);
+    const t = ctx.currentTime;
+    // Le souffle s'ouvre vers l'aigu avec la vitesse, sans jamais siffler.
+    this.lameBande?.frequency.setTargetAtTime(340 + v * 1150, t, 0.03);
+    const g = this.lameGain.gain;
+    // On fige la valeur courante avant de reprogrammer : sans cet ancrage, le
+    // moteur audio saute à la nouvelle consigne et le souffle craque.
+    const courant = g.value;
+    g.cancelScheduledValues(t);
+    g.setValueAtTime(courant, t);
+    g.setTargetAtTime(0.02 + v * 0.2, t, 0.025);
+    g.setTargetAtTime(0, t + 0.13, 0.05);
   }
 
   /** Explosion de bombe : bruit grave qui s'étouffe + chute de basse. */

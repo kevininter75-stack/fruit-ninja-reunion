@@ -41,8 +41,20 @@ const BASS: Array<number | null> = [
   N.C2, null, N.A2, null, N.G2, null, N.G2, null,
 ];
 
-/** Croches ou frappe le rouler, dans chaque mesure de huit : le 3-3-2 sega. */
-const ROULER = [0, 3, 6];
+/**
+ * Ou frappe le rouler, dans chaque mesure de huit croches.
+ *
+ * 3-3-2 : c'est la pulsation du sega et du maloya, celle qui donne le
+ * balancement parce qu'elle tombe a cote des temps forts de la basse.
+ *
+ * Le MENU en garde les deux premieres frappes seulement, et plus doucement :
+ * assez pour qu'on entende un morceau et pas une nappe, pas assez pour
+ * presser le joueur avant qu'il n'ait choisi son mode. C'est la meme boucle
+ * qui prend son elan au lancement de la partie -- le signal le moins couteux
+ * pour dire << ca commence >>.
+ */
+const ROULER_PARTIE = [0, 3, 6];
+const ROULER_MENU = [0, 3];
 
 const MUSIC_VOLUME = 0.2;
 
@@ -176,51 +188,94 @@ export class MusicManager {
     // Motif 3-3-2 sur chaque mesure de huit croches, la pulsation du séga :
     // elle tombe à côté des temps forts de la basse, et c'est le décalage
     // entre les deux qui donne le balancement.
-    if (this.enPartie && ROULER.includes(patternStep % 8)) {
-      this.playRouler(ctx, time, patternStep % 8 === 0 ? 0.5 : 0.34);
+    const dansLaMesure = patternStep % 8;
+    const motif = this.enPartie ? ROULER_PARTIE : ROULER_MENU;
+    if (motif.includes(dansLaMesure)) {
+      const fort = dansLaMesure === 0;
+      const ampleur = this.enPartie ? 1 : 0.62;
+      this.playRouler(ctx, time, (fort ? 0.5 : 0.34) * ampleur);
     }
   }
 
   /**
-   * Le roulèr : le gros tambour du séga.
+   * Le roulèr : le gros tambour du séga et du maloya.
    *
-   * Deux couches, et la première n'est pas décorative. Un tambour grave posé
-   * seul à 80-190 Hz ne s'entend pas sur un téléphone — c'est le même piège
-   * que la basse en sinus. La claque de peau, elle, vit entre 300 et 900 Hz :
-   * c'est elle qui porte le rythme sur un petit haut-parleur, pendant que le
-   * corps grave donne le poids sur une vraie enceinte.
+   * LA PREMIÈRE VERSION NE SONNAIT PAS COMME UN TAMBOUR, et pour une raison
+   * précise : elle était faite de 100 ms de bruit filtré. Du bruit qui dure,
+   * c'est un « chhh » — un balai, un souffle, tout sauf une peau frappée. Une
+   * frappe est un événement très court suivi d'une RÉSONANCE qui chante.
+   *
+   * Ce qui fait entendre un tambour, c'est l'ENVELOPPE DE HAUTEUR. Quand une
+   * peau est frappée, sa tension s'effondre dans les premières millisecondes :
+   * la note part haut et tombe aussitôt. Ici, 430 Hz → 95 Hz en 80 ms. C'est ce
+   * plongeon, et lui seul, qui distingue un tambour d'un simple bourdon grave.
+   * L'ancienne version ne descendait que de 190 à 80 Hz en 140 ms : trop peu,
+   * et trop lentement.
+   *
+   * Trois couches, toutes brèves :
+   *   1. LA MAIN sur la peau : 10 ms de bruit aigu, l'instant du contact ;
+   *   2. LA PEAU : 35 ms autour de 600 Hz — et non 100 ms, c'était là le défaut ;
+   *   3. LA MEMBRANE : le plongeon 430 → 95 Hz, qui résonne 300 ms.
+   *
+   * La couche 2 n'est pas décorative : un tambour qui ne vivrait qu'à 95 Hz
+   * serait muet sur un téléphone, exactement comme l'était la basse en sinus.
+   * C'est elle, entre 350 et 700 Hz, qui porte le rythme sur un petit
+   * haut-parleur, pendant que la membrane donne le poids sur une enceinte.
+   * D'où leur dosage : la peau a été montée et la membrane retenue, parce que
+   * le grave du tambour mangeait la part du mixage qu'un téléphone restitue.
+   *
+   * La hauteur varie légèrement d'une frappe à l'autre : une peau tendue à la
+   * main ne rend jamais deux fois exactement la même note, et sans cette
+   * variation le motif devient une boîte à rythmes.
    */
   private playRouler(ctx: AudioContext, time: number, volume: number): void {
     if (this.master === null) {
       return;
     }
-    const src = ctx.createBufferSource();
-    src.buffer = this.getNoise(ctx);
-    const filtre = ctx.createBiquadFilter();
-    filtre.type = 'bandpass';
-    filtre.Q.value = 1.4;
-    filtre.frequency.setValueAtTime(900, time);
-    filtre.frequency.exponentialRampToValueAtTime(300, time + 0.09);
-    const peau = ctx.createGain();
-    peau.gain.setValueAtTime(volume, time);
-    peau.gain.exponentialRampToValueAtTime(0.001, time + 0.1);
-    src.connect(filtre).connect(peau).connect(this.master);
-    src.start(time, Math.random() * 0.4);
-    src.stop(time + 0.12);
+    const tension = 0.94 + Math.random() * 0.12;
 
-    const corps = ctx.createOscillator();
-    corps.type = 'sine';
-    corps.frequency.setValueAtTime(190, time);
-    corps.frequency.exponentialRampToValueAtTime(80, time + 0.14);
-    const gc = ctx.createGain();
-    gc.gain.setValueAtTime(volume * 0.7, time);
-    gc.gain.exponentialRampToValueAtTime(0.001, time + 0.16);
-    corps.connect(gc).connect(this.master);
-    corps.start(time);
-    corps.stop(time + 0.18);
+    // 1. La main sur la peau.
+    const main = ctx.createBufferSource();
+    main.buffer = this.getNoise(ctx);
+    const aigu = ctx.createBiquadFilter();
+    aigu.type = 'highpass';
+    aigu.frequency.value = 1800;
+    const gMain = ctx.createGain();
+    gMain.gain.setValueAtTime(volume * 0.3, time);
+    gMain.gain.exponentialRampToValueAtTime(0.001, time + 0.012);
+    main.connect(aigu).connect(gMain).connect(this.master);
+    main.start(time, Math.random() * 0.4);
+    main.stop(time + 0.03);
+
+    // 2. La peau : court, et c'est tout l'intérêt.
+    const peau = ctx.createBufferSource();
+    peau.buffer = this.getNoise(ctx);
+    const bande = ctx.createBiquadFilter();
+    bande.type = 'bandpass';
+    bande.Q.value = 1.8;
+    bande.frequency.setValueAtTime(700 * tension, time);
+    bande.frequency.exponentialRampToValueAtTime(340 * tension, time + 0.035);
+    const gPeau = ctx.createGain();
+    gPeau.gain.setValueAtTime(volume * 0.55, time);
+    gPeau.gain.exponentialRampToValueAtTime(0.001, time + 0.04);
+    peau.connect(bande).connect(gPeau).connect(this.master);
+    peau.start(time, Math.random() * 0.4);
+    peau.stop(time + 0.05);
+
+    // 3. La membrane : le plongeon de hauteur, puis la résonance.
+    const membrane = ctx.createOscillator();
+    membrane.type = 'sine';
+    membrane.frequency.setValueAtTime(430 * tension, time);
+    membrane.frequency.exponentialRampToValueAtTime(95 * tension, time + 0.08);
+    const gMembrane = ctx.createGain();
+    gMembrane.gain.setValueAtTime(volume * 0.78, time);
+    gMembrane.gain.exponentialRampToValueAtTime(0.001, time + 0.3);
+    membrane.connect(gMembrane).connect(this.master);
+    membrane.start(time);
+    membrane.stop(time + 0.32);
   }
 
-  /** Le roulèr entre (partie) ou se tait (menu, écran de fin). */
+  /** Le roulèr passe du motif de menu à celui de la partie. */
   setEnPartie(enPartie: boolean): void {
     this.enPartie = enPartie;
   }

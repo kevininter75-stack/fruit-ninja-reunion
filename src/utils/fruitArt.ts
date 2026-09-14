@@ -243,6 +243,7 @@ function traceSilhouette(ctx: CanvasRenderingContext2D, variety: FruitVariety, s
       traceMango(ctx, c, c, r);
       break;
     case 'papaye':
+    case 'papaye_cyclone':
       tracePear(ctx, c, c, r);
       break;
     case 'corossol':
@@ -744,6 +745,62 @@ export function paintWhole(
       break;
     }
 
+    case 'papaye_cyclone': {
+      // LA SEULE COULEUR INVENTEE DU CATALOGUE, et c'est assume.
+      //
+      // Toutes les autres varietes ont ete calees sur des photos reelles.
+      // Celle-ci ne le peut pas : c'est un fruit de jeu, pas un fruit de
+      // marche, et son metier est d'etre reconnue en un dixieme de seconde au
+      // bord de l'ecran. Or le catalogue occupe deja le rouge, l'orange, le
+      // jaune, le vert, le violet et le magenta -- il ne restait que le bleu.
+      //
+      // Indigo profond parcouru d'une SPIRALE turquoise : aucun autre fruit du
+      // jeu n'a de motif tournant, et c'est le dessin d'un cyclone vu du ciel.
+      // La silhouette (une poire), la couleur et le motif disent donc la meme
+      // chose trois fois.
+      paintBody(ctx, variety, size, skin, () => {
+        const fond = ctx.createLinearGradient(0, c - r, 0, c + r);
+        fond.addColorStop(0, 'rgba(92, 74, 190, 0.75)');
+        fond.addColorStop(0.55, 'rgba(38, 30, 96, 0.2)');
+        fond.addColorStop(1, 'rgba(14, 12, 48, 0.6)');
+        ctx.fillStyle = fond;
+        ctx.fillRect(0, 0, size, size);
+
+        // Trois bras de spirale, comme les bandes nuageuses d'un cyclone.
+        ctx.lineCap = 'round';
+        for (let bras = 0; bras < 3; bras++) {
+          const depart = (bras / 3) * Math.PI * 2;
+          ctx.beginPath();
+          for (let t = 0; t <= 1.001; t += 0.04) {
+            // Spirale logarithmique : l'ecart entre deux tours croit avec le
+            // rayon, ce qui est exactement la forme d'une bande cyclonique.
+            const ang = depart + t * 3.4;
+            const rad = r * 0.16 * Math.exp(t * 1.45);
+            const x = c + Math.cos(ang) * rad;
+            const y = c + Math.sin(ang) * rad * 1.12;
+            if (t === 0) { ctx.moveTo(x, y); } else { ctx.lineTo(x, y); }
+          }
+          ctx.strokeStyle = 'rgba(74, 232, 222, 0.5)';
+          ctx.lineWidth = r * 0.13;
+          ctx.stroke();
+          ctx.strokeStyle = 'rgba(186, 255, 250, 0.55)';
+          ctx.lineWidth = r * 0.045;
+          ctx.stroke();
+        }
+        // L'oeil du cyclone : le calme au centre.
+        const oeil = ctx.createRadialGradient(c, c, 0, c, c, r * 0.26);
+        oeil.addColorStop(0, 'rgba(232, 255, 253, 0.9)');
+        oeil.addColorStop(0.55, 'rgba(120, 240, 232, 0.35)');
+        oeil.addColorStop(1, 'rgba(120, 240, 232, 0)');
+        ctx.fillStyle = oeil;
+        ctx.beginPath();
+        ctx.arc(c, c, r * 0.26, 0, TAU);
+        ctx.fill();
+      });
+      drawStem(ctx, c, c - r * 0.93, r * 0.26, 0.3, '#2b6f7a');
+      break;
+    }
+
     case 'corossol': {
       paintShadedBody(ctx, variety, size, skinMaterial(skin, 0.5, 0.16, 24, [190, 230, 140]), (x, y) => voronoiHeight(x, y, 8 / size, 0.3, 0x2c19), () => {
         // Écailles à pointe recourbée : chaque bosse du contour a sa base
@@ -1148,6 +1205,32 @@ function paintFleshDetails(
         ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
         ctx.beginPath();
         ctx.arc(px - r * 0.02, py - r * 0.02, r * 0.018, 0, TAU);
+        ctx.fill();
+      }
+      break;
+    }
+
+    case 'papaye_cyclone': {
+      // Meme anatomie que la papaye -- cavite centrale et couronne de graines
+      // -- mais aux couleurs de l'orage : c'est le meme fruit, coupe.
+      ctx.fillStyle = 'rgba(70, 210, 214, 0.45)';
+      ctx.beginPath();
+      ctx.ellipse(c, c, r * 0.5, r * 0.72, 0, 0, TAU);
+      ctx.fill();
+      const nombreDor = Math.PI * (3 - Math.sqrt(5));
+      for (let i = 0; i < 26; i++) {
+        const t = (i + 0.5) / 26;
+        const rad = Math.sqrt(t);
+        const a = i * nombreDor;
+        const gx = c + Math.cos(a) * rad * r * 0.34;
+        const gy = c + Math.sin(a) * rad * r * 0.55;
+        ctx.fillStyle = '#161a3a';
+        ctx.beginPath();
+        ctx.arc(gx, gy, r * 0.06, 0, TAU);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(190, 255, 250, 0.4)';
+        ctx.beginPath();
+        ctx.arc(gx - r * 0.02, gy - r * 0.02, r * 0.018, 0, TAU);
         ctx.fill();
       }
       break;

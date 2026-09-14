@@ -1366,12 +1366,15 @@ export class GameScene extends Phaser.Scene {
         gesture.strokeActive = true;
         gesture.strokeStart = now;
         gesture.comboCount = 0;
-        // Le sifflement de lame appartient au GESTE, pas au fruit : il sonne
-        // ici, à l'ouverture du coup de sabre, même si celui-ci ne touche
-        // rien. Trancher dans le vide s'entend, et c'est voulu.
-        sfx.lame();
       }
       gesture.lastFastTime = now;
+      // Le souffle de lame appartient au GESTE, pas au fruit, et il se PILOTE
+      // plutôt qu'il ne se déclenche : on lui passe la vitesse du doigt à
+      // chaque image, et il monte ou s'efface avec elle. Trancher dans le vide
+      // s'entend donc aussi — c'est ce qui donne son poids au geste manqué.
+      // La vitesse est ramenée entre 0 et 1, la borne haute étant trois fois
+      // la vitesse minimale de coupe : au-delà, le souffle est déjà au maximum.
+      sfx.lameVitesse((speed - SLICE_MIN_SPEED) / (SLICE_MIN_SPEED * 3));
 
       // Angle du geste : les moitiés s'écarteront perpendiculairement à lui
       const sliceAngle = Math.atan2(py - gesture.lastY, px - gesture.lastX);
