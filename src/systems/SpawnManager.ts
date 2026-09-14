@@ -38,10 +38,12 @@ import {
   FRENZY_SAFE_TIME_MS,
   FRENZY_STEP_GROWTH,
   FRENZY_MIN_GAP_MS,
-  DELUGE_DURATION_MS,
   DELUGE_INTERVAL_MS,
-  DELUGE_APEX_MIN,
-  DELUGE_APEX_MAX,
+  DELUGE_SOMMET_MIN,
+  DELUGE_SOMMET_MAX,
+  DELUGE_ENTREE_MIN,
+  DELUGE_ENTREE_MAX,
+  DELUGE_CALM_MS,
   DELUGE_TRAVEL_MIN,
   DELUGE_TRAVEL_MAX,
   CYCLONE_MIN_GAP_MS,
@@ -49,7 +51,8 @@ import {
   CYCLONE_SAFE_TIME_MS,
   CYCLONE_SAFE_TIME_CHRONO_MS,
   SPECIAL_MIN_GAP_MS,
-  FRENZY_APEX_FRACTION,
+  SIDE_SOMMET_MIN,
+  SIDE_SOMMET_MAX,
   FRENZY_CROSS_FACTOR,
 } from '../utils/constants';
 import {
@@ -184,9 +187,26 @@ export class SpawnManager {
     this.lastSpecialAt = this.scene.time.now;
   }
 
-  /** Vrai pendant le déluge qui suit l'explosion de la grenade. */
+  /** Vrai pendant le déluge déclenché par la papaye cyclone. */
   isDeluge(): boolean {
-    return this.scene.time.now < this.delugeUntil;
+    return this.delugeUntil > 0 && this.scene.time.now < this.delugeUntil;
+  }
+
+  /**
+   * Vrai pendant le déluge ET pendant le calme qui le suit.
+   *
+   * C'est cette fenêtre-là, et non `isDeluge()`, qui doit régir tout ce qui
+   * PUNIT le joueur. Les fruits lancés à la dernière seconde du déluge volent
+   * encore deux secondes après sa fin : s'arrêter à `isDeluge()` revenait à
+   * facturer une croix pour un fruit issu de la récompense elle-même.
+   *
+   * Le test sur `delugeUntil > 0` n'est pas un détail : sans lui, la valeur
+   * initiale de zéro rendrait ce calme vrai pendant les 2,6 premières
+   * secondes de CHAQUE partie, `time.now` étant l'horloge du jeu et non celle
+   * de la partie.
+   */
+  isDelugeCalm(): boolean {
+    return this.delugeUntil > 0 && this.scene.time.now < this.delugeUntil + DELUGE_CALM_MS;
   }
 
   /**
@@ -198,7 +218,7 @@ export class SpawnManager {
    * être à plus d'une seconde, et ce temps mort aurait cassé l'enchaînement
    * juste après l'explosion.
    */
-  startDeluge(dureeMs = DELUGE_DURATION_MS): void {
+  startDeluge(dureeMs: number): void {
     if (!this.running) {
       return;
     }
@@ -253,6 +273,12 @@ export class SpawnManager {
   private getSpawnInterval(): number {
     if (this.isDeluge()) {
       return DELUGE_INTERVAL_MS;
+    }
+    // Pendant le calme on repasse souvent, sans rien lancer : c'est ce qui
+    // permet à la partie de repartir dès la fin de la fenêtre, au lieu
+    // d'attendre en plus l'intervalle ordinaire d'une seconde.
+    if (this.isDelugeCalm()) {
+      return 250;
     }
     const base = Phaser.Math.Linear(
       SPAWN_INTERVAL_START_MS,
@@ -391,9 +417,16 @@ export class SpawnManager {
 
     // Le déluge remplace entièrement la salve ordinaire, et sort AVANT toute
     // la mécanique de bombes, de bonus et de grenade : aucune de ces trois
-    // choses ne peut donc s'y glisséer.
+    // choses ne peut donc s'y glisser.
     if (this.isDeluge()) {
       this.spawnDelugeBurst();
+      return;
+    }
+
+    // Le calme : on ne lance plus rien, on laisse l'écran finir de se vider.
+    // La salve suivante reprendra d'elle-même, ce compteur n'étant qu'une
+    // fenêtre de temps — rien à réarmer, donc rien qui puisse rester bloqué.
+    if (this.isDelugeCalm()) {
       return;
     }
 
@@ -578,8 +611,10 @@ export class SpawnManager {
     p.x = fromLeft ? -radius : width + radius;
     p.y = height * rndFloat(0.64, 0.78);
     // Arc ample : elle monte franchement puis redescend, ce qui lui donne
-    // près de deux secondes de présence utile à l'écran.
-    p.velocityY = -Math.sqrt(2 * GRAVITY_Y * FRENZY_APEX_FRACTION * height);
+    // près de deux secondes de présence utile à l'écran. Le sommet est visé
+    // directement, donc il ne sort jamais par le haut.
+    const sommet = height * rndFloat(SIDE_SOMMET_MIN, SIDE_SOMMET_MAX);
+    p.velocityY = -Math.sqrt(2 * GRAVITY_Y * Math.max(p.y - sommet, height * 0.2));
     if (Number.isNaN(traverse)) {
       // La grenade : elle n'a pas besoin de traverser, on l'attrape au vol et
       // elle se cale d'elle-même au premier coup (cf. settleGrenade).
@@ -614,8 +649,11 @@ export class SpawnManager {
       const depuisGauche = rnd() < 0.5;
       const variete = pickRandomVariety();
       const x = depuisGauche ? -variete.radius : width + variete.radius;
-      const y = height * rndFloat(0.55, 0.85);
-      const vy = -Math.sqrt(2 * GRAVITY_Y * rndFloat(DELUGE_APEX_MIN, DELUGE_APEX_MAX) * height);
+      const y = height * rndFloat(DELUGE_ENTREE_MIN, DELUGE_ENTREE_MAX);
+      // On vise un SOMMET, pas une montée : le point le plus haut du vol est
+      // ainsi garanti dans l'écran (cf. DELUGE_SOMMET_MIN dans constants.ts).
+      const sommet = height * rndFloat(DELUGE_SOMMET_MIN, DELUGE_SOMMET_MAX);
+      const vy = -Math.sqrt(2 * GRAVITY_Y * Math.max(y - sommet, height * 0.12));
       // La vitesse horizontale se DÉDUIT de la distance qu'on veut lui faire
       // parcourir : le fruit traverse vraiment l'écran, quel que soit l'arc
       // qui vient d'être tiré (cf. DELUGE_TRAVEL_MIN dans constants.ts).

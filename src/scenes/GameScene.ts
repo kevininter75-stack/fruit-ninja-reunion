@@ -1798,13 +1798,14 @@ export class GameScene extends Phaser.Scene {
       other.kill();
     }
 
-    // LE DÉLUGE. Le souffle vient de nettoyer l'écran : c'est l'instant exact
-    // où relancer, rien ne gêne la lecture. Cinq secondes de fruits par les
-    // côtés, sans une seule bombe — la récompense de la grenade, et ce qui
-    // manquait pour que la frénésie soit un sommet plutôt qu'une parenthèse.
-    this.delugeFruits = 0;
-    this.spawnManager.startDeluge();
-    this.grading.setMode('frenzy');
+    // PAS DE DÉLUGE ICI, et c'est délibéré depuis que la papaye cyclone
+    // existe. La grenade en déclenchait un, du temps où elle était le seul
+    // fruit spécial du jeu ; les deux se sont retrouvés à faire la même
+    // chose, et la frénésie perdait sa rareté à sortir deux fois plus souvent.
+    //
+    // Chacun son métier : la grenade paie le combo de coups qu'on vient de lui
+    // porter — c'est déjà une récompense complète, et elle a la sienne. Le
+    // déluge appartient au cyclone, qui n'a que ça à offrir.
   }
 
   /**
@@ -2195,7 +2196,11 @@ export class GameScene extends Phaser.Scene {
     // Pendant le déluge non plus : on déverse sept fruits par seconde, il est
     // impossible de tous les prendre, et c'est voulu. Facturer les manqués
     // transformerait la récompense en piège.
-    if (this.spawnManager.isDeluge()) {
+    //
+    // La fenêtre va jusqu'à la FIN DU CALME, pas jusqu'à la fin du déluge. Un
+    // fruit parti à la dernière seconde vole encore deux secondes : s'arrêter
+    // au déluge revenait à faire payer une croix pour un fruit du cadeau.
+    if (this.spawnManager.isDelugeCalm()) {
       return;
     }
 

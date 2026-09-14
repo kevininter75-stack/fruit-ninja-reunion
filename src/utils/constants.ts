@@ -273,11 +273,45 @@ export const FRENZY_POINTS_PER_SLASH = 5;
  * seconde. Le pool en contient 24 et un fruit vole 2 s : on frise le plafond
  * sans jamais le crèver, et spawnFruit renonce proprement s'il y arrive.
  */
-export const DELUGE_DURATION_MS = 5000;
 export const DELUGE_INTERVAL_MS = 220;
-/** Hauteur de l'arc des fruits du déluge, en fraction d'écran. */
-export const DELUGE_APEX_MIN = 0.42;
-export const DELUGE_APEX_MAX = 0.74;
+/**
+ * SOMMET de l'arc des fruits du déluge, en fraction de hauteur DEPUIS LE HAUT
+ * de l'écran. Ce n'est plus une hauteur de montée, et c'est tout le sujet.
+ *
+ * L'ancien réglage donnait la montée au-dessus du point de départ : 0,42 à
+ * 0,74 de la hauteur. Or les fruits du déluge entrent par le côté, à une
+ * hauteur elle aussi tirée au hasard. Un fruit parti à 0,55 H et montant de
+ * 0,74 H culminait donc à −0,19 H, soit 137 px AU-DESSUS du haut de l'écran
+ * sur une dalle de 720. Il disparaissait en plein vol, et le joueur n'avait
+ * aucun moyen de savoir quand il redescendrait.
+ *
+ * En visant directement le SOMMET, le point le plus haut est connu d'avance
+ * et toujours dans le cadre : entre 17 % et 38 % de la hauteur depuis le haut.
+ * La montée s'en déduit, et elle varie donc toute seule selon la hauteur
+ * d'entrée — ce qui donne même plus de variété qu'avant, sans le défaut.
+ */
+export const DELUGE_SOMMET_MIN = 0.17; // le plus haut autorisé
+export const DELUGE_SOMMET_MAX = 0.38; // le plus bas : un arc rasant
+/** Hauteur d'entrée sur le côté, en fraction de hauteur. */
+export const DELUGE_ENTREE_MIN = 0.6;
+export const DELUGE_ENTREE_MAX = 0.88;
+
+/**
+ * LE CALME APRÈS LE CYCLONE.
+ *
+ * Le déluge s'arrêtait net. Les fruits lancés à sa toute dernière seconde,
+ * eux, volaient encore deux secondes de plus — et ceux-là, une fois le déluge
+ * officiellement terminé, coûtaient une croix. Le joueur se prenait donc une
+ * vie pour un fruit issu de la récompense elle-même.
+ *
+ * Pendant ce calme, deux choses : aucune nouvelle salve, et aucun fruit manqué
+ * ne coûte quoi que ce soit. L'écran finit de se vider tout seul, puis la
+ * partie reprend. Ce n'est pas un temps mort, c'est la fin de la vague.
+ *
+ * 2,6 s parce que le vol le plus long du déluge dure environ 2,3 s : il faut
+ * couvrir le fruit parti au tout dernier instant, marge comprise.
+ */
+export const DELUGE_CALM_MS = 2600;
 /**
  * TRAVERSÉE : la part de la largeur qu'un fruit du déluge parcourt pendant
  * TOUT son vol. Ce n'est pas une vitesse — c'est une distance, et c'est là
@@ -317,7 +351,15 @@ export const COMBO_PUNCH_ZOOM = 1.06; // à la célébration d'un combo de swipe
 export const COMBO_PUNCH_MS = 130;
 export const FRENZY_HIT_PUNCH = 1.03; // à chaque coup porté à la grenade
 // Entrée latérale : la grenade traverse l'écran depuis un bord, en arc.
-export const FRENZY_APEX_FRACTION = 0.55; // hauteur de l'arc, en fraction d'écran
+/**
+ * Sommet de l'arc des fruits SPÉCIAUX entrant par le côté (grenade, cyclone),
+ * en fraction de hauteur depuis le haut. Même raisonnement que pour le déluge,
+ * et même raison d'y venir : la papaye cyclone est le plus gros fruit du jeu
+ * (88 px de rayon) et culminait à 65 px du haut — son sommet passait donc sous
+ * la barre, coupé. On vise le sommet, il est dans le cadre par construction.
+ */
+export const SIDE_SOMMET_MIN = 0.2;
+export const SIDE_SOMMET_MAX = 0.32;
 export const FRENZY_CROSS_FACTOR = 0.14; // vitesse de traversée, en fraction de largeur
 
 // Halo et ondes de choc : le vocabulaire visuel réservé à la grenade
