@@ -209,6 +209,8 @@ export class GameScene extends Phaser.Scene {
   private punchReturn: Phaser.Time.TimerEvent | null = null;
   /** Vrai entre enterFrenzyZoom et exitFrenzyZoom, et seulement là. */
   private frenzyZoomed = false;
+  /** Mémoire de l'état précédent, pour détecter la FIN du déluge. */
+  private delugeEnCours = false;
   private grading!: SceneGrading;
   private chronoEndTime = 0;
   /** Avancement à restaurer après une rotation d'écran, sinon null. */
@@ -238,6 +240,7 @@ export class GameScene extends Phaser.Scene {
       clearSeed();
     }
     this.gameEnded = false;
+    this.delugeEnCours = false;
     this.lastShownSecond = -1;
     this.multiplierTimer = null;
     this.fruitsSliced = data.resume?.fruitsSliced ?? 0;
@@ -404,6 +407,7 @@ export class GameScene extends Phaser.Scene {
     }
     this.closeStaleStrokes();
     this.updateFuseSparks();
+    this.updateDeluge();
     this.updateHalvesShading();
     this.updateFrenzyAura();
     if (this.mode === 'chrono' && !this.gameEnded) {
@@ -483,6 +487,19 @@ export class GameScene extends Phaser.Scene {
     }
     // setDisplaySize rétablit l'échelle de repos, la teinte et l'opacité.
     this.syncLifeCrossStyles();
+  }
+
+  /**
+   * Rend l'étalonnage normal à la fin du déluge.
+   *
+   * L'image reste chaude tant que les fruits pleuvent — c'est le même signal
+   * périphérique que pendant la frénésie, et il dit la même chose : profite.
+   */
+  private updateDeluge(): void {
+    if (this.delugeEnCours && !this.spawnManager.isDeluge()) {
+      this.grading.setMode(this.filledCrosses >= STARTING_LIVES - 1 ? 'danger' : 'normal');
+    }
+    this.delugeEnCours = this.spawnManager.isDeluge();
   }
 
   /**
@@ -1549,6 +1566,13 @@ export class GameScene extends Phaser.Scene {
       this.spawnHalves(other, Phaser.Math.FloatBetween(0, Math.PI));
       other.kill();
     }
+
+    // LE DÉLUGE. Le souffle vient de nettoyer l'écran : c'est l'instant exact
+    // où relancer, rien ne gêne la lecture. Cinq secondes de fruits par les
+    // côtés, sans une seule bombe — la récompense de la grenade, et ce qui
+    // manquait pour que la frénésie soit un sommet plutôt qu'une parenthèse.
+    this.spawnManager.startDeluge();
+    this.grading.setMode('frenzy');
   }
 
   /**
@@ -1910,6 +1934,13 @@ export class GameScene extends Phaser.Scene {
     if (this.gameEnded || this.mode === 'chrono' || fruit.isBonus || fruit.isFrenzy) {
       return;
     }
+    // Pendant le déluge non plus : on déverse sept fruits par seconde, il est
+    // impossible de tous les prendre, et c'est voulu. Facturer les manqués
+    // transformerait la récompense en piège.
+    if (this.spawnManager.isDeluge()) {
+      return;
+    }
+
     // Pendant le moment du fruit spécial, plus rien ne coûte de vie.
     //
     // Les salves sont déjà suspendues, mais les fruits partis AVANT l'entrée

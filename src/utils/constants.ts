@@ -254,6 +254,33 @@ export const FRENZY_SAFE_TIME_MS = 15_000; // jamais en tout début de partie
 export const FRENZY_DURATION_MS = 4000; // durée de la frénésie une fois amorcée
 export const FRENZY_HIT_COOLDOWN_MS = 70; // borne le compteur (~14 coups/s max)
 export const FRENZY_POINTS_PER_SLASH = 5;
+
+/**
+ * LE DÉLUGE, juste après l'explosion de la grenade.
+ *
+ * Relevé sur Fruit Ninja (mode Arcade, 45-90 s de la vidéo) : leur frénésie
+ * est un DÉLUGE de fruits entrant par les côtés, sans une seule bombe, qui
+ * fait tripler le rendement — 7,7 points/s avant, 26 points/s pendant. Un
+ * combo de douze fruits d'un seul geste y devient possible.
+ *
+ * La nôtre faisait exactement l'inverse : la grenade arrivait SEULE, tous les
+ * lancers suspendus pour qu'elle reste lisible. La lisibilité était le bon
+ * choix pendant qu'on la frappe ; ce qui manquait, c'était la récompense
+ * après. L'explosion tranche déjà tout ce qui vole — l'écran est donc net au
+ * moment précis où le déluge commence, et rien ne gêne la lecture.
+ *
+ * Cadence : une salve de 1 à 2 fruits toutes les 220 ms, soit environ 7 par
+ * seconde. Le pool en contient 24 et un fruit vole 2 s : on frise le plafond
+ * sans jamais le crèver, et spawnFruit renonce proprement s'il y arrive.
+ */
+export const DELUGE_DURATION_MS = 5000;
+export const DELUGE_INTERVAL_MS = 220;
+/** Hauteur de l'arc des fruits du déluge, en fraction d'écran. */
+export const DELUGE_APEX_MIN = 0.42;
+export const DELUGE_APEX_MAX = 0.74;
+/** Vitesse de traversée, en fraction de largeur. */
+export const DELUGE_CROSS_MIN = 0.1;
+export const DELUGE_CROSS_MAX = 0.22;
 // Zone où la grenade vient se caler à la première coupe, en fraction de la
 // hauteur : assez haut pour ne pas gêner le HUD, assez bas pour rester à portée.
 export const FRENZY_ZONE_TOP = 0.28;

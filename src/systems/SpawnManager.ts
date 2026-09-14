@@ -38,6 +38,12 @@ import {
   FRENZY_SAFE_TIME_MS,
   FRENZY_STEP_GROWTH,
   FRENZY_MIN_GAP_MS,
+  DELUGE_DURATION_MS,
+  DELUGE_INTERVAL_MS,
+  DELUGE_APEX_MIN,
+  DELUGE_APEX_MAX,
+  DELUGE_CROSS_MIN,
+  DELUGE_CROSS_MAX,
   FRENZY_APEX_FRACTION,
   FRENZY_CROSS_FACTOR,
 } from '../utils/constants';
@@ -113,6 +119,8 @@ export class SpawnManager {
   private lastFrenzyEndedAt = -Infinity;
   /** Mémoire de l'état précédent, pour détecter la FIN d'une frénésie. */
   private frenzyOnStage = false;
+  /** Fin du déluge qui suit l'explosion de la grenade (0 = pas de déluge). */
+  private delugeUntil = 0;
   private readonly launchParams: LaunchParams = { x: 0, y: 0, velocityX: 0, velocityY: 0 };
 
   constructor(
@@ -135,6 +143,7 @@ export class SpawnManager {
     this.frenzyCount = 0;
     this.lastFrenzyEndedAt = -Infinity;
     this.frenzyOnStage = false;
+    this.delugeUntil = 0;
     this.scheduleNextWave();
   }
 
@@ -149,8 +158,35 @@ export class SpawnManager {
     this.waveIndex = Math.max(this.waveIndex, Math.round(fruitsSliced / 2));
   }
 
+  /** Vrai pendant le déluge qui suit l'explosion de la grenade. */
+  isDeluge(): boolean {
+    return this.scene.time.now < this.delugeUntil;
+  }
+
+  /**
+   * Ouvre le déluge : cinq secondes de fruits par les côtés, sans une seule
+   * bombe. C'est la récompense de la grenade, et c'est ce qui manquait — la
+   * frénésie était une parenthèse au lieu d'être un sommet.
+   *
+   * La salve en attente est annulée et reprogrammée aussitôt : elle pouvait
+   * être à plus d'une seconde, et ce temps mort aurait cassé l'enchaînement
+   * juste après l'explosion.
+   */
+  startDeluge(): void {
+    if (!this.running) {
+      return;
+    }
+    this.delugeUntil = this.scene.time.now + DELUGE_DURATION_MS;
+    if (this.timer !== null) {
+      this.timer.remove();
+      this.timer = null;
+    }
+    this.scheduleNextWave();
+  }
+
   stop(): void {
     this.running = false;
+    this.delugeUntil = 0;
     if (this.timer !== null) {
       this.timer.remove();
       this.timer = null;
@@ -189,6 +225,9 @@ export class SpawnManager {
 
   /** Intervalle avant la prochaine salve (interpolé, bruité, respiration). */
   private getSpawnInterval(): number {
+    if (this.isDeluge()) {
+      return DELUGE_INTERVAL_MS;
+    }
     const base = Phaser.Math.Linear(
       SPAWN_INTERVAL_START_MS,
       SPAWN_INTERVAL_MIN_MS,
@@ -323,6 +362,15 @@ export class SpawnManager {
     if (frenzyEnScene) {
       return;
     }
+
+    // Le déluge remplace entièrement la salve ordinaire, et sort AVANT toute
+    // la mécanique de bombes, de bonus et de grenade : aucune de ces trois
+    // choses ne peut donc s'y glisséer.
+    if (this.isDeluge()) {
+      this.spawnDelugeBurst();
+      return;
+    }
+
     this.waveIndex += 1;
     const shape = this.pickShape();
     const size = this.getWaveSize(shape);
@@ -448,6 +496,35 @@ export class SpawnManager {
     p.velocityY = -Math.sqrt(2 * GRAVITY_Y * FRENZY_APEX_FRACTION * height);
     p.velocityX = (fromLeft ? 1 : -1) * width * FRENZY_CROSS_FACTOR;
     return p;
+  }
+
+  /**
+   * Une bouffée du déluge : un ou deux fruits entrant par un bord.
+   *
+   * Les deux côtés alternent par tirage plutôt que strictement : une
+   * alternance régulière se lit comme un métronome au bout de trois salves.
+   * L'arc et la vitesse de traversée varient aussi, sinon tous les fruits
+   * suivent la même parabole et un seul geste les prend tous — ce qui serait
+   * généreux, mais sans intérêt.
+   */
+  private spawnDelugeBurst(): void {
+    const combien = rnd() < 0.55 ? 1 : 2;
+    for (let i = 0; i < combien; i++) {
+      const fruit = this.fruits.get() as Fruit | null;
+      if (fruit === null) {
+        return; // pool épuisé : on renonce plutôt que d'allouer en pleine action
+      }
+      const width = this.scene.scale.width;
+      const height = this.scene.scale.height;
+      const depuisGauche = rnd() < 0.5;
+      const variete = pickRandomVariety();
+      const x = depuisGauche ? -variete.radius : width + variete.radius;
+      const y = height * rndFloat(0.62, 0.82);
+      const vy = -Math.sqrt(2 * GRAVITY_Y * rndFloat(DELUGE_APEX_MIN, DELUGE_APEX_MAX) * height);
+      const vx = (depuisGauche ? 1 : -1) * width * rndFloat(DELUGE_CROSS_MIN, DELUGE_CROSS_MAX);
+      fruit.launchAs(variete, false, x, y, vx, vy);
+    }
+    sfx.launch();
   }
 
   /**
