@@ -6,6 +6,7 @@ import {
   LANDSCAPE_HEIGHT,
   TEX_BOMB,
   TEX_JUICE,
+  TEX_SEED,
   TEX_SPLAT_PREFIX,
   SPLAT_VARIANTS,
   BOMB_RADIUS,
@@ -91,6 +92,7 @@ export class PreloadScene extends Phaser.Scene {
     this.taches.push({ libelle: 'La lame et le jus', run: () => {
       this.createBombTexture();
       this.createJuiceTexture();
+      this.createSeedTexture();
       this.createSplatTextures();
     } });
     this.taches.push({ libelle: 'Les finitions', run: () => {
@@ -616,6 +618,55 @@ export class PreloadScene extends Phaser.Scene {
 
     g.generateTexture(TEX_BOMB, size, size);
     g.destroy();
+  }
+
+  /**
+   * GRAINE DE PIMENT, projetée par poignées à l'explosion.
+   *
+   * Un disque flou teinté aurait suffi à faire « des particules » — c'est
+   * d'ailleurs ce que fait la goutte de jus juste en dessous. Mais on ne
+   * verrait pas des GRAINES : à l'explosion du piment, ce qui doit voler, ce
+   * sont des objets nets, plats et identifiables, pas une brume colorée.
+   *
+   * D'où une ellipse aux bords FRANCS, avec son liseré brun et son petit
+   * reflet — exactement la graine dessinée dans la chair du piment coupé
+   * (cf. fruitArt.ts). Celle qui vole et celle qu'on voit dans la tranche
+   * sont la même, et c'est ce qui fait tenir l'illusion.
+   *
+   * Elle n'est PAS teintée à l'émission, contrairement aux autres particules :
+   * une graine de piment est crème, toujours, quelle que soit la couleur du
+   * fruit. Elle porte donc ses vraies couleurs dans la texture.
+   */
+  private createSeedTexture(): void {
+    const w = 22;
+    const h = 16;
+    const tex = this.textures.createCanvas(TEX_SEED, px(w), px(h));
+    if (tex === null) {
+      return;
+    }
+    const ctx = tex.getContext();
+    ctx.scale(RENDER_SCALE, RENDER_SCALE);
+    const cx = w / 2;
+    const cy = h / 2;
+    // Corps : dégradé très doux, du crème clair vers le doré.
+    const g = ctx.createRadialGradient(cx - w * 0.12, cy - h * 0.16, 1, cx, cy, w * 0.5);
+    g.addColorStop(0, '#fff6d2');
+    g.addColorStop(0.6, '#f0dc9a');
+    g.addColorStop(1, '#dcc072');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, w * 0.44, h * 0.4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Liseré brun : sans lui, la graine se dissout sur un ciel clair.
+    ctx.strokeStyle = 'rgba(138, 100, 34, 0.75)';
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+    // Reflet : une graine de piment est lisse et un peu luisante.
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+    ctx.beginPath();
+    ctx.ellipse(cx - w * 0.13, cy - h * 0.15, w * 0.13, h * 0.11, -0.4, 0, Math.PI * 2);
+    ctx.fill();
+    tex.refresh();
   }
 
   /** Goutte de jus : disque à dégradé radial doux (bord fondu), teinté à l'émission. */

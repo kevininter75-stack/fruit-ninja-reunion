@@ -547,6 +547,10 @@ export const BOMB_GAMEOVER_DELAY_MS = 700; // durée du flash avant l'écran de 
 
 // Particules de jus
 export const TEX_JUICE = 'juice';
+/** Graine de piment : projetée en gerbe quand le piment cabri éclate. */
+export const TEX_SEED = 'seed';
+/** Graines lâchées à l'explosion. Généreux : un piment en est PLEIN. */
+export const SEED_BURST_COUNT = 34;
 export const JUICE_PARTICLE_COUNT = 14;
 
 // Éclaboussures persistantes sur le décor (Étape 1 du polish "feel")

@@ -19,6 +19,7 @@ import type { ScoreSnapshot } from '../systems/ScoreManager';
 import { dailySeed, saveTodayResult } from '../utils/dailyChallenge';
 import { exclamationCombo, FRENESIE, CYCLONE } from '../utils/creole';
 import {
+  GRAVITY_Y,
   FRUIT_POOL_SIZE,
   HALF_POOL_SIZE,
   HALF_LIFETIME_MS,
@@ -59,6 +60,8 @@ import {
   DEPTH_FRENZY_AURA,
   TEX_BOMB,
   TEX_JUICE,
+  TEX_SEED,
+  SEED_BURST_COUNT,
   BOMB_POOL_SIZE,
   BOMB_GAMEOVER_DELAY_MS,
   JUICE_PARTICLE_COUNT,
@@ -68,6 +71,7 @@ import {
   SPLAT_FADE_MS,
   DEPTH_SPLAT,
   DEPTH_HALF,
+  DEPTH_FRUIT,
   DEPTH_JUICE,
   DEPTH_DARKEN,
   GAME_DARKEN_COLOR,
@@ -175,6 +179,7 @@ export class GameScene extends Phaser.Scene {
   private spawnManager!: SpawnManager;
   private juiceEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
   private fuseEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private seedEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
   private readonly fuseTip = new Phaser.Math.Vector2(); // réutilisé (pas d'alloc/frame)
   private frameCount = 0;
   private flashRect!: Phaser.GameObjects.Rectangle;
@@ -382,6 +387,37 @@ export class GameScene extends Phaser.Scene {
         emitting: false,
       })
       .setDepth(DEPTH_JUICE);
+
+    // GRAINES DE PIMENT : la gerbe de l'explosion du piment cabri.
+    //
+    // Trois reglages la distinguent des autres particules du jeu, et chacun
+    // dit quelque chose de ce qu'est une graine.
+    //
+    //   ELLE N'EST PAS TEINTEE. Le jus et les etincelles empruntent la couleur
+    //   de ce qui les emet ; une graine de piment est creme, toujours. Elle
+    //   porte donc ses vraies couleurs dans sa texture (cf. PreloadScene).
+    //
+    //   ELLE NE RETRECIT PAS en mourant. Une goutte de jus s'evapore, une
+    //   graine non : elle tombe. L'echelle reste donc quasi constante et c'est
+    //   l'ALPHA qui s'eteint, en toute fin de course seulement.
+    //
+    //   ELLE TOURNE SUR ELLE-MEME. Une graine plate projetee a la volee
+    //   culbute ; sans rotation, la gerbe ressemble a des confettis colles au
+    //   vent. C'est le detail qui la fait lire comme un objet solide.
+    this.seedEmitter = this.add
+      .particles(0, 0, TEX_SEED, {
+        speed: { min: 220, max: 760 },
+        angle: { min: 0, max: 360 },
+        scale: { min: 0.72, max: 1.1 },
+        rotate: { start: 0, end: 360 },
+        alpha: { start: 1, end: 0, ease: 'Quad.easeIn' },
+        lifespan: { min: 700, max: 1400 },
+        gravityY: GRAVITY_Y * 1.15,
+        emitting: false,
+      })
+      // Au-dessus des fruits : les graines viennent d'eclater, elles sont
+      // devant tout le reste.
+      .setDepth(DEPTH_FRUIT + 1);
 
     // Flash blanc plein écran (bombe) — créé une fois, réactivé au besoin
     this.flashRect = this.add
@@ -1789,6 +1825,11 @@ export class GameScene extends Phaser.Scene {
     // Gerbe généreuse au point d'explosion
     this.juiceEmitter.setParticleTint(piment.juiceColor);
     this.juiceEmitter.emitParticleAt(piment.x, piment.y, JUICE_PARTICLE_COUNT * 5);
+    // ET LES GRAINES. Un piment n'explose pas comme un fruit quelconque : il
+    // est PLEIN de graines, et c'est ce qu'on doit voir partir dans tous les
+    // sens. Elles sortent en même temps que le jus mais vivent deux fois plus
+    // longtemps — le jus s'évapore, les graines retombent.
+    this.seedEmitter.emitParticleAt(piment.x, piment.y, SEED_BURST_COUNT);
     this.spawnSplat(piment.x, piment.y, piment.juiceColor);
     this.shakeCamera(260, 0.008);
     // Double onde : une rapide et serrée, une lente et large — le souffle
