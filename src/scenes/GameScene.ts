@@ -759,7 +759,7 @@ export class GameScene extends Phaser.Scene {
     this.grading.setMode('frenzy');
 
     const gagne = this.scoreManager.addScore(CYCLONE_POINTS);
-    this.showBigBanner(`${CYCLONE}\n+${gagne}`, 1.15, papaye.x, papaye.y);
+    this.showBigBanner(CYCLONE, 1.15, papaye.x, papaye.y, `+${gagne}`);
 
     // Double onde chaude, secousse, gel bref : le vocabulaire du gros moment.
     this.spawnRing(papaye.x, papaye.y, 7, 0xffd166, 420);
@@ -1839,11 +1839,7 @@ export class GameScene extends Phaser.Scene {
     sfx.crit();
     // Même découpage que pour les combos : l'exclamation au centre, le détail
     // chiffré dispersé autour du point d'explosion.
-    this.showBigBanner(FRENESIE, 1, piment.x, piment.y);
-    this.showRewardBurst(piment.x, piment.y, [
-      { texte: `${slashes} COUPS`, couleur: COLOR_COMBO, taille: px(48) },
-      { texte: `+${awarded}`, couleur: COLOR_POINTS, taille: px(38) },
-    ]);
+    this.showBigBanner(FRENESIE, 1, piment.x, piment.y, `${slashes} coups   +${awarded}`);
 
     this.hideFrenzyVisuals();
     piment.kill();
@@ -1945,14 +1941,13 @@ export class GameScene extends Phaser.Scene {
     // détache et part vivre ailleurs sur l'écran : c'est ce qui fait passer la
     // récompense d'un bloc unique à une gerbe de récompenses, comme dans la
     // référence.
-    this.showBigBanner(exclamationCombo(n), enorme ? 1.3 : 1, gesture.lastX, gesture.lastY);
-    this.showRewardBurst(gesture.lastX, gesture.lastY, [
-      { texte: `${n} FRUITS`, couleur: COLOR_COMBO, taille: px(enorme ? 56 : 46) },
-      { texte: `+${awarded}`, couleur: COLOR_POINTS, taille: px(38) },
-      ...(this.spawnManager.isDeluge()
-        ? [{ texte: 'EN PLEIN CYCLONE', couleur: COLOR_CYCLONE, taille: px(36) }]
-        : []),
-    ]);
+    this.showBigBanner(
+      exclamationCombo(n),
+      enorme ? 1.3 : 1,
+      gesture.lastX,
+      gesture.lastY,
+      `${n} fruits   +${awarded}`
+    );
     // L'arpège s'allonge avec le combo, et un coup grave passe dessous à
     // partir de six (cf. SfxManager.bigCombo).
     sfx.bigCombo(n);
@@ -1981,52 +1976,107 @@ export class GameScene extends Phaser.Scene {
    * nombre de deux et ne s'inventent pas — la montée se joue donc sur la
    * PRÉSENCE : même mot, mais dit beaucoup plus fort.
    */
-  private showBigBanner(message: string, emphase = 1, x = Number.NaN, y = Number.NaN): void {
+  private showBigBanner(
+    message: string,
+    emphase = 1,
+    x = Number.NaN,
+    y = Number.NaN,
+    detail = ''
+  ): void {
     // Le mot s'affiche LÀ OÙ LE GESTE A EU LIEU, pas systématiquement au
     // centre. Au centre, il racontait toujours la même histoire quelle que
     // soit l'action ; à l'endroit du coup de sabre, il désigne ce qu'on vient
     // de faire — et l'œil du joueur y est déjà, puisque c'est là qu'il vient
     // de trancher. Le centre reste le défaut pour ce qui ne se passe nulle
     // part en particulier : l'arrivée du piment, une vie regagnée.
-    const viseX = Number.isNaN(x) ? this.scale.width / 2 : x;
-    const viseY = Number.isNaN(y) ? this.scale.height * 0.34 : y - px(70);
-    const banner = this.add
-      .text(viseX, viseY, message, {
+    //
+    // LE DÉTAIL CHIFFRÉ VIT DANS LE BANDEAU, et c'est une correction.
+    //
+    // Il vivait à côté, dans une gerbe de récompenses posée au même endroit.
+    // Tant que le bandeau tenait le centre de l'écran, les deux ne se
+    // croisaient jamais ; en le déplaçant sur le geste, je les ai posés l'un
+    // sur l'autre sans m'en apercevoir. Mesuré sur un combo de cinq : le
+    // bandeau occupait y 277-375 à la profondeur 70, « 5 FRUITS » y 288-347 à
+    // la profondeur 60. Le chiffre était donc ENTIÈREMENT derrière le mot.
+    // Kevin ne voyait plus jamais les points de ses combos.
+    //
+    // Les réunir en un seul objet supprime la classe entière de ces bugs : il
+    // n'y a plus deux choses à placer au même endroit, donc plus rien qui
+    // puisse se recouvrir. Le titre et le détail restent de deux tailles et de
+    // deux couleurs — ce qu'on cherchait — mais dans un conteneur commun qui
+    // s'anime d'un bloc et se borne d'un bloc.
+    const titre = this.add
+      .text(0, 0, message, {
         fontFamily: GAME_FONT,
         fontSize: fontPx(Math.round(76 * emphase)),
         fontStyle: 'bold',
-        color: '#ffe066',
+        color: COLOR_COMBO,
         align: 'center',
         stroke: '#2d3a4a',
         strokeThickness: px(10),
       })
-      .setOrigin(0.5)
+      .setOrigin(0.5);
+
+    const enfants: Phaser.GameObjects.GameObject[] = [titre];
+    let basRel = titre.height / 2;
+    if (detail !== '') {
+      const sousTitre = this.add
+        .text(0, 0, detail, {
+          fontFamily: GAME_FONT,
+          fontSize: fontPx(Math.round(40 * emphase)),
+          fontStyle: 'bold',
+          color: COLOR_POINTS,
+          align: 'center',
+          stroke: '#2d3a4a',
+          strokeThickness: px(7),
+        })
+        .setOrigin(0.5);
+      // Empilé à partir des hauteurs RÉELLES, jamais d'un écart deviné : c'est
+      // ce qui garantit qu'aucune taille de police ne les fera se toucher.
+      sousTitre.y = titre.height / 2 + sousTitre.height / 2 + px(6);
+      basRel = sousTitre.y + sousTitre.height / 2;
+      enfants.push(sousTitre);
+    }
+
+    const bandeau = this.add
+      .container(
+        Number.isNaN(x) ? this.scale.width / 2 : x,
+        Number.isNaN(y) ? this.scale.height * 0.34 : y - px(70),
+        enfants
+      )
       .setDepth(70)
       .setScale(0.3)
       .setAngle(Phaser.Math.Between(-7, 7)); // léger décalage : moins figé
-    // Bornage APRÈS création : c'est la seule façon de connaître la largeur
+
+    // Bornage APRÈS création : c'est la seule façon de connaître la taille
     // réelle du texte une fois rendu. « Cyclone y débarque ! » fait plus du
     // tiers de l'écran — posé sur un geste près d'un bord, il en sortirait.
-    const demiL = banner.width / 2 + px(16);
-    const demiH = banner.height / 2 + px(12);
-    banner.setPosition(
-      Phaser.Math.Clamp(banner.x, demiL, this.scale.width - demiL),
-      Phaser.Math.Clamp(banner.y, demiH, this.scale.height - demiH)
+    //
+    // Le facteur 1,15 est celui du dernier soubresaut de l'animation : c'est
+    // sa taille MAXIMALE qu'il faut faire tenir, pas celle du repos.
+    const demiL = (Math.max(...enfants.map((e) => (e as Phaser.GameObjects.Text).width)) / 2) * 1.15 + px(16);
+    const hautRel = (titre.height / 2) * 1.15 + px(12);
+    const debordBas = basRel * 1.15 + px(12);
+    bandeau.setPosition(
+      Phaser.Math.Clamp(bandeau.x, demiL, this.scale.width - demiL),
+      Phaser.Math.Clamp(bandeau.y, hautRel, this.scale.height - debordBas)
     );
+
     this.tweens.add({
-      targets: banner,
+      targets: bandeau,
       scale: 1,
       angle: 0,
       duration: 320,
       ease: 'Back.easeOut',
       onComplete: () => {
         this.tweens.add({
-          targets: banner,
+          targets: bandeau,
           alpha: 0,
           scale: 1.15,
           delay: 350 * emphase,
           duration: 350,
-          onComplete: () => banner.destroy(),
+          // Détruire le conteneur détruit ses enfants : aucun texte orphelin.
+          onComplete: () => bandeau.destroy(),
         });
       },
     });

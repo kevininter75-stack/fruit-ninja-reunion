@@ -54,7 +54,7 @@ export interface SurfaceMaterial {
  * haut-gauche. Le soleil du décor est placé du même côté (SUN_FRAC_X) —
  * c'est la même lumière, il ne peut y en avoir qu'une.
  */
-export const KEY = normalize(-0.46, -0.58, 0.67);
+export const KEY = normalize(-0.655, -0.348, 0.671);
 const KEY_COLOR: [number, number, number] = [1.0, 0.9, 0.78];
 /** Remplissage froid venant du ciel opposé : sans lui, l'ombre est un trou. */
 const FILL = normalize(0.52, 0.34, 0.45);

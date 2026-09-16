@@ -79,14 +79,14 @@ export function sphereGradient(
 
 /** Reflet brillant (spéculaire) en haut-gauche, pour l'aspect verni. */
 export function addGloss(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number): void {
-  const gx = cx - r * 0.34;
-  const gy = cy - r * 0.4;
+  const gx = cx - r * 0.46;
+  const gy = cy - r * 0.25;
   const g = ctx.createRadialGradient(gx, gy, 0, gx, gy, r * 0.46);
   g.addColorStop(0, 'rgba(255, 255, 255, 0.62)');
   g.addColorStop(1, 'rgba(255, 255, 255, 0)');
   ctx.fillStyle = g;
   ctx.beginPath();
-  ctx.ellipse(gx, gy, r * 0.44, r * 0.34, -0.5, 0, TAU);
+  ctx.ellipse(gx, gy, r * 0.44, r * 0.34, -0.12, 0, TAU);
   ctx.fill();
 }
 
