@@ -84,7 +84,7 @@ export class MusicManager {
     this.started = true;
 
     this.master = ctx.createGain();
-    this.master.gain.value = isMuted() ? 0 : MUSIC_VOLUME;
+    this.master.gain.value = this.niveauCible();
     this.master.connect(ctx.destination);
 
     this.startOcean(ctx);
@@ -161,7 +161,7 @@ export class MusicManager {
     if (this.master !== null && ctx !== null) {
       // Rampe courte pour éviter le clic audio
       this.master.gain.cancelScheduledValues(ctx.currentTime);
-      this.master.gain.linearRampToValueAtTime(muted ? 0 : MUSIC_VOLUME, ctx.currentTime + 0.15);
+      this.master.gain.linearRampToValueAtTime(this.niveauCible(), ctx.currentTime + 0.15);
     }
     return muted;
   }
@@ -299,10 +299,27 @@ export class MusicManager {
     if (ctx === null) {
       return;
     }
-    this.master.gain.linearRampToValueAtTime(
-      enPartie ? MUSIC_VOLUME_PARTIE : MUSIC_VOLUME,
-      ctx.currentTime + 0.5
-    );
+    this.master.gain.linearRampToValueAtTime(this.niveauCible(), ctx.currentTime + 0.5);
+  }
+
+  /**
+   * Le niveau que la musique doit atteindre DANS L'ÉTAT COURANT.
+   *
+   * Une seule source de vérité, et c'est une correction. Le rétablissement du
+   * son recalculait son niveau tout seul, à MUSIC_VOLUME, sans regarder si une
+   * partie était en cours : couper puis remettre le son en plein match rendait
+   * la boucle au volume du menu pour tout le reste de la partie. L'écart d'un
+   * tiers qui dit « ça commence » disparaissait sur un aller-retour de bouton.
+   *
+   * Trois endroits fixent ce gain — le démarrage, le bouton, le lancement
+   * d'une partie. Tant qu'ils le calculaient chacun de leur côté, il suffisait
+   * d'en oublier un pour que les états se désynchronisent.
+   */
+  private niveauCible(): number {
+    if (isMuted()) {
+      return 0;
+    }
+    return this.enPartie ? MUSIC_VOLUME_PARTIE : MUSIC_VOLUME;
   }
 
   /**

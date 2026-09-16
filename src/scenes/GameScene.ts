@@ -2041,6 +2041,19 @@ export class GameScene extends Phaser.Scene {
       enfants.push(sousTitre);
     }
 
+    // LE BANDEAU SE MET À LA TAILLE DE L'ÉCRAN AVANT D'Y ÊTRE POSÉ.
+    //
+    // « Cyclone y débarque ! » mesure 826 px de large ; sur un écran logique
+    // de 720, il ne rentre pas, et aucune position ne le fera rentrer. Le
+    // réduire jusqu'à ce qu'il tienne est la seule issue — un mot un peu plus
+    // petit reste un mot, un mot coupé ne dit plus rien.
+    //
+    // Le facteur 1,15 est celui du dernier soubresaut de l'animation : c'est
+    // sa taille MAXIMALE qu'il faut faire tenir, pas celle du repos. La marge
+    // de px(32) laisse le contour respirer contre les bords.
+    const largeurMax = Math.max(...enfants.map((e) => (e as Phaser.GameObjects.Text).width));
+    const ajuste = Math.min(1, (this.scale.width - px(32)) / (largeurMax * 1.15));
+
     const bandeau = this.add
       .container(
         Number.isNaN(x) ? this.scale.width / 2 : x,
@@ -2048,26 +2061,38 @@ export class GameScene extends Phaser.Scene {
         enfants
       )
       .setDepth(70)
-      .setScale(0.3)
+      .setScale(0.3 * ajuste)
       .setAngle(Phaser.Math.Between(-7, 7)); // léger décalage : moins figé
 
     // Bornage APRÈS création : c'est la seule façon de connaître la taille
     // réelle du texte une fois rendu. « Cyclone y débarque ! » fait plus du
     // tiers de l'écran — posé sur un geste près d'un bord, il en sortirait.
     //
-    // Le facteur 1,15 est celui du dernier soubresaut de l'animation : c'est
-    // sa taille MAXIMALE qu'il faut faire tenir, pas celle du repos.
-    const demiL = (Math.max(...enfants.map((e) => (e as Phaser.GameObjects.Text).width)) / 2) * 1.15 + px(16);
-    const hautRel = (titre.height / 2) * 1.15 + px(12);
-    const debordBas = basRel * 1.15 + px(12);
+    // Les demi-tailles se mesurent APRÈS l'ajustement : c'est la taille qu'aura
+    // vraiment le bandeau à l'écran qu'il faut borner, pas celle du texte brut.
+    const demiL = ((largeurMax / 2) * 1.15 + px(16)) * ajuste;
+    const hautRel = ((titre.height / 2) * 1.15 + px(12)) * ajuste;
+    const debordBas = (basRel * 1.15 + px(12)) * ajuste;
+
+    // CENTRER PLUTÔT QUE PLAQUER quand les bornes se croisent.
+    //
+    // Phaser.Math.Clamp rend sa borne BASSE lorsqu'on lui passe un minimum
+    // supérieur au maximum. Un bandeau plus large que l'écran se retrouvait
+    // donc collé au bord gauche — le pire des deux, puisqu'il débordait alors
+    // tout entier du même côté. Symétrique, il reste lisible en son milieu.
+    // L'ajustement ci-dessus rend ce cas très improbable ; on s'en défend quand
+    // même, parce qu'un arrondi suffit à le faire réapparaître.
+    const borne = (v: number, avant: number, apres: number, plein: number): number =>
+      avant + apres >= plein ? plein / 2 : Phaser.Math.Clamp(v, avant, plein - apres);
+
     bandeau.setPosition(
-      Phaser.Math.Clamp(bandeau.x, demiL, this.scale.width - demiL),
-      Phaser.Math.Clamp(bandeau.y, hautRel, this.scale.height - debordBas)
+      borne(bandeau.x, demiL, demiL, this.scale.width),
+      borne(bandeau.y, hautRel, debordBas, this.scale.height)
     );
 
     this.tweens.add({
       targets: bandeau,
-      scale: 1,
+      scale: ajuste,
       angle: 0,
       duration: 320,
       ease: 'Back.easeOut',
@@ -2075,7 +2100,7 @@ export class GameScene extends Phaser.Scene {
         this.tweens.add({
           targets: bandeau,
           alpha: 0,
-          scale: 1.15,
+          scale: 1.15 * ajuste,
           delay: 350 * emphase,
           duration: 350,
           // Détruire le conteneur détruit ses enfants : aucun texte orphelin.
