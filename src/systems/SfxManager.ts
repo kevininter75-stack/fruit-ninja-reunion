@@ -16,18 +16,53 @@ import { MECHE_VOLUME, MECHE_CREPITEMENT } from '../utils/constants';
 export class SfxManager {
   private noiseBuffer: AudioBuffer | null = null;
   private master: GainNode | null = null;
-  /** Horodatage du dernier bruit de coupe, pour atténuer les rafales. */
-  private dernierTranchage = 0;
+  /**
+   * Horodatage du dernier bruit de coupe, pour atténuer les rafales.
+   *
+   * MOINS L'INFINI, ET PAS ZÉRO. Ces horodatages se comparent à
+   * `ctx.currentTime`, qui repart de zéro avec chaque contexte : initialisés à
+   * 0, ils prétendent qu'un son vient d'être joué à l'instant même où l'audio
+   * s'ouvre, et le tout premier coup de sabre de la session passe à la trappe.
+   * Moins l'infini dit la vérité — aucun son n'a encore été joué.
+   */
+  private dernierTranchage = Number.NEGATIVE_INFINITY;
   /** Horodatage du dernier souffle de lame : deux gestes ne se chevauchent pas. */
-  private derniereLame = 0;
+  private derniereLame = Number.NEGATIVE_INFINITY;
   /** Voix continue de la mèche, créée au premier pétard puis réutilisée. */
   private mecheGain: GainNode | null = null;
+  /** Le contexte auquel appartient tout ce qui est mis en cache ci-dessus. */
+  private ctxCourant: AudioContext | null = null;
 
+  /**
+   * Le contexte audio du moment — et le seul endroit qui constate qu'il change.
+   *
+   * TOUT CE QU'ON GARDE EN CACHE APPARTIENT À UN CONTEXTE PRÉCIS. Les nœuds ne
+   * peuvent pas se brancher sur un autre, le buffer de bruit a été fabriqué à
+   * la fréquence d'échantillonnage de celui-là, et les horodatages se lisent
+   * sur son horloge. Un nouveau contexte remet cette horloge à zéro : des
+   * horodatages hérités de l'ancien se retrouvent alors dans le futur, et les
+   * garde-fous anti-rafale — qui refusent un son « trop proche du précédent »
+   * — se mettent à tout refuser, définitivement.
+   *
+   * `bus()` et `meche()` se défendaient chacun de leur côté en comparant
+   * `.context`, le bruit et les horodatages ne se défendaient pas du tout.
+   * Constater le changement UNE FOIS, ici, par où tout passe, vaut mieux que
+   * de le redire à chaque appel en espérant n'en oublier aucun.
+   */
   private context(): AudioContext | null {
     if (isMuted()) {
       return null;
     }
-    return getAudioContext();
+    const ctx = getAudioContext();
+    if (ctx !== null && ctx !== this.ctxCourant) {
+      this.ctxCourant = ctx;
+      this.master = null;
+      this.mecheGain = null;
+      this.noiseBuffer = null;
+      this.dernierTranchage = Number.NEGATIVE_INFINITY;
+      this.derniereLame = Number.NEGATIVE_INFINITY;
+    }
+    return ctx;
   }
 
   /**

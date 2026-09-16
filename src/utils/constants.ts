@@ -618,6 +618,19 @@ export const DEPTH_FRUIT = 6;
  */
 export const DEPTH_SHEEN = 7;
 export const DEPTH_JUICE = 40;
+/**
+ * Graines projetées par l'explosion du piment.
+ *
+ * JUSTE AU-DESSUS DU JUS, et c'est voulu : la même explosion lance les deux au
+ * même endroit, à la même seconde. Une graine est un objet solide, le jus est
+ * une projection — la graine passe donc devant, sinon la gerbe se perd dedans.
+ *
+ * Elles étaient à DEPTH_FRUIT + 1, c'est-à-dire exactement DEPTH_SHEEN : deux
+ * choses différentes sur la même profondeur, dont l'ordre de tracé ne dépendait
+ * plus que de l'ordre de création. Un nombre nommé, lui, ne peut pas entrer en
+ * collision par accident.
+ */
+export const DEPTH_SEED = 41;
 
 
 

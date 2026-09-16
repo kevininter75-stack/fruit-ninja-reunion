@@ -72,7 +72,7 @@ import {
   SPLAT_FADE_MS,
   DEPTH_SPLAT,
   DEPTH_HALF,
-  DEPTH_FRUIT,
+  DEPTH_SEED,
   DEPTH_JUICE,
   DEPTH_DARKEN,
   GAME_DARKEN_COLOR,
@@ -416,9 +416,9 @@ export class GameScene extends Phaser.Scene {
         gravityY: GRAVITY_Y * 1.15,
         emitting: false,
       })
-      // Au-dessus des fruits : les graines viennent d'eclater, elles sont
-      // devant tout le reste.
-      .setDepth(DEPTH_FRUIT + 1);
+      // Au-dessus des fruits ET du jus de la meme explosion (cf. DEPTH_SEED) :
+      // les graines viennent d'eclater, elles sont devant tout le reste.
+      .setDepth(DEPTH_SEED);
 
     // Flash blanc plein écran (bombe) — créé une fois, réactivé au besoin
     this.flashRect = this.add
