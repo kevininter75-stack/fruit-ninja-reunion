@@ -263,6 +263,13 @@ export const FRENZY_SCORE_STEP = 700; // un palier de score = un piment
 export const FRENZY_STEP_GROWTH = 0.55;
 /** Deux piments ne peuvent jamais être séparés de moins de 25 s. */
 export const FRENZY_MIN_GAP_MS = 25_000;
+/**
+ * Sous « Sézon piment », le palier de score qui appelle un piment est divisé
+ * par trois — et son délai plancher avec, sinon le délai deviendrait le vrai
+ * régulateur et la mutation ne changerait presque rien.
+ */
+export const SEZON_PIMENT_DIVISEUR = 3;
+export const FRENZY_GAP_SEZON_MS = 9_000;
 export const FRENZY_SAFE_TIME_MS = 15_000; // jamais en tout début de partie
 export const FRENZY_DURATION_MS = 4000; // durée de la frénésie une fois amorcée
 export const FRENZY_HIT_COOLDOWN_MS = 70; // borne le compteur (~14 coups/s max)
@@ -808,6 +815,28 @@ export const DEPTH_BG_MOTE = -18;
 // ------------------------------------------------------------------
 // Vignettage : cadre sombre discret sur les bords → rendu cinématique
 export const TEX_VIGNETTE = 'vignette';
+/**
+ * Le voile de brume de la mutation « Brume des Hauts ».
+ *
+ * Au-dessus du jus (40) pour qu'elle passe devant les éclaboussures, sous la
+ * vignette (45) et le HUD : le score doit rester net quoi qu'il arrive à
+ * l'image. Une brume qui masquerait les chiffres ne serait plus une ambiance,
+ * ce serait une panne.
+ */
+export const DEPTH_BRUME = 42;
+/** Part basse de l'écran que le voile recouvre — la brume monte d'en bas. */
+export const BRUME_HAUTEUR = 0.62;
+/** Opacité au creux et à la crête d'une vague. */
+export const BRUME_ALPHA_MIN = 0.1;
+export const BRUME_ALPHA_MAX = 0.74;
+/**
+ * Durée d'une respiration complète.
+ *
+ * Onze secondes : assez lent pour qu'on la subisse sans pouvoir l'attendre au
+ * métronome, assez court pour qu'une éclaircie revienne avant l'agacement.
+ */
+export const BRUME_PERIODE_MS = 11_000;
+
 export const DEPTH_VIGNETTE = 45; // au-dessus du jeu et du jus, sous le HUD (50)
 // HUD en cartouches translucides arrondis
 export const HUD_PANEL_COLOR = 0x0b2a3a;
@@ -849,6 +878,14 @@ export const CYCLONE_DURATION_MS = 6000;
  * Ninja, où la banane de frénésie passe deux à trois fois en une minute.
  */
 export const CYCLONE_MIN_GAP_MS = 58_000;
+/**
+ * Cadence du cyclone sous la mutation « Saison cyclone » du Défi du jour.
+ *
+ * Quinze secondes : assez pour qu'il redevienne un événement entre deux
+ * passages, trop peu pour qu'on souffle. C'est la seule mutation qui rend la
+ * partie plus généreuse, d'où l'objectif du jour relevé qui l'accompagne.
+ */
+export const CYCLONE_GAP_SAISON_MS = 15_000;
 export const CYCLONE_MIN_GAP_CHRONO_MS = 22_000;
 /** Jamais en tout début de partie : on laisse le joueur entrer dans le jeu. */
 export const CYCLONE_SAFE_TIME_MS = 28_000;

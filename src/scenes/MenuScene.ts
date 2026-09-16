@@ -22,6 +22,8 @@ import { SliceTrail } from '../entities/SliceTrail';
 import { AnimatedBackground } from '../entities/AnimatedBackground';
 import { createMuteButton, createQualityButton, addVignette, fadeIn, fadeToScene } from '../utils/ui';
 import { getTodayResult, getStreak } from '../utils/dailyChallenge';
+import { mutationDuJour, objectifDuJour } from '../utils/mutations';
+import { hexToCss } from '../utils/fruitArt';
 
 /** Un emblème-fruit tranchable qui lance un mode de jeu. */
 interface ModeEmblem {
@@ -102,11 +104,18 @@ export class MenuScene extends Phaser.Scene {
 
     const resultatDuJour = getTodayResult();
     const serie = getStreak();
+    // LA RÈGLE DU JOUR SE LIT AVANT D'APPUYER. C'est ce qui manquait au mode :
+    // la séquence changeait déjà tous les jours, mais rien ne le montrait, et
+    // deux jours de suite étaient indiscernables à l'œil.
+    const mutation = mutationDuJour();
+    const objectif = objectifDuJour();
     const sousTitreDefi = resultatDuJour
-      ? `Fait · ${resultatDuJour.score} pts`
+      ? `Fait · ${resultatDuJour.score} / ${objectif} pts`
       : serie > 1
-        ? `Une par jour · série ${serie}`
-        : 'Une partie par jour';
+        ? `Objectif ${objectif} pts · série ${serie}`
+        : `Objectif ${objectif} pts`;
+    const regleDuJour = `${mutation.nom} — ${mutation.description}`;
+    const couleurRegle = hexToCss(mutation.couleur);
 
     if (portrait) {
       // Portrait : le fruit à gauche, ses libellés à côté.
@@ -126,11 +135,11 @@ export class MenuScene extends Phaser.Scene {
       const premier = h * 0.4;
       this.createEmblem(w * 0.31, premier, classic, 'classic', 'CLASSIQUE', `3 vies · Record ${getBestScore('classic')}`, 1.15, 'right');
       this.createEmblem(w * 0.31, premier + pas, chrono, 'chrono', 'CHRONO', `60 s · Record ${getBestScore('chrono')}`, 1.15, 'right');
-      this.createEmblem(w * 0.31, premier + pas * 2, daily, 'daily', 'DÉFI DU JOUR', sousTitreDefi, 1.15, 'right');
+      this.createEmblem(w * 0.31, premier + pas * 2, daily, 'daily', 'DÉFI DU JOUR', sousTitreDefi, 1.15, 'right', regleDuJour, couleurRegle);
     } else {
       this.createEmblem(w * 0.22, h * 0.58, classic, 'classic', 'CLASSIQUE', `3 vies · Record ${getBestScore('classic')}`, 1.7, 'below');
       this.createEmblem(w * 0.5, h * 0.58, chrono, 'chrono', 'CHRONO', `60 s · Record ${getBestScore('chrono')}`, 1.7, 'below');
-      this.createEmblem(w * 0.78, h * 0.58, daily, 'daily', 'DÉFI DU JOUR', sousTitreDefi, 1.7, 'below');
+      this.createEmblem(w * 0.78, h * 0.58, daily, 'daily', 'DÉFI DU JOUR', sousTitreDefi, 1.7, 'below', regleDuJour, couleurRegle);
     }
 
     // Jus (feedback de coupe) + lame qui suit le doigt
@@ -171,7 +180,10 @@ export class MenuScene extends Phaser.Scene {
     label: string,
     subtitle: string,
     scale: number,
-    cote: 'below' | 'right'
+    cote: 'below' | 'right',
+    /** Troisième ligne, colorée : la règle du jour du Défi. Vide ailleurs. */
+    detail = '',
+    detailCouleur = '#ffd9a0'
   ): void {
     // Rayon de coupe = rayon logique du fruit mis à l'échelle
     const radius = variety.radius * scale;
@@ -242,6 +254,25 @@ export class MenuScene extends Phaser.Scene {
         color: '#fff3e0',
       })
       .setOrigin(ancre, 0);
+    if (detail !== '') {
+      // Le retour à la ligne est calé sur la largeur RÉELLEMENT disponible :
+      // à côté du fruit c'est ce qui reste jusqu'au bord, dessous c'est le pas
+      // entre deux emblèmes. Sans cela, « Brume des Hauts — La brume monte par
+      // vagues… » sortirait de l'écran le jour où il tombe.
+      const dispo = aCote ? this.scale.width - tx - px(24) : this.scale.width / 3.4;
+      this.add
+        .text(tx, tySub + px(34), detail, {
+          fontFamily: GAME_FONT,
+          fontSize: fontPx(22),
+          fontStyle: 'bold',
+          color: detailCouleur,
+          stroke: '#1d2a36',
+          strokeThickness: px(4),
+          align: aCote ? 'left' : 'center',
+          wordWrap: { width: dispo },
+        })
+        .setOrigin(ancre, 0);
+    }
 
     // Secours : un simple appui sélectionne aussi le mode
     sprite.on('pointerup', () => this.selectMode(mode, sprite));

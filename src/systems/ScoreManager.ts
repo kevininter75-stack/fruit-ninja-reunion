@@ -22,13 +22,31 @@ export interface ScoreSnapshot {
 
 export class ScoreManager {
   private score = 0;
-  private lives = STARTING_LIVES;
+  private lives: number;
   private multiplier = 1;
   private multiplierUntil = 0;
   /** Prochain palier de score qui accordera une vie. */
   private nextExtraLifeAt = EXTRA_LIFE_SCORE_STEP;
 
-  constructor(private readonly scene: Phaser.Scene) {}
+  /**
+   * Le nombre de vies de départ est un PARAMÈTRE, plus une constante.
+   *
+   * La mutation « une seule vie » du Défi du jour le ramène à 1. Tout le reste
+   * — les croix du HUD, le refroidissement de l'image à la dernière, le palier
+   * de score qui en rend une — se déduit de ce nombre, donc il suffit de le
+   * dire une fois, ici, pour que la partie entière en tienne compte.
+   */
+  constructor(
+    private readonly scene: Phaser.Scene,
+    private readonly viesDepart: number = STARTING_LIVES
+  ) {
+    this.lives = viesDepart;
+  }
+
+  /** Vies au lancement — ce à quoi les croix du HUD doivent se rapporter. */
+  getStartingLives(): number {
+    return this.viesDepart;
+  }
 
   /**
    * Photographie de l'avancement, pour survivre à une rotation d'écran.
@@ -95,7 +113,7 @@ export class ScoreManager {
   private checkExtraLife(): void {
     while (this.score >= this.nextExtraLifeAt) {
       this.nextExtraLifeAt += EXTRA_LIFE_SCORE_STEP;
-      if (this.lives < STARTING_LIVES) {
+      if (this.lives < this.viesDepart) {
         this.lives += 1;
         this.scene.events.emit('lives-changed', this.lives);
         this.scene.events.emit('life-gained');

@@ -3,6 +3,7 @@ import { Fruit } from '../entities/Fruit';
 import { Bomb } from '../entities/Bomb';
 import { ScoreManager } from './ScoreManager';
 import { sfx } from './SfxManager';
+import type { Mutation } from '../utils/mutations';
 import {
   type GameMode,
   FRUIT_RADIUS,
@@ -35,6 +36,8 @@ import {
   BONUS_CHANCE,
   BONUS_SAFE_TIME_MS,
   FRENZY_SCORE_STEP,
+  SEZON_PIMENT_DIVISEUR,
+  FRENZY_GAP_SEZON_MS,
   FRENZY_SAFE_TIME_MS,
   FRENZY_STEP_GROWTH,
   FRENZY_MIN_GAP_MS,
@@ -47,6 +50,7 @@ import {
   DELUGE_TRAVEL_MIN,
   DELUGE_TRAVEL_MAX,
   CYCLONE_MIN_GAP_MS,
+  CYCLONE_GAP_SAISON_MS,
   CYCLONE_MIN_GAP_CHRONO_MS,
   CYCLONE_SAFE_TIME_MS,
   CYCLONE_SAFE_TIME_CHRONO_MS,
@@ -152,7 +156,15 @@ export class SpawnManager {
     private readonly scoreManager: ScoreManager,
     private readonly mode: GameMode,
     /** Fruits tranchés depuis le début de la partie (mesure de progression). */
-    private readonly fruitsSliced: () => number = () => 0
+    private readonly fruitsSliced: () => number = () => 0,
+    /**
+     * La règle du jour, en Défi du jour uniquement.
+     *
+     * Trois des cinq mutations se jouent ici, parce que c'est ici que se décide
+     * ce qui entre à l'écran et par où. Les deux autres (« une seule vie »,
+     * « brume des Hauts ») n'ont rien à voir avec le semeur et vivent ailleurs.
+     */
+    private readonly mutation: Mutation | null = null
   ) {}
 
   start(): void {
@@ -161,7 +173,7 @@ export class SpawnManager {
     this.waveIndex = 0;
     this.fruitsSinceBomb = 0;
     this.needsBreather = false;
-    this.nextFrenzyAt = FRENZY_SCORE_STEP;
+    this.nextFrenzyAt = this.palierPimentBase();
     this.frenzyCount = 0;
     this.lastFrenzyEndedAt = -Infinity;
     this.frenzyOnStage = false;
@@ -506,7 +518,9 @@ export class SpawnManager {
     // Délai plancher en temps réel. C'est la seule garantie qu'un joueur qui
     // marque plus vite que prévu ne puisse pas déborder : un palier de score,
     // aussi haut soit-il, finit toujours par être atteint plus tôt.
-    if (this.scene.time.now - this.lastFrenzyEndedAt < FRENZY_MIN_GAP_MS) {
+    const gapPiment =
+      this.mutation?.id === 'sezon-piment' ? FRENZY_GAP_SEZON_MS : FRENZY_MIN_GAP_MS;
+    if (this.scene.time.now - this.lastFrenzyEndedAt < gapPiment) {
       return;
     }
     if (this.scoreManager.getScore() < this.nextFrenzyAt) {
@@ -560,7 +574,15 @@ export class SpawnManager {
     if (depuisDebut < (chrono ? CYCLONE_SAFE_TIME_CHRONO_MS : CYCLONE_SAFE_TIME_MS)) {
       return;
     }
-    const ecart = chrono ? CYCLONE_MIN_GAP_CHRONO_MS : CYCLONE_MIN_GAP_MS;
+    // SAISON CYCLONE : quinze secondes au lieu d'une minute. C'est la seule
+    // mutation qui RELÈVE l'objectif du jour (cf. mutations.ts) : elle offre
+    // bien plus de points qu'elle n'en coûte.
+    const ecart =
+      this.mutation?.id === 'saison-cyclone'
+        ? CYCLONE_GAP_SAISON_MS
+        : chrono
+          ? CYCLONE_MIN_GAP_CHRONO_MS
+          : CYCLONE_MIN_GAP_MS;
     if (this.scene.time.now - this.lastCycloneAt < ecart) {
       return;
     }
@@ -716,7 +738,21 @@ export class SpawnManager {
    * ne le demande.
    */
   private frenzyStep(): number {
-    return Math.round(FRENZY_SCORE_STEP * (1 + this.frenzyCount * FRENZY_STEP_GROWTH));
+    return Math.round(this.palierPimentBase() * (1 + this.frenzyCount * FRENZY_STEP_GROWTH));
+  }
+
+  /**
+   * Le palier de score qui appelle un piment.
+   *
+   * SÉZON PIMENT le divise par trois. Agir sur le palier plutôt que d'ajouter
+   * un tirage au sort garde intacte la propriété qui fait tout l'intérêt du
+   * piment : il arrive à un moment que le joueur finit par anticiper, et non
+   * quand le hasard le décide.
+   */
+  private palierPimentBase(): number {
+    return this.mutation?.id === 'sezon-piment'
+      ? FRENZY_SCORE_STEP / SEZON_PIMENT_DIVISEUR
+      : FRENZY_SCORE_STEP;
   }
 
   /** Vrai tant qu'un piment de frénésie est en jeu (parcours du pool). */
@@ -811,7 +847,14 @@ export class SpawnManager {
     if (fruit === null) {
       return; // pool épuisé : on saute ce spawn plutôt que d'allouer
     }
-    const p = this.computeLaunch(baseX, offsetX);
+    // ALÉ-RETOUR : tout entre par les bords, plus rien ne monte du bas. On
+    // réutilise la trajectoire traversante du cyclone, avec une distance tirée
+    // au hasard — à traversée fixe, tous les fruits suivraient la même parabole
+    // et un seul geste les prendrait tous.
+    const p =
+      this.mutation?.id === 'ale-retour'
+        ? this.computeSideLaunch(FRUIT_RADIUS, rndFloat(0.55, 1.05))
+        : this.computeLaunch(baseX, offsetX);
     fruit.launchAs(pickRandomVariety(), false, p.x, p.y, p.velocityX, p.velocityY);
     sfx.launch();
   }

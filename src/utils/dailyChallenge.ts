@@ -11,6 +11,11 @@
  * personnelles à protéger.
  */
 
+import { mutationDuJour, objectifDuJour } from './mutations';
+import { todayKey } from './jour';
+
+export { todayKey };
+
 const HISTORY_KEY = 'fruit-ninja-reunion-daily';
 const MAX_HISTORY = 120;
 
@@ -20,19 +25,6 @@ export interface DailyResult {
   score: number;
 }
 
-/**
- * Date du jour en heure LOCALE, pas UTC.
- *
- * Volontaire : à La Réunion (UTC+4), un défi calé sur UTC changerait à 4 h du
- * matin, en plein milieu d'une soirée de jeu. Le joueur doit voir le défi
- * changer quand SA journée change.
- */
-export function todayKey(date = new Date()): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
 
 /**
  * Graine du jour. Le préfixe évite qu'une date serve par hasard de graine à
@@ -147,5 +139,13 @@ export function buildShareText(score: number, fruitsSliced: number): string {
   const serie = getStreak();
   const sabres = '🔪'.repeat(Math.min(5, 1 + Math.floor(score / 400)));
   const ligneSerie = serie > 1 ? ` · série ${serie} 🔥` : '';
-  return `Kout Sab' — Défi du ${jour}/${mois}\n${sabres} ${score} pts · ${fruitsSliced} fruits${ligneSerie}`;
+  // La regle du jour et le verdict font tout le sel du partage : « 850 pts »
+  // ne se compare a rien, « objectif manque sous Brume des Hauts » se raconte.
+  // Le score reste dedans, mais il n'est plus seul a porter le message.
+  const objectif = objectifDuJour();
+  const verdict = score >= objectif ? '✅' : '❌';
+  const mutation = mutationDuJour();
+  return `Kout Sab' — Défi du ${jour}/${mois}
+${mutation.nom}
+${sabres} ${verdict} ${score}/${objectif} pts · ${fruitsSliced} fruits${ligneSerie}`;
 }

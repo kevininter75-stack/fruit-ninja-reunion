@@ -17,6 +17,7 @@ import { applyShadingTint } from '../utils/surfaceShading';
 import { seedRandom, clearSeed } from '../utils/rng';
 import type { ScoreSnapshot } from '../systems/ScoreManager';
 import { dailySeed, saveTodayResult } from '../utils/dailyChallenge';
+import { mutationDuJour, objectifDuJour, type Mutation } from '../utils/mutations';
 import { exclamationCombo, FRENESIE, CYCLONE } from '../utils/creole';
 import {
   GRAVITY_Y,
@@ -28,6 +29,11 @@ import {
   STROKE_BREAK_MS,
   STROKE_MAX_MS,
   STARTING_LIVES,
+  DEPTH_BRUME,
+  BRUME_HAUTEUR,
+  BRUME_ALPHA_MIN,
+  BRUME_ALPHA_MAX,
+  BRUME_PERIODE_MS,
   FRENZY_ZONE_TOP,
   FRENZY_ZONE_BOTTOM,
   FRENZY_ZOOM,
@@ -171,6 +177,22 @@ const MAX_GESTURES = 3;
  */
 export class GameScene extends Phaser.Scene {
   private mode: GameMode = 'classic';
+  /**
+   * La règle du jour, en Défi du jour uniquement (null partout ailleurs).
+   *
+   * Elle est lue à l'init et ne change plus de toute la partie : une mutation
+   * qui s'appliquerait en cours de route rendrait les scores incomparables
+   * entre deux joueurs, ce qui est exactement ce que le Défi cherche à éviter.
+   */
+  private mutation: Mutation | null = null;
+  /** Objectif de points du jour, 0 hors Défi. */
+  private objectif = 0;
+  /** Voile de la mutation « Brume des Hauts » (null les autres jours). */
+  private brume: Phaser.GameObjects.Image | null = null;
+  /** Vrai pendant la frénésie, quand le HUD s'efface (cf. setHudDimmed). */
+  private hudEstompe = false;
+  /** Vies au lancement : 3, ou 1 le jour où « une seule vie » tombe. */
+  private viesDepart = STARTING_LIVES;
 
   private fruits!: Phaser.Physics.Arcade.Group;
   private halves!: Phaser.Physics.Arcade.Group;
@@ -259,7 +281,15 @@ export class GameScene extends Phaser.Scene {
     // une partie libre lancée après un défi rejouerait ce même défi.
     if (this.mode === 'daily') {
       seedRandom(dailySeed());
+      // La mutation se déduit de la date par son propre calcul : elle ne puise
+      // PAS dans le générateur qu'on vient de semer, sinon elle décalerait la
+      // séquence de fruits et deux joueurs du même jour ne joueraient plus la
+      // même partie.
+      this.mutation = mutationDuJour();
+      this.objectif = objectifDuJour();
     } else {
+      this.mutation = null;
+      this.objectif = 0;
       clearSeed();
     }
     this.gameEnded = false;
@@ -335,7 +365,11 @@ export class GameScene extends Phaser.Scene {
       maxSize: BOMB_POOL_SIZE,
     });
 
-    this.scoreManager = new ScoreManager(this);
+    // STARTING_LIVES et pas this.viesDepart : la scène est réutilisée au
+    // restart, et une valeur héritée d'un Défi « une seule vie » suivrait le
+    // joueur dans sa partie Classique suivante.
+    this.viesDepart = this.mutation?.id === 'une-vie' ? 1 : STARTING_LIVES;
+    this.scoreManager = new ScoreManager(this, this.viesDepart);
     this.sliceDetector = new SliceDetector();
     this.spawnManager = new SpawnManager(
       this,
@@ -343,7 +377,8 @@ export class GameScene extends Phaser.Scene {
       this.bombs,
       this.scoreManager,
       this.mode,
-      () => this.fruitsSliced
+      () => this.fruitsSliced,
+      this.mutation
     );
 
     // Slots de gestes multi-touch : traînées et états pré-alloués,
@@ -449,9 +484,11 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.startedAt = this.time.now;
+    this.createBrume();
     this.spawnManager.start();
     this.restoreRun();
     fadeIn(this);
+    this.annonceMutation();
   }
 
   update(): void {
@@ -467,6 +504,7 @@ export class GameScene extends Phaser.Scene {
     this.updateHalvesShading();
     this.updateFrenzyAura();
     this.updateCycloneAura();
+    this.updateBrume();
     if (this.mode === 'chrono' && !this.gameEnded) {
       this.updateChrono();
     }
@@ -554,7 +592,7 @@ export class GameScene extends Phaser.Scene {
    */
   private updateDeluge(): void {
     if (this.delugeEnCours && !this.spawnManager.isDeluge()) {
-      this.grading.setMode(this.filledCrosses >= STARTING_LIVES - 1 ? 'danger' : 'normal');
+      this.grading.setMode(this.filledCrosses >= this.viesDepart - 1 ? 'danger' : 'normal');
       // Bilan du déluge. Un moment fort a besoin d'une fin, sinon il s'éteint
       // sans qu'on sache ce qu'il a rapporté — et le joueur n'a aucun repère
       // pour faire mieux la fois suivante.
@@ -1036,6 +1074,7 @@ export class GameScene extends Phaser.Scene {
    * pendant la frénésie, donc ni le score ni les vies n'y sont actionnables.
    */
   private setHudDimmed(dimmed: boolean): void {
+    this.hudEstompe = dimmed;
     for (const element of this.hudElements) {
       this.tweens.killTweensOf(element);
       this.tweens.add({
@@ -1070,8 +1109,8 @@ export class GameScene extends Phaser.Scene {
         .setAlpha(isFilled ? 1 : 0.7);
     }
 
-    const remaining = STARTING_LIVES - this.filledCrosses;
-    this.livesLabel?.setText(`${remaining} / ${STARTING_LIVES}`);
+    const remaining = this.viesDepart - this.filledCrosses;
+    this.livesLabel?.setText(`${remaining} / ${this.viesDepart}`);
   }
 
   /**
@@ -1087,9 +1126,9 @@ export class GameScene extends Phaser.Scene {
     // croix, deux croix trop proches se lisaient comme une seule tache.
     const gap = px(64);
     const panelCenterX = this.scale.width - px(14) - px(204) / 2;
-    for (let i = 0; i < STARTING_LIVES; i++) {
+    for (let i = 0; i < this.viesDepart; i++) {
       // i = 0 le plus à gauche : les croix s'allument de gauche à droite
-      const x = panelCenterX + (i - (STARTING_LIVES - 1) / 2) * gap;
+      const x = panelCenterX + (i - (this.viesDepart - 1) / 2) * gap;
       const cross = this.add
         .image(x, px(54), TEX_CROSS)
         .setDisplaySize(px(40), px(40))
@@ -1103,7 +1142,7 @@ export class GameScene extends Phaser.Scene {
     // Le nombre de vies écrit en clair. C'est la seule forme d'information
     // qui reste lisible quelles que soient la vision et la luminosité.
     this.livesLabel = this.add
-      .text(panelCenterX, px(92), `${STARTING_LIVES} / ${STARTING_LIVES}`, {
+      .text(panelCenterX, px(92), `${this.viesDepart} / ${this.viesDepart}`, {
         fontFamily: GAME_FONT,
         fontSize: fontPx(22),
         color: '#eef3f7',
@@ -1618,7 +1657,7 @@ export class GameScene extends Phaser.Scene {
   private exitFrenzyZoom(): void {
     this.cancelPunchReturn();
     this.frenzyZoomed = false;
-    this.grading.setMode(this.filledCrosses >= STARTING_LIVES - 1 ? 'danger' : 'normal');
+    this.grading.setMode(this.filledCrosses >= this.viesDepart - 1 ? 'danger' : 'normal');
     this.zoomCamera(1, FRENZY_ZOOM_MS, 'Sine.easeInOut');
     this.panCamera(this.scale.width / 2, this.scale.height / 2, FRENZY_ZOOM_MS, 'Sine.easeInOut');
     this.setHudDimmed(false);
@@ -1977,6 +2016,99 @@ export class GameScene extends Phaser.Scene {
    * nombre de deux et ne s'inventent pas — la montée se joue donc sur la
    * PRÉSENCE : même mot, mais dit beaucoup plus fort.
    */
+  /**
+   * Annonce la règle du jour avant le premier fruit.
+   *
+   * C'est toute la différence entre une règle et une surprise : une mutation
+   * qu'on découvre en jouant se subit, une mutation annoncée se joue. Le
+   * délai laisse le fondu d'entrée se terminer — un bandeau qui apparaît
+   * pendant que l'écran s'éclaircit ne se lit pas.
+   *
+   * Rien à l'écran après une rotation : la partie est déjà commencée, et
+   * réafficher l'objectif ferait croire à un recommencement.
+   */
+  private annonceMutation(): void {
+    const mutation = this.mutation;
+    if (mutation === null || this.resume !== null) {
+      return;
+    }
+    this.time.delayedCall(360, () => {
+      if (!this.gameEnded) {
+        this.showBigBanner(mutation.nom, 1.1, Number.NaN, Number.NaN, 'Objectif ' + this.objectif + ' pts');
+      }
+    });
+  }
+
+  /**
+   * Le voile de brume, fabriqué seulement le jour où il sert.
+   *
+   * C'est un dégradé vertical dessiné une fois dans une texture de 8 px de
+   * large : elle est étirée sur toute la largeur de l'écran, et le dégradé ne
+   * varie que sur la hauteur — inutile de payer les pixels horizontaux.
+   */
+  private createBrume(): void {
+    this.brume = null;
+    if (this.mutation?.id !== 'brume') {
+      return;
+    }
+    const cle = 'brume_voile';
+    if (!this.textures.exists(cle)) {
+      const hauteur = 256;
+      const texture = this.textures.createCanvas(cle, 8, hauteur);
+      const ctx = texture?.getContext();
+      if (texture !== null && ctx !== null && ctx !== undefined) {
+        const degrade = ctx.createLinearGradient(0, 0, 0, hauteur);
+        degrade.addColorStop(0, 'rgba(198, 214, 226, 0)');
+        degrade.addColorStop(0.5, 'rgba(198, 214, 226, 0.6)');
+        degrade.addColorStop(1, 'rgba(216, 228, 236, 0.95)');
+        ctx.fillStyle = degrade;
+        ctx.fillRect(0, 0, 8, hauteur);
+        texture.refresh();
+      }
+    }
+    const h = this.scale.height;
+    this.brume = this.add
+      .image(0, h * (1 - BRUME_HAUTEUR), cle)
+      .setOrigin(0, 0)
+      .setDisplaySize(this.scale.width, h * BRUME_HAUTEUR)
+      .setDepth(DEPTH_BRUME)
+      .setAlpha(BRUME_ALPHA_MIN)
+      .setScrollFactor(0);
+    // SURTOUT PAS DANS hudElements. Le HUD s'estompe par un tween sur son
+    // opacité, or celle du voile est recalculée à chaque frame par updateBrume :
+    // les deux se battraient, et le tween perdrait en laissant la brume pleine.
+    // La frénésie est traitée un cran plus bas, dans updateBrume elle-même.
+  }
+
+  /**
+   * La brume respire : elle monte, épaissit, puis se déchire.
+   *
+   * Une opacité constante deviendrait un simple filtre qu'on oublie au bout de
+   * dix secondes. C'est la VARIATION qui se joue : on apprend à trancher pendant
+   * les éclaircies et à tenir pendant les vagues. Le cosinus donne un cycle sans
+   * palier ni à-coup, et le voile glisse légèrement vers le haut à la crête,
+   * pour que la brume ait l'air de monter plutôt que de s'allumer.
+   */
+  private updateBrume(): void {
+    const voile = this.brume;
+    if (voile === null) {
+      return;
+    }
+    // Pendant la frénésie la caméra zoome et le HUD s'efface : le voile s'en
+    // va avec eux. Plus aucun fruit n'arrive à ce moment-là, donc la brume n'a
+    // plus rien à cacher — elle ne ferait que salir le seul moment du jeu qu'on
+    // a voulu spectaculaire.
+    if (this.hudEstompe) {
+      voile.setAlpha(0);
+      return;
+    }
+    const phase = ((this.time.now - this.startedAt) % BRUME_PERIODE_MS) / BRUME_PERIODE_MS;
+    const vague = (1 - Math.cos(phase * Math.PI * 2)) / 2; // 0 → 1 → 0, tout en douceur
+    const h = this.scale.height;
+    voile.setAlpha(BRUME_ALPHA_MIN + (BRUME_ALPHA_MAX - BRUME_ALPHA_MIN) * vague);
+    voile.y = h * (1 - BRUME_HAUTEUR) - h * 0.06 * vague;
+  }
+
   private showBigBanner(
     message: string,
     emphase = 1,
@@ -2320,14 +2452,14 @@ export class GameScene extends Phaser.Scene {
     if (!this.modeAvecVies()) {
       return;
     }
-    const filled = STARTING_LIVES - Phaser.Math.Clamp(lives, 0, STARTING_LIVES);
+    const filled = this.viesDepart - Phaser.Math.Clamp(lives, 0, this.viesDepart);
     // "Pop" sur la croix qui vient de changer d'état : la dernière allumée
     // quand on encaisse un strike, celle qui s'éteint quand on regagne une vie.
     const changedIndex = filled > this.filledCrosses ? filled - 1 : filled;
     this.filledCrosses = filled;
     // Dernière vie : l'image se refroidit et se désature. Un signal en
     // périphérie de vision, qui n'occupe aucune place à l'écran.
-    this.grading.setMode(filled >= STARTING_LIVES - 1 ? 'danger' : 'normal');
+    this.grading.setMode(filled >= this.viesDepart - 1 ? 'danger' : 'normal');
     this.syncLifeCrossStyles();
     const target = this.lifeCrosses[changedIndex];
     if (target === undefined) {

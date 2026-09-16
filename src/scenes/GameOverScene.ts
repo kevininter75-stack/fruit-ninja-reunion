@@ -23,6 +23,7 @@ import { AnimatedBackground } from '../entities/AnimatedBackground';
 import { addVignette, fadeIn, fadeToScene } from '../utils/ui';
 import { prefersReducedMotion } from '../utils/settings';
 import { buildShareText, getStreak } from '../utils/dailyChallenge';
+import { mutationDuJour, objectifDuJour } from '../utils/mutations';
 import { RECORD, BOMBE } from '../utils/creole';
 
 /** Données passées par la GameScene à la fin d'une partie. */
@@ -319,17 +320,41 @@ export class GameOverScene extends Phaser.Scene {
     // donne envie de revenir demain : un record se bat une fois, une série se
     // perd si on saute un jour.
     if (this.mode === 'daily') {
+      // LE VERDICT D'ABORD, LA SÉRIE ENSUITE.
+      //
+      // Sans objectif, un score n'est qu'un nombre : on ne sait pas si on a
+      // bien joué. L'objectif du jour donne une réponse binaire, et c'est elle
+      // qu'on retient et qu'on raconte. La série vient après, parce qu'elle
+      // parle de demain quand le verdict parle d'aujourd'hui.
+      const objectif = objectifDuJour();
+      const reussi = this.finalScore >= objectif;
+      const mutation = mutationDuJour();
+      const verdict = this.add
+        .text(
+          w / 2,
+          y,
+          reussi ? `Objectif atteint ! ${this.finalScore} / ${objectif}` : `Objectif manqué · ${this.finalScore} / ${objectif}`,
+          {
+            fontFamily: DISPLAY_FONT,
+            fontSize: fontPx(36),
+            color: reussi ? '#7ddf7a' : '#ffa07a',
+            stroke: '#2d3a4a',
+            strokeThickness: px(6),
+          }
+        )
+        .setOrigin(0.5);
+      this.reveal(verdict, 5);
+
       const serie = getStreak();
-      const libelle =
-        serie > 1 ? `Série de ${serie} jours 🔥` : 'Défi du jour relevé';
+      const suite = serie > 1 ? ` · série de ${serie} jours 🔥` : '';
       const ligne = this.add
-        .text(w / 2, y, libelle, {
+        .text(w / 2, y + px(42), `${mutation.nom}${suite}`, {
           fontFamily: GAME_FONT,
-          fontSize: fontPx(32),
-          color: serie > 1 ? '#ffd76a' : '#fff3e0',
+          fontSize: fontPx(26),
+          color: '#fff3e0',
         })
         .setOrigin(0.5);
-      this.reveal(ligne, 5);
+      this.reveal(ligne, 6);
       return;
     }
 
