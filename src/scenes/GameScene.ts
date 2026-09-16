@@ -983,7 +983,7 @@ export class GameScene extends Phaser.Scene {
     });
 
     const w = this.scale.width;
-    if (this.mode !== 'chrono') {
+    if (this.modeAvecVies()) {
       // Pas de libellé « VIES » : trois croix parlent d'elles-mêmes, et le
       // texte entrait en collision avec les éclaboussures de la dernière.
       this.hudElements.push(addHudPanel(this, w - px(14) - px(204), px(12), px(204), px(84)));
@@ -2293,13 +2293,31 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
+   * Vrai dans les modes qui comptent des vies — c'est-à-dire partout sauf en
+   * Chrono, où seul le temps arrête la partie.
+   *
+   * CETTE QUESTION SE POSAIT À DEUX ENDROITS, ET ILS NE RÉPONDAIENT PAS PAREIL.
+   * La création du HUD demandait « pas en Chrono » et fabriquait donc les trois
+   * croix pour le Défi du jour ; leur mise à jour demandait « en Classique » et
+   * sortait aussitôt. Le Défi perdait ses vies pour de bon — rien ne l'en
+   * exemptait — mais ses croix restaient vides du début à la fin : aucune
+   * secousse sur un strike, aucun refroidissement de l'image à la dernière vie,
+   * et une partie qui s'arrête au troisième fruit manqué sans avoir prévenu.
+   *
+   * Un seul prédicat, deux appels : les deux ne peuvent plus diverger.
+   */
+  private modeAvecVies(): boolean {
+    return this.mode !== 'chrono';
+  }
+
+  /**
    * Synchronise les croix de strike sur le nombre de vies. Le rendu est
    * recalculé intégralement (et non incrémenté) car les vies remontent
    * désormais aux paliers de score : une croix peut aussi bien s'allumer
    * que s'éteindre.
    */
   private onLivesChanged(lives: number): void {
-    if (this.mode !== 'classic') {
+    if (!this.modeAvecVies()) {
       return;
     }
     const filled = STARTING_LIVES - Phaser.Math.Clamp(lives, 0, STARTING_LIVES);
