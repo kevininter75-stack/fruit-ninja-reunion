@@ -10,6 +10,7 @@ import {
   TEX_GLOW,
   TEX_SHEEN,
   GAME_FONT,
+  DISPLAY_FONT,
   fontPx,
   px,
 } from '../utils/constants';
@@ -70,7 +71,7 @@ export class MenuScene extends Phaser.Scene {
 
     const title = this.add
       .text(w / 2, h * 0.15, portrait ? "Kout\nSab'" : "Kout Sab'", {
-        fontFamily: GAME_FONT,
+        fontFamily: DISPLAY_FONT,
         fontSize: fontPx(76),
         fontStyle: 'bold',
         color: '#ffffff',
@@ -226,7 +227,7 @@ export class MenuScene extends Phaser.Scene {
 
     this.add
       .text(tx, tyLabel, label, {
-        fontFamily: GAME_FONT,
+        fontFamily: DISPLAY_FONT,
         fontSize: fontPx(46),
         fontStyle: 'bold',
         color: '#ffffff',

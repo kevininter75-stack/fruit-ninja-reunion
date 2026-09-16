@@ -496,6 +496,29 @@ export const SPRITE_SUPERSAMPLE: number = RENDER_SCALE >= 2 ? 2 : 3;
 // correct si la webfont ne se charge pas.
 export const GAME_FONT = '"Fredoka", "Trebuchet MS", sans-serif';
 
+/**
+ * LA VOIX DU JEU : titre, exclamations créoles, bandeaux de récompense.
+ *
+ * Deux polices, et le partage n'est pas arbitraire. Le guide de style du jeu
+ * (STYLE.md) exclut explicitement « le vectoriel plat » et « l'icône système »
+ * — or Fredoka est exactement cela : une géométrique régulière, sans main.
+ * Elle ne contredisait rien de ce qu'on voit, elle ne disait simplement rien
+ * du couchant peint autour d'elle.
+ *
+ * Shrikhand a des pleins et des déliés, une inclinaison, un contraste de
+ * plume. Elle a été dessinée pour le gujarati autant que pour le latin, et sur
+ * un jeu réunionnais cette filiation indienne n'est pas un ornement : elle est
+ * dans l'île. C'est le même raisonnement que le calendrier des saisons du
+ * catalogue — un détail que personne ne peut copier depuis ailleurs.
+ *
+ * FREDOKA GARDE LES CHIFFRES, et ce n'est pas un compromis mou. La planche du
+ * HUD est fabriquée à partir de GAME_FONT ; un caractère d'affichage aussi
+ * gras que Shrikhand rendrait 6, 8 et 9 confus au petit corps, et un score
+ * qu'on lit mal est pire qu'un score sans caractère. Chacune à son poste :
+ * DISPLAY_FONT parle, GAME_FONT informe.
+ */
+export const DISPLAY_FONT = '"Shrikhand", "Fredoka", "Trebuchet MS", sans-serif';
+
 // Planche de chiffres du HUD : générée une fois au préchargement puis
 // utilisée en BitmapText. Un objet Text Phaser reconstruit sa texture canvas
 // et la renvoie au GPU À CHAQUE changement — inacceptable pour un score qui

@@ -4,6 +4,7 @@ import {
   type GameMode,
   type GameOverReason,
   GAME_FONT,
+  DISPLAY_FONT,
   FONT_DIGITS,
   MEDAL_THRESHOLDS,
   MEDAL_COLORS,
@@ -123,7 +124,7 @@ export class GameOverScene extends Phaser.Scene {
     // --- Titre et cause, révélés en premier ---
     const title = this.add
       .text(w / 2, h * L.title, display.title, {
-        fontFamily: GAME_FONT,
+        fontFamily: DISPLAY_FONT,
         fontSize: portrait ? fontPx(78) : fontPx(80),
         fontStyle: '700',
         color: display.color,

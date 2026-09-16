@@ -31,6 +31,19 @@
         font-style: normal;
         font-display: block;
       }
+      /* Shrikhand : la voix du jeu — titre, exclamations créoles, bandeaux.
+         Elle a des pleins et des déliés là où Fredoka est régulière, ce qui la
+         met d'accord avec un décor peint à la main. Les CHIFFRES restent à
+         Fredoka : la planche du HUD est fabriquée à partir d'elle, et un
+         caractère d'affichage aussi gras rendrait 6, 8 et 9 confus au petit
+         corps. Deux polices, chacune à son poste. */
+      @font-face {
+        font-family: 'Shrikhand';
+        src: url('fonts/shrikhand-latin.woff2') format('woff2');
+        font-weight: 400;
+        font-style: normal;
+        font-display: block;
+      }
       /* Plein écran, pas de scroll, fond sombre pendant le chargement */
       html,
       body {

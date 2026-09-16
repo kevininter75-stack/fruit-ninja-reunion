@@ -1,3 +1,17 @@
+Deux polices sont embarquées dans ce jeu, toutes deux sous SIL Open Font
+License 1.1. Le texte de la licence, identique pour les deux, est reproduit
+ci-dessous une seule fois — mais les copyrights sont distincts :
+
+  fredoka-latin.woff2
+    Copyright 2016 The Fredoka Project Authors
+    https://github.com/hafontia/Fredoka-One
+
+  shrikhand-latin.woff2
+    Copyright 2016 The Shrikhand Project Authors (Jonny Pinhorn)
+    https://github.com/itfoundry/shrikhand
+
+--------------------------------------------------------------------------
+
 Copyright 2016 The Fredoka Project Authors (https://github.com/hafontia/Fredoka-One)
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.

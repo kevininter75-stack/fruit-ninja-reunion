@@ -37,6 +37,7 @@ import {
   COMBO_PUNCH_ZOOM,
   COMBO_PUNCH_MS,
   GAME_FONT,
+  DISPLAY_FONT,
   FONT_DIGITS,
   TEX_CROSS,
   HITSTOP_CRIT_MS,
@@ -2007,7 +2008,9 @@ export class GameScene extends Phaser.Scene {
     // s'anime d'un bloc et se borne d'un bloc.
     const titre = this.add
       .text(0, 0, message, {
-        fontFamily: GAME_FONT,
+        // La voix du jeu. Le détail chiffré sous lui reste à GAME_FONT : un
+        // caractère d'affichage aussi gras brouillerait les chiffres.
+        fontFamily: DISPLAY_FONT,
         fontSize: fontPx(Math.round(76 * emphase)),
         fontStyle: 'bold',
         color: COLOR_COMBO,

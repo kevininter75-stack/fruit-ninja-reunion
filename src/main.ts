@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { gameConfig } from './config/gameConfig';
 import { computeViewport } from './utils/viewport';
-import { GAME_FONT } from './utils/constants';
+import { GAME_FONT, DISPLAY_FONT } from './utils/constants';
 import { installAppLifecycle } from './systems/appLifecycle';
 import { relayoutActiveScenes } from './utils/relayout';
 import { installLandscapeGate } from './systems/orientation';
@@ -32,6 +32,10 @@ async function waitForFont(): Promise<void> {
       document.fonts.load(`500 40px ${GAME_FONT}`),
       document.fonts.load(`600 40px ${GAME_FONT}`),
       document.fonts.load(`700 40px ${GAME_FONT}`),
+      // La voix du jeu doit être prête elle aussi : un bandeau tracé avant son
+      // arrivée sortirait dans la police de repli, et le premier combo d'une
+      // partie est justement celui qu'on regarde le plus.
+      document.fonts.load(`400 40px ${DISPLAY_FONT}`),
     ]);
     await document.fonts.ready;
   })().catch(() => undefined);
