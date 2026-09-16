@@ -23,8 +23,6 @@ import {
   DIGIT_CELL_H,
   DIGIT_FONT_SIZE,
   GAME_FONT,
-  SUN_FRAC_X,
-  SUN_FRAC_Y,
   SPRITE_SUPERSAMPLE,
   fontPx,
   px,
@@ -40,7 +38,8 @@ import {
   halfTextureKeys,
 } from '../utils/fruitCatalog';
 import { paintWhole, paintCut } from '../utils/fruitArt';
-import { paintBackdrop } from '../utils/backdrop';
+import { ensureBackdropTextures } from '../utils/backdropTextures';
+import { computeViewport } from '../utils/viewport';
 import { paintSphereSheen } from '../utils/surfaceShading';
 
 /**
@@ -74,8 +73,15 @@ export class PreloadScene extends Phaser.Scene {
     // apparaîtrait — autant ne pas en mettre.
     this.taches = [
       { libelle: 'Le décor', run: () => {
-        this.createBackgroundTexture('background_portrait', PORTRAIT_WIDTH, PORTRAIT_HEIGHT);
-        this.createBackgroundTexture('background_landscape', LANDSCAPE_WIDTH, LANDSCAPE_HEIGHT);
+        // Seulement l'orientation en cours : l'autre sera peinte si quelqu'un
+        // tourne vraiment son écran (cf. utils/backdropTextures.ts).
+        const portrait = computeViewport().isPortrait;
+        ensureBackdropTextures(
+          this,
+          portrait,
+          portrait ? PORTRAIT_WIDTH : LANDSCAPE_WIDTH,
+          portrait ? PORTRAIT_HEIGHT : LANDSCAPE_HEIGHT
+        );
       } },
     ];
 
@@ -404,14 +410,6 @@ export class PreloadScene extends Phaser.Scene {
   // Décor : coucher de soleil tropical, volcan, océan, palmiers
   // ------------------------------------------------------------------
 
-  private createBackgroundTexture(key: string, W: number, H: number): void {
-    const texture = this.textures.createCanvas(key, W, H);
-    if (texture === null) {
-      return; // ne peut arriver que si la clé existe déjà
-    }
-    paintBackdrop(texture.getContext(), W, H, SUN_FRAC_X, SUN_FRAC_Y);
-    texture.refresh();
-  }
 
   // ------------------------------------------------------------------
   // Fruits : 3 textures par variété (entier + 2 moitiés par clipping)

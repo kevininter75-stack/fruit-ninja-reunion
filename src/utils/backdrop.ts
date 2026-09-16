@@ -29,44 +29,89 @@
 type Ridge = Array<[number, number]>;
 
 /**
- * Peint le paysage complet dans le contexte donné.
+ * LE PAYSAGE EN QUATRE PLANS, et non plus en une seule image.
+ *
+ * POURQUOI LE DÉCOUPER. Les quatre crêtes étaient cuites dans la même texture.
+ * Elles ne pouvaient donc pas bouger l'une par rapport à l'autre : quand la
+ * caméra se resserre sur un fruit spécial et se déplace, tout le paysage
+ * glissait d'un bloc — c'est-à-dire exactement ce que fait une image plate
+ * qu'on agrandit. Un décor peint à la main qui se comporte comme un
+ * autocollant annule le travail fait sur la perspective aérienne.
+ *
+ * Séparés, les mêmes tracés deviennent de la profondeur : le Piton reste
+ * presque immobile pendant que la mer et les palmiers glissent. C'est le
+ * repère de distance le plus fort dont dispose l'œil, et il ne coûte aucun
+ * dessin supplémentaire — ce sont les MÊMES crêtes, peintes sur quatre toiles.
+ *
+ * L'ORDRE EST CELUI DE L'ANCIENNE FONCTION, à la ligne près. La brume vient
+ * APRÈS les crêtes et avant la mer : c'est elle qui pose l'atmosphère entre
+ * l'œil et la montagne, et l'inverser rendrait les reliefs sales au lieu de
+ * lointains. Elle part donc avec l'avant-plan, ce qui est d'ailleurs juste :
+ * l'air qu'on traverse est plus proche que ce qu'il voile.
  *
  * `u` est l'unité de longueur : 1 sur un écran de 720 de petit côté, 2 à
- * l'échelle 2. Toutes les distances en découlent, donc le paysage garde
- * exactement les mêmes proportions à toute résolution.
+ * l'échelle 2. Chaque plan la recalcule, donc les proportions du paysage sont
+ * identiques à toute résolution.
  */
-export function paintBackdrop(ctx: CanvasRenderingContext2D, W: number, H: number, sunFracX: number, sunFracY: number): void {
+export function paintCiel(
+  ctx: CanvasRenderingContext2D,
+  W: number,
+  H: number,
+  sunFracX: number,
+  sunFracY: number
+): void {
   const u = Math.min(W, H) / 720;
-  const sunX = W * sunFracX;
-  const sunY = H * sunFracY;
-
   paintSky(ctx, W, H);
-  paintSunHalo(ctx, sunX, sunY, u, H);
+  paintSunHalo(ctx, W * sunFracX, H * sunFracY, u, H);
+}
 
-  // Les trois crêtes lointaines sont peintes FLOUES : c'est la profondeur de
-  // champ. L'œil fait la mise au point sur les fruits, qui volent à un mètre ;
-  // à cette distance un relief à quinze kilomètres ne peut pas être net. Sans
-  // ce flou, fruits et montagnes paraissent collés sur la même vitre.
-  //
-  // ctx.filter n'existe pas partout ; là où il manque, l'affectation est
-  // ignorée et le décor reste net. C'est une dégradation acceptable.
+/**
+ * Les deux crêtes les plus lointaines, peintes FLOUES : c'est la profondeur de
+ * champ. L'œil fait la mise au point sur les fruits, qui volent à un mètre ;
+ * à cette distance un relief à quinze kilomètres ne peut pas être net. Sans
+ * ce flou, fruits et montagnes paraissent collés sur la même vitre.
+ *
+ * ctx.filter n'existe pas partout ; là où il manque, l'affectation est
+ * ignorée et le décor reste net. C'est une dégradation acceptable.
+ */
+export function paintCretesLointaines(ctx: CanvasRenderingContext2D, W: number, H: number): void {
+  const u = Math.min(W, H) / 720;
   withBlur(ctx, 3.2 * u, () => {
     paintRidge(ctx, W, H, RIDGE_FAR, 'rgba(126, 149, 172, 0.55)');
     paintRidge(ctx, W, H, RIDGE_MID, 'rgba(92, 112, 136, 0.68)');
   });
+}
+
+/** La crête proche, à peine floue, et le Piton — net, c'est lui qui donne
+ *  l'échelle du paysage. */
+export function paintCretesProches(ctx: CanvasRenderingContext2D, W: number, H: number): void {
+  const u = Math.min(W, H) / 720;
   withBlur(ctx, 1.4 * u, () => {
     paintRidge(ctx, W, H, RIDGE_NEAR, 'rgba(61, 76, 96, 0.86)');
   });
-
-  // Le Piton, plan principal : net, c'est lui qui donne l'échelle du paysage.
   paintRidge(ctx, W, H, RIDGE_PITON, 'rgba(38, 49, 64, 0.94)');
+}
 
-  paintHaze(ctx, W, H, sunX, sunY, u);
+/**
+ * Brume, océan et palmiers : tout ce qui est devant la montagne.
+ *
+ * Les palmiers sont volontairement coupés par le bord de l'image — un objet
+ * dont on ne voit pas les limites se lit comme proche, c'est le repère de
+ * profondeur le moins cher qui soit. C'est aussi pour cela qu'ils sont dans
+ * ce plan-ci : ce sont eux qui doivent glisser le plus.
+ */
+export function paintAvantPlan(
+  ctx: CanvasRenderingContext2D,
+  W: number,
+  H: number,
+  sunFracX: number,
+  sunFracY: number
+): void {
+  const u = Math.min(W, H) / 720;
+  const sunX = W * sunFracX;
+  paintHaze(ctx, W, H, sunX, H * sunFracY, u);
   paintSea(ctx, W, H, sunX, u);
 
-  // Palmiers : le seul plan net devant l'océan. Ils sont volontairement
-  // coupés par le bord de l'image — un objet dont on ne voit pas les limites
-  // se lit comme proche, c'est le repère de profondeur le moins cher qui soit.
   const shore = H * 0.87;
   drawPalm(ctx, W * 0.05, shore + 18 * u, 1, u * 1.15);
   drawPalm(ctx, W * 0.96, shore + 26 * u, -1, u * 1.3);

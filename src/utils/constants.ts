@@ -756,11 +756,39 @@ export const TEX_CLOUD = 'cloud';
 export const SUN_FRAC_X = 0.34;
 export const SUN_FRAC_Y = 0.52;
 export const BG_CLOUD_COUNT = 5;
-// Profondeurs du fond animé (sous tout le reste, sous le voile sombre)
-export const DEPTH_BG_BASE = -20;
-export const DEPTH_BG_GLOW = -18;
-export const DEPTH_BG_CLOUD = -16;
-export const DEPTH_BG_MOTE = -14;
+/**
+ * LES QUATRE PLANS DU DÉCOR, du plus lointain au plus proche.
+ *
+ * Chacun porte un `scrollFactor` : la part du déplacement de la caméra que le
+ * plan suit. À 1 il colle au monde, à 0 il reste vissé à l'écran. Le décalage
+ * entre les plans EST la profondeur — c'est le repère de distance le plus fort
+ * dont dispose l'œil, et le moins cher à produire.
+ *
+ * LES VALEURS SONT TOUTES SOUS 1, ET C'EST AUSSI PLUS SÛR QU'AVANT. Le décor
+ * d'hier était une image unique à scrollFactor 1 : elle suivait la caméra au
+ * pixel près, d'où le débord SCREEN_BLEED pour qu'une secousse ne découvre pas
+ * le vide. Un plan qui bouge MOINS que le monde ne peut, par construction, pas
+ * découvrir davantage. Le découpage réduit donc le risque au lieu de l'ajouter.
+ *
+ * L'écart entre les plans compte plus que leurs valeurs absolues : 0,03 contre
+ * 0,30, c'est un rapport de dix entre le ciel et les palmiers. C'est ce rapport
+ * qu'on voit quand la caméra se resserre sur un fruit spécial.
+ */
+export const BG_CIEL_SCROLL = 0.03;
+export const BG_LOIN_SCROLL = 0.09;
+export const BG_PROCHE_SCROLL = 0.18;
+export const BG_AVANT_SCROLL = 0.3;
+
+// Profondeurs du fond animé (sous tout le reste, sous le voile sombre).
+// L'ordre relatif de la lueur, des nuages et des poussières est conservé :
+// ils restent AU-DESSUS du décor, comme avant le découpage.
+export const DEPTH_BG_CIEL = -24;
+export const DEPTH_BG_LOIN = -23;
+export const DEPTH_BG_PROCHE = -22;
+export const DEPTH_BG_AVANT = -21;
+export const DEPTH_BG_GLOW = -20;
+export const DEPTH_BG_CLOUD = -19;
+export const DEPTH_BG_MOTE = -18;
 
 // ------------------------------------------------------------------
 // Polish visuel global

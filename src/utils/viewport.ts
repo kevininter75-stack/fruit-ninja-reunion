@@ -63,7 +63,16 @@ export function computeViewport(): ViewportSize {
     : { width: LANDSCAPE_WIDTH, height: LANDSCAPE_HEIGHT, isPortrait: false };
 }
 
-/** Clé de texture du décor adaptée à l'orientation d'une scène. */
-export function backgroundKey(scene: Phaser.Scene): string {
-  return scene.scale.height > scene.scale.width ? 'background_portrait' : 'background_landscape';
+/** Les quatre plans du décor, du plus lointain au plus proche. */
+export const BG_COUCHES = ['ciel', 'loin', 'proche', 'avant'] as const;
+export type BgCouche = (typeof BG_COUCHES)[number];
+
+/** Clé de texture d'un plan du décor, adaptée à l'orientation. */
+export function backgroundKey(couche: BgCouche, portrait: boolean): string {
+  return `bg_${couche}_${portrait ? 'portrait' : 'landscape'}`;
+}
+
+/** Vrai si la scène est actuellement en format vertical. */
+export function scenePortrait(scene: Phaser.Scene): boolean {
+  return scene.scale.height > scene.scale.width;
 }

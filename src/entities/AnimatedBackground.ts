@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { backgroundKey } from '../utils/viewport';
+import { backgroundKey, scenePortrait, BG_COUCHES, type BgCouche } from '../utils/viewport';
+import { ensureBackdropTextures } from '../utils/backdropTextures';
 import {
   TEX_GLOW,
   TEX_CLOUD,
@@ -7,7 +8,14 @@ import {
   SUN_FRAC_X,
   SUN_FRAC_Y,
   BG_CLOUD_COUNT,
-  DEPTH_BG_BASE,
+  DEPTH_BG_CIEL,
+  DEPTH_BG_LOIN,
+  DEPTH_BG_PROCHE,
+  DEPTH_BG_AVANT,
+  BG_CIEL_SCROLL,
+  BG_LOIN_SCROLL,
+  BG_PROCHE_SCROLL,
+  BG_AVANT_SCROLL,
   DEPTH_BG_GLOW,
   DEPTH_BG_CLOUD,
   DEPTH_BG_MOTE,
@@ -27,6 +35,10 @@ import {
  * rien à mettre à jour dans les scènes. Recréé à chaque entrée de scène
  * (et donc à chaque rotation), il lit la taille courante de l'écran.
  */
+/** Profondeur et vitesse de chaque plan, dans l'ordre de BG_COUCHES. */
+const PROFONDEURS = [DEPTH_BG_CIEL, DEPTH_BG_LOIN, DEPTH_BG_PROCHE, DEPTH_BG_AVANT];
+const VITESSES = [BG_CIEL_SCROLL, BG_LOIN_SCROLL, BG_PROCHE_SCROLL, BG_AVANT_SCROLL];
+
 export class AnimatedBackground {
   /**
    * @param parallax Active la dérive en parallaxe des plans du décor. Réservé
@@ -37,13 +49,25 @@ export class AnimatedBackground {
     const w = scene.scale.width;
     const h = scene.scale.height;
 
-    // Décor de base (adapté à l'orientation), débordant légèrement de l'écran
-    // pour qu'une secousse de caméra ne découvre jamais le vide (SCREEN_BLEED).
-    const base = scene.add
-      .image(-SCREEN_BLEED, -SCREEN_BLEED, backgroundKey(scene))
-      .setOrigin(0)
-      .setDisplaySize(w + SCREEN_BLEED * 2, h + SCREEN_BLEED * 2)
-      .setDepth(DEPTH_BG_BASE);
+    // LES QUATRE PLANS DU DÉCOR, du plus lointain au plus proche. Chacun suit
+    // la caméra à sa propre vitesse : c'est l'écart entre eux qui fait la
+    // profondeur (cf. BG_CIEL_SCROLL dans constants.ts).
+    //
+    // Ils débordent de l'écran (SCREEN_BLEED) pour qu'une secousse de caméra ne
+    // découvre jamais le vide — précaution héritée du décor d'une seule pièce,
+    // et désormais surabondante : un plan qui bouge moins que le monde ne peut
+    // pas découvrir plus de bord qu'un plan qui le suit exactement.
+    const portrait = scenePortrait(scene);
+    // Sans effet si elles existent déjà ; les peint si l'écran vient de tourner.
+    ensureBackdropTextures(scene, portrait, w, h);
+    const plans: Phaser.GameObjects.Image[] = BG_COUCHES.map((couche, i) =>
+      scene.add
+        .image(-SCREEN_BLEED, -SCREEN_BLEED, backgroundKey(couche as BgCouche, portrait))
+        .setOrigin(0)
+        .setDisplaySize(w + SCREEN_BLEED * 2, h + SCREEN_BLEED * 2)
+        .setDepth(PROFONDEURS[i])
+        .setScrollFactor(VITESSES[i])
+    );
 
     // Halo de soleil qui respire, en fusion additive pour un vrai rayonnement
     const glow = scene.add
@@ -53,7 +77,7 @@ export class AnimatedBackground {
       .setAlpha(0.55);
 
     if (parallax) {
-      this.addParallaxDrift(scene, base, glow, w, h);
+      this.addParallaxDrift(scene, plans, glow, w, h);
     }
     scene.tweens.add({
       targets: glow,
@@ -103,29 +127,35 @@ export class AnimatedBackground {
    */
   private addParallaxDrift(
     scene: Phaser.Scene,
-    base: Phaser.GameObjects.Image,
+    plans: Phaser.GameObjects.Image[],
     glow: Phaser.GameObjects.Image,
     w: number,
     h: number
   ): void {
     const amplitude = w * 0.016;
-    base.setDisplaySize(w * 1.05, h * 1.05).setPosition(-w * 0.025, -h * 0.025);
 
-    scene.tweens.add({
-      targets: base,
-      x: base.x + amplitude,
-      duration: 9000,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut',
-    });
-    scene.tweens.add({
-      targets: base,
-      y: base.y + amplitude * 0.6,
-      duration: 7000, // période différente de X : trajectoire jamais bouclée
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut',
+    plans.forEach((plan, i) => {
+      // L'amplitude suit la vitesse du plan : le ciel dérive à peine, les
+      // palmiers franchement. C'est la même hiérarchie que pour la caméra, et
+      // elle doit l'être — deux hiérarchies contradictoires se remarqueraient.
+      const part = VITESSES[i] / BG_AVANT_SCROLL;
+      plan.setDisplaySize(w * 1.05, h * 1.05).setPosition(-w * 0.025, -h * 0.025);
+      scene.tweens.add({
+        targets: plan,
+        x: plan.x + amplitude * part,
+        duration: 9000,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+      });
+      scene.tweens.add({
+        targets: plan,
+        y: plan.y + amplitude * 0.6 * part,
+        duration: 7000, // période différente de X : trajectoire jamais bouclée
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+      });
     });
 
     // Le soleil est le plan le plus lointain : il bouge deux fois moins
