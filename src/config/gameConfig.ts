@@ -6,6 +6,7 @@ import { PreloadScene } from '../scenes/PreloadScene';
 import { MenuScene } from '../scenes/MenuScene';
 import { GameScene } from '../scenes/GameScene';
 import { GameOverScene } from '../scenes/GameOverScene';
+import { ClassementScene } from '../scenes/ClassementScene';
 
 // Résolution logique initiale = orientation au démarrage. Elle bascule ensuite
 // à la rotation du device (main.ts appelle scale.setGameSize + relayout).
@@ -37,5 +38,5 @@ export const gameConfig: Phaser.Types.Core.GameConfig = {
     // Multi-touch prévu pour la Phase 4 : on réserve 2 pointeurs supplémentaires dès maintenant
     activePointers: 3,
   },
-  scene: [BootScene, PreloadScene, MenuScene, GameScene, GameOverScene],
+  scene: [BootScene, PreloadScene, MenuScene, GameScene, GameOverScene, ClassementScene],
 };

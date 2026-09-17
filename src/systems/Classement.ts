@@ -128,7 +128,20 @@ function ecrireFile(file: Envoi[]): void {
   ecrireLocal(CLE_FILE, JSON.stringify(file.slice(-FILE_MAX)));
 }
 
-async function poster(envoi: Envoi): Promise<boolean> {
+/**
+ * Issue d'un envoi. TROIS ÉTATS, ET PAS DEUX.
+ *
+ * Un booléen mentait ici, et mon propre test l'a pris en flagrant délit : une
+ * deuxième tentative du Défi le même jour est refusée par la base, mais elle
+ * ne doit pas non plus être remise en file — elle sera refusée pour toujours.
+ * Avec un seul booléen, « ne pas remettre en file » devenait « envoyé », donc
+ * la fonction déclarait un succès là où le serveur avait dit non.
+ *
+ * Aucun appelant n'en dépendait encore. C'est précisément le bon moment.
+ */
+type Issue = 'ok' | 'refuse' | 'reessayer';
+
+async function poster(envoi: Envoi): Promise<Issue> {
   const controleur = new AbortController();
   const minuteur = window.setTimeout(() => controleur.abort(), DELAI_MS);
   try {
@@ -143,13 +156,15 @@ async function poster(envoi: Envoi): Promise<boolean> {
       },
       body: JSON.stringify(envoi),
     });
-    // 409 = doublon (déjà joué aujourd'hui) et 4xx = refusé par les
-    // contraintes. Dans les deux cas l'envoi ne passera JAMAIS : on le retire
-    // de la file au lieu de le retenter éternellement. Seules les pannes
-    // réseau et les 5xx méritent une nouvelle chance.
-    return reponse.ok || (reponse.status >= 400 && reponse.status < 500);
+    if (reponse.ok) {
+      return 'ok';
+    }
+    // 409 = déjà joué aujourd'hui, 400 = refusé par une contrainte. L'envoi ne
+    // passera JAMAIS : on le retire de la file plutôt que de le retenter
+    // éternellement. Seules les pannes réseau et les 5xx méritent une reprise.
+    return reponse.status >= 400 && reponse.status < 500 ? 'refuse' : 'reessayer';
   } catch {
-    return false;
+    return 'reessayer';
   } finally {
     window.clearTimeout(minuteur);
   }
@@ -169,8 +184,7 @@ export async function viderLaFile(): Promise<void> {
   }
   const restants: Envoi[] = [];
   for (const envoi of file) {
-    const fait = await poster(envoi);
-    if (!fait) {
+    if ((await poster(envoi)) === 'reessayer') {
       restants.push(envoi);
     }
   }
@@ -179,8 +193,12 @@ export async function viderLaFile(): Promise<void> {
 
 /**
  * Dépose un score. Ne rejette jamais, n'attend jamais le réseau pour rendre
- * la main au jeu : en cas d'échec l'envoi part dans la file et repartira au
+ * la main au jeu : en cas de panne l'envoi part dans la file et repartira au
  * prochain lancement.
+ *
+ * Renvoie vrai UNIQUEMENT si la ligne a été créée. Un refus du serveur — la
+ * deuxième tentative du Défi dans la même journée, par exemple — renvoie faux
+ * et ne va pas en file : il serait refusé à chaque reprise.
  */
 export async function envoyer(
   mode: GameMode,
@@ -201,11 +219,11 @@ export async function envoyer(
     combo_max: comboMax,
     joueur: idJoueur(),
   };
-  const fait = await poster(envoi);
-  if (!fait) {
+  const issue = await poster(envoi);
+  if (issue === 'reessayer') {
     ecrireFile([...lireFile(), envoi]);
   }
-  return fait;
+  return issue === 'ok';
 }
 
 async function lire(chemin: string): Promise<Entree[]> {

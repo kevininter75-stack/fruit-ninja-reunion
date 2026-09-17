@@ -157,6 +157,24 @@ export class MenuScene extends Phaser.Scene {
 
     this.registerPointerEvents();
     addVignette(this);
+    // Le classement se rejoint depuis le menu, pas depuis l'écran de fin : on
+    // veut pouvoir aller voir où l'on en est sans avoir à rejouer une partie.
+    const classement = this.add
+      .text(px(52), h - px(52), '🏆  Classement', {
+        fontFamily: GAME_FONT,
+        fontSize: fontPx(26),
+        fontStyle: '700',
+        color: '#ffd9a0',
+        stroke: '#1d2731',
+        strokeThickness: px(5),
+      })
+      .setOrigin(0, 0.5)
+      .setInteractive({ useHandCursor: true });
+    classement.on('pointerdown', () => {
+      sfx.click();
+      fadeToScene(this, 'ClassementScene', { mode: 'daily' });
+    });
+
     createMuteButton(this, w - px(52), h - px(52));
     // À gauche du bouton de son, sur la même ligne : c'est le seul écran
     // depuis lequel recharger la page ne coûte rien au joueur.

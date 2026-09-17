@@ -24,6 +24,7 @@ import { addVignette, fadeIn, fadeToScene } from '../utils/ui';
 import { prefersReducedMotion } from '../utils/settings';
 import { buildShareText, getStreak } from '../utils/dailyChallenge';
 import { mutationDuJour, objectifDuJour } from '../utils/mutations';
+import { envoyer, initiales } from '../systems/Classement';
 import { RECORD, BOMBE } from '../utils/creole';
 
 /** Données passées par la GameScene à la fin d'une partie. */
@@ -110,6 +111,16 @@ export class GameOverScene extends Phaser.Scene {
     const display = REASON_DISPLAY[this.reason];
     // Le record est calculé AVANT tout affichage : la célébration dépend de lui
     const isNewRecord = saveBestScore(this.mode, this.finalScore);
+
+    // LE SCORE PART EN SILENCE, ET SANS QU'ON L'ATTENDE. Le joueur n'a rien à
+    // valider et ne voit aucune roue tourner : soit ça passe, soit ça part dans
+    // la file locale et repartira au prochain lancement. Un écran de fin qui
+    // attendrait le réseau serait un écran de fin cassé.
+    // Tant que le joueur n'a pas choisi ses trois lettres, il n'y a rien à
+    // envoyer — il les choisira depuis l'écran de classement.
+    if (initiales() !== null) {
+      void envoyer(this.mode, this.finalScore, this.fruitsSliced, this.bestCombo);
+    }
     const medal = this.medalIndex();
 
     // Disposition explicite par orientation. Le paysage ne fait que 720 px de

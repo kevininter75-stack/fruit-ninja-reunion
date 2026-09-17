@@ -5,6 +5,7 @@ import { GAME_FONT, DISPLAY_FONT } from './utils/constants';
 import { installAppLifecycle } from './systems/appLifecycle';
 import { relayoutActiveScenes } from './utils/relayout';
 import { installLandscapeGate } from './systems/orientation';
+import { viderLaFile } from './systems/Classement';
 
 /**
  * Attend que la police d'affichage soit réellement disponible.
@@ -60,6 +61,11 @@ async function boot(): Promise<void> {
   // Phaser met sa boucle en pause tout seul ; la musique, elle, tourne sur une
   // horloge du navigateur qui l'ignore.
   installAppLifecycle();
+
+  // Les scores qui n'ont pas pu partir (avion, tunnel, base en pause) repartent
+  // ici, en fond. Volontairement non attendu : le jeu ne doit jamais retarder
+  // son démarrage pour un service qui n'est pas indispensable.
+  void viderLaFile();
 
   // Accès au jeu depuis la console, en DÉVELOPPEMENT UNIQUEMENT.
   // import.meta.env.DEV est remplacé par false au build et la branche entière
