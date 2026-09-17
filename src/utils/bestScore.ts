@@ -8,7 +8,7 @@ import type { GameMode } from './constants';
  */
 
 function storageKey(mode: GameMode): string {
-  return `fruit-ninja-reunion-best-${mode}`;
+  return `kout-sab-best-${mode}`;
 }
 
 export function getBestScore(mode: GameMode): number {

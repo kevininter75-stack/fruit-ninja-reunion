@@ -1,5 +1,5 @@
 /**
- * Service worker de Fruit Ninja Réunion.
+ * Service worker de Kout Sab'.
  *
  * Stratégie choisie pour ne JAMAIS figer les joueurs sur une vieille version :
  * - Navigations (HTML) : NETWORK-FIRST. On récupère toujours la dernière
@@ -14,7 +14,7 @@
  * immédiatement ; le client se recharge alors une fois (voir main.ts,
  * écouteur 'controllerchange'). Incrémenter CACHE_NAME purge l'ancien cache.
  */
-const CACHE_NAME = 'fnr-v4';
+const CACHE_NAME = 'kout-sab-v1';
 const PRECACHE = [
   '.',
   'index.html',

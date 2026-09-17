@@ -5,7 +5,8 @@ import { GAME_FONT, DISPLAY_FONT } from './utils/constants';
 import { installAppLifecycle } from './systems/appLifecycle';
 import { relayoutActiveScenes } from './utils/relayout';
 import { installLandscapeGate } from './systems/orientation';
-import { viderLaFile } from './systems/Classement';
+import { migrerStockage } from './utils/migrationStockage';
+import { viderLaFile, rattraperDefiDuJour } from './systems/Classement';
 
 /**
  * Attend que la police d'affichage soit réellement disponible.
@@ -49,6 +50,9 @@ async function waitForFont(): Promise<void> {
  * plus simple et plus sûr que de retarder le démarrage des scènes après coup.
  */
 async function boot(): Promise<void> {
+  // AVANT TOUT LE RESTE : les clés de stockage ont changé de nom avec le jeu,
+  // et rien ne doit être lu sous l'ancien nom après ce point.
+  migrerStockage();
   await waitForFont();
   const game = new Phaser.Game(gameConfig);
 
@@ -66,6 +70,9 @@ async function boot(): Promise<void> {
   // ici, en fond. Volontairement non attendu : le jeu ne doit jamais retarder
   // son démarrage pour un service qui n'est pas indispensable.
   void viderLaFile();
+  // Et le Défi du jour joué mais jamais monté : il ne se rejoue pas, donc
+  // aucun autre chemin ne le rattraperait.
+  void rattraperDefiDuJour();
 
   // Accès au jeu depuis la console, en DÉVELOPPEMENT UNIQUEMENT.
   // import.meta.env.DEV est remplacé par false au build et la branche entière

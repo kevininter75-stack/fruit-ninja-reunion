@@ -1,6 +1,7 @@
 import type { GameMode } from '../utils/constants';
 import { todayKey } from '../utils/jour';
 import { getBestScore } from '../utils/bestScore';
+import { getTodayResult } from './../utils/dailyChallenge';
 
 /**
  * Le classement en ligne : trois tableaux, un par mode.
@@ -45,6 +46,7 @@ const CLE_FILE = 'kout-sab-envois-en-attente';
 const CLE_DERNIER = 'kout-sab-dernier-resultat';
 const CLE_IMPORTE = 'kout-sab-records-importes';
 const CLE_CODE = 'kout-sab-code-reprise';
+const CLE_DEFI_ENVOYE = 'kout-sab-defi-envoye';
 /** Au-delà, on abandonne : une file qui gonfle est une fuite, pas une file. */
 const FILE_MAX = 12;
 /** Le jeu ne doit jamais attendre le réseau. */
@@ -332,27 +334,52 @@ export function retenirResultat(mode: GameMode, score: number, fruits: number, c
   if (pseudo() !== null) {
     return; // rien à retenir : il est déjà parti
   }
-  // On ne garde que le MEILLEUR des résultats en attente, pas le dernier. Un
-  // joueur peut enchaîner cinq parties avant de s'inscrire ; ce serait dommage
-  // que ce soit la plus mauvaise qui monte.
-  const enAttente = lireDernier();
-  if (enAttente !== null && enAttente.mode === mode && enAttente.score >= score) {
+  // UNE ATTENTE PAR MODE, ET C'EST UNE CORRECTION. Il n'y en avait qu'une pour
+  // tout le jeu : un joueur qui faisait son Défi du jour PUIS une partie
+  // Classique voyait la seconde écraser la première, et son Défi ne montait
+  // jamais. Trois modes, trois résultats en attente — ils ne se marchent plus
+  // dessus.
+  //
+  // Et on garde le MEILLEUR de chaque mode, pas le dernier : on peut enchaîner
+  // cinq parties avant de choisir son pseudo, ce serait dommage que ce soit la
+  // plus mauvaise qui monte.
+  const attentes = lireAttentes();
+  const dejaLa = attentes[mode];
+  if (dejaLa !== undefined && dejaLa.score >= score) {
     return;
   }
-  const r: Resultat = { mode, score, fruits, comboMax };
-  ecrireLocal(CLE_DERNIER, JSON.stringify(r));
+  attentes[mode] = { mode, score, fruits, comboMax };
+  ecrireLocal(CLE_DERNIER, JSON.stringify(attentes));
 }
 
-function lireDernier(): Resultat | null {
+type Attentes = Partial<Record<GameMode, Resultat>>;
+
+function lireAttentes(): Attentes {
   try {
     const brut = lireLocal(CLE_DERNIER);
-    if (brut === null) {
-      return null;
+    if (brut === null || brut === '') {
+      return {};
     }
-    const r = JSON.parse(brut) as Resultat;
-    return typeof r.score === 'number' && typeof r.mode === 'string' ? r : null;
+    const brut2: unknown = JSON.parse(brut);
+    if (typeof brut2 !== 'object' || brut2 === null) {
+      return {};
+    }
+    // L'ANCIEN FORMAT ÉTAIT UN RÉSULTAT SEUL. Un joueur qui met à jour au
+    // mauvais moment aurait perdu sa partie en attente : on le relit.
+    const peutEtreUnique = brut2 as Resultat;
+    if (typeof peutEtreUnique.mode === 'string' && typeof peutEtreUnique.score === 'number') {
+      return { [peutEtreUnique.mode]: peutEtreUnique };
+    }
+    const sortie: Attentes = {};
+    for (const [cle, valeur] of Object.entries(brut2 as Record<string, unknown>)) {
+      const r = valeur as Resultat;
+      if (r !== null && typeof r === 'object' && typeof r.score === 'number') {
+        sortie[cle as GameMode] = r;
+      }
+    }
+    return sortie;
   } catch {
-    return null;
+    return {};
   }
 }
 
@@ -410,17 +437,24 @@ export async function inscrire(nom: string): Promise<void> {
   // sur le même mode et le même score, on ne dépose que la partie : elle, au
   // moins, sait combien de fruits ont été tranchés. Un « record importé » à
   // côté d'une vraie ligne serait un doublon sans intérêt.
-  const dernier = lireDernier();
+  const attentes = lireAttentes();
   const couverts = new Set<GameMode>();
-  if (dernier !== null) {
-    ecrireLocal(CLE_DERNIER, '');
-    if (await envoyer(dernier.mode, dernier.score, dernier.fruits, dernier.comboMax)) {
-      if (dernier.score >= getBestScore(dernier.mode)) {
-        couverts.add(dernier.mode);
+  ecrireLocal(CLE_DERNIER, '');
+  // Les trois modes partent d'affilée : la limite de cadence de la base est
+  // posée par (joueur, MODE), donc ils ne se bloquent pas entre eux.
+  for (const r of Object.values(attentes)) {
+    if (r === undefined) {
+      continue;
+    }
+    if (await envoyer(r.mode, r.score, r.fruits, r.comboMax)) {
+      if (r.score >= getBestScore(r.mode)) {
+        couverts.add(r.mode);
       }
     }
   }
   await importerRecords(couverts);
+  // Et le Défi du jour déjà joué, qu'aucun autre chemin ne pourrait envoyer.
+  await rattraperDefiDuJour();
 }
 
 /**
@@ -518,4 +552,32 @@ export async function reserver(nom: string, code?: string): Promise<Reservation>
     return { ok: false, raison: 'forme' };
   }
   return { ok: false, raison: 'reseau' };
+}
+
+/**
+ * Rattrape le Défi du jour déjà joué mais jamais monté au classement.
+ *
+ * LE PIÈGE QU'IL FALLAIT OUVRIR. Le Défi ne se joue QU'UNE FOIS par jour, et le
+ * jeu le sait : une fois la tentative enregistrée en local, il refuse de la
+ * rejouer. Un joueur qui fait son Défi PUIS choisit son pseudo se retrouvait
+ * donc avec un score qu'aucun chemin ne pouvait plus envoyer — ni en rejouant,
+ * puisque c'est interdit, ni en s'inscrivant, puisque l'inscription ne
+ * regardait que les parties mises de côté.
+ *
+ * On lit donc directement l'historique du Défi. Le témoin garde la date du
+ * dernier envoi : relancé dix fois, ça n'envoie qu'une fois par jour, et la
+ * base refuserait le doublon de toute façon.
+ */
+export async function rattraperDefiDuJour(): Promise<boolean> {
+  if (pseudo() === null) {
+    return false;
+  }
+  const resultat = getTodayResult();
+  if (resultat === null || lireLocal(CLE_DEFI_ENVOYE) === resultat.date) {
+    return false;
+  }
+  ecrireLocal(CLE_DEFI_ENVOYE, resultat.date);
+  // Le nombre de fruits n'a pas été conservé par l'historique du Défi, qui est
+  // antérieur au classement : il part comme un record importé.
+  return envoyer('daily', resultat.score, null, 0);
 }

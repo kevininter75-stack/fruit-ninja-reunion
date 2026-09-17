@@ -16,7 +16,7 @@ import { todayKey } from './jour';
 
 export { todayKey };
 
-const HISTORY_KEY = 'fruit-ninja-reunion-daily';
+const HISTORY_KEY = 'kout-sab-daily';
 const MAX_HISTORY = 120;
 
 export interface DailyResult {

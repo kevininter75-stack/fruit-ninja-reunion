@@ -2,8 +2,8 @@
  * Réglages utilisateur persistés (localStorage) avec cache mémoire :
  * isMuted() est appelé à chaque son, on ne relit pas le stockage à chaque fois.
  */
-const MUTED_KEY = 'fruit-ninja-reunion-muted';
-const MOTION_KEY = 'fruit-ninja-reunion-motion';
+const MUTED_KEY = 'kout-sab-muted';
+const MOTION_KEY = 'kout-sab-motion';
 
 let mutedCache: boolean | null = null;
 let motionCache: 'auto' | 'reduced' | 'full' | null = null;
@@ -120,7 +120,7 @@ export function motionScale(): number {
  */
 export type QualityPreference = 'auto' | 'high';
 
-const QUALITY_KEY = 'fruit-ninja-reunion-quality';
+const QUALITY_KEY = 'kout-sab-quality';
 let qualityCache: QualityPreference | null = null;
 
 export function getQualityPreference(): QualityPreference {
