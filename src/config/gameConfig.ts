@@ -34,6 +34,10 @@ export const gameConfig: Phaser.Types.Core.GameConfig = {
       debug: false,
     },
   },
+  // Le choix du pseudo passe par un vrai champ de saisie HTML posé par-dessus
+  // le canvas : c'est le seul moyen d'avoir le clavier du système, ses
+  // suggestions et son bouton « OK » sans réécrire un clavier à la main.
+  dom: { createContainer: true },
   input: {
     // Multi-touch prévu pour la Phase 4 : on réserve 2 pointeurs supplémentaires dès maintenant
     activePointers: 3,

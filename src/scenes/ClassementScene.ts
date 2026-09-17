@@ -10,7 +10,15 @@ import { addVignette, fadeIn, fadeToScene } from '../utils/ui';
 import { AnimatedBackground } from '../entities/AnimatedBackground';
 import { SceneGrading } from '../systems/SceneGrading';
 import { sfx } from '../systems/SfxManager';
-import { lireDefi, lireRecords, initiales, inscrire, type Entree } from '../systems/Classement';
+import {
+  lireDefi,
+  lireRecords,
+  pseudo,
+  pseudoValide,
+  inscrire,
+  PSEUDO_MAX,
+  type Entree,
+} from '../systems/Classement';
 import { mutationDuJour } from '../utils/mutations';
 
 /**
@@ -35,7 +43,6 @@ const ONGLETS: ReadonlyArray<{ mode: GameMode; libelle: string }> = [
 ];
 
 const LIGNES_MAX = 10;
-const LETTRES = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
 export class ClassementScene extends Phaser.Scene {
   private modeAffiche: GameMode = 'daily';
@@ -201,14 +208,14 @@ export class ClassementScene extends Phaser.Scene {
       );
     }
 
-    const mes = initiales();
+    const mien = pseudo();
     const haut = h * 0.3;
     const pas = Math.min(px(46), (h * 0.55) / LIGNES_MAX);
     const gauche = w / 2 - px(250);
 
     entrees.forEach((e, i) => {
       const y = haut + i * pas;
-      const moi = mes !== null && e.initiales === mes;
+      const moi = mien !== null && e.pseudo === mien;
       const couleur = moi ? '#ffcf40' : i === 0 ? '#ffe9b0' : '#e8f1f7';
 
       if (moi) {
@@ -227,7 +234,7 @@ export class ClassementScene extends Phaser.Scene {
       };
       this.zoneListe.push(
         this.add.text(gauche, y, `${i + 1}`.padStart(2, ' '), style).setOrigin(0, 0.5),
-        this.add.text(gauche + px(70), y, e.initiales, style).setOrigin(0, 0.5),
+        this.add.text(gauche + px(70), y, e.pseudo, style).setOrigin(0, 0.5),
         // Les chiffres alignés à droite : un classement se lit en colonne.
         this.add.text(gauche + px(330), y, `${e.score}`, style).setOrigin(1, 0.5),
         this.add
@@ -263,116 +270,131 @@ export class ClassementScene extends Phaser.Scene {
   }
 
   private rafraichirPiedDePage(): void {
-    const mes = initiales();
+    const mien = pseudo();
     this.piedDePage?.setText(
-      mes === null ? '▸ Choisis tes initiales pour entrer au classement' : `Tes initiales : ${mes}  ▸ changer`
+      mien === null ? '▸ Choisis ton pseudo pour entrer au classement' : `Ton pseudo : ${mien}  ▸ changer`
     );
   }
 
   /**
-   * Le sélecteur de trois lettres, façon borne d'arcade.
+   * Le choix du pseudo : un vrai champ de saisie posé sur le canvas.
    *
-   * Pas de champ de saisie : un clavier virtuel qui s'ouvre sur un jeu en
-   * plein écran paysage casse la mise en page, et laisse taper n'importe quoi.
-   * Trois molettes de lettres ne peuvent produire qu'une valeur valide.
+   * POURQUOI UN ÉLÉMENT HTML ET PAS UN CLAVIER DESSINÉ. Réécrire un clavier
+   * dans Phaser, c'est réécrire aussi les accents, la sélection, le
+   * copier-coller et les suggestions — pour un champ qu'on remplit UNE FOIS
+   * dans la vie du joueur. Le champ du système fait tout cela, et le clavier
+   * qu'il ouvre est celui que la personne connaît déjà.
+   *
+   * La validation est dite AVANT le refus : le bouton reste éteint tant que le
+   * pseudo ne passe pas, avec la raison sous le champ. Envoyer pour apprendre
+   * que c'est refusé serait la pire des deux façons.
    */
   private ouvrirSelecteur(): void {
     const w = this.scale.width;
     const h = this.scale.height;
-    const depart = initiales() ?? 'AAA';
-    const choix = [...depart].map((c) => Math.max(0, LETTRES.indexOf(c)));
 
-    const voile = this.add.rectangle(0, 0, w, h, 0x05141d, 0.9).setOrigin(0).setDepth(300).setInteractive();
+    const voile = this.add.rectangle(0, 0, w, h, 0x05141d, 0.92).setOrigin(0).setDepth(300).setInteractive();
     const groupe: Phaser.GameObjects.GameObject[] = [voile];
-    // Tous les objets posés ici sont des Text ou des Rectangle : ils ont bien
-    // une profondeur. Le type le dit, plutôt qu'un appel optionnel qui masquait
-    // la question.
-    const ajouter = <T extends Phaser.GameObjects.Text>(o: T): T => {
-      o.setDepth(301);
-      groupe.push(o);
-      return o;
-    };
 
-    ajouter(
-      this.add
-        .text(w / 2, h * 0.28, 'TES INITIALES', {
-          fontFamily: DISPLAY_FONT,
-          fontSize: fontPx(48),
-          color: '#ffcf40',
-          stroke: '#1d2731',
-          strokeThickness: px(8),
-        })
-        .setOrigin(0.5)
-    );
+    const titre = this.add
+      .text(w / 2, h * 0.3, 'TON PSEUDO', {
+        fontFamily: DISPLAY_FONT,
+        fontSize: fontPx(52),
+        color: '#ffcf40',
+        stroke: '#1d2731',
+        strokeThickness: px(8),
+      })
+      .setOrigin(0.5)
+      .setDepth(301);
+    groupe.push(titre);
 
-    const lettres: Phaser.GameObjects.Text[] = [];
-    const ecart = px(110);
-    for (let i = 0; i < 3; i++) {
-      const x = w / 2 + (i - 1) * ecart;
-      const lettre = ajouter(
-        this.add
-          .text(x, h * 0.5, LETTRES[choix[i]], {
-            fontFamily: DISPLAY_FONT,
-            fontSize: fontPx(86),
-            color: '#ffffff',
-            stroke: '#2d3a4a',
-            strokeThickness: px(9),
-          })
-          .setOrigin(0.5)
+    const champ = this.add
+      .dom(w / 2, h * 0.47)
+      .createFromHTML(
+        `<input type="text" maxlength="${PSEUDO_MAX}" autocomplete="off" autocapitalize="words"
+           spellcheck="false" placeholder="Ton nom de joueur"
+           style="width:${px(520)}px;padding:${px(14)}px ${px(18)}px;border-radius:${px(12)}px;
+                  border:${px(3)}px solid #7fd4ff;background:#0e2b3c;color:#ffffff;
+                  font-family:${GAME_FONT};font-size:${px(34)}px;text-align:center;outline:none;">`
+      )
+      .setDepth(301);
+    groupe.push(champ);
+
+    const aide = this.add
+      .text(w / 2, h * 0.58, '', {
+        fontFamily: GAME_FONT,
+        fontSize: fontPx(22),
+        color: '#ffa07a',
+        align: 'center',
+        wordWrap: { width: w * 0.8 },
+      })
+      .setOrigin(0.5)
+      .setDepth(301);
+    groupe.push(aide);
+
+    const valider = this.add
+      .text(w / 2, h * 0.72, 'VALIDER', {
+        fontFamily: GAME_FONT,
+        fontSize: fontPx(38),
+        fontStyle: '700',
+        color: '#0b2a3a',
+        backgroundColor: '#ffcf40',
+        padding: { x: px(28), y: px(12) },
+      })
+      .setOrigin(0.5)
+      .setDepth(301);
+    groupe.push(valider);
+
+    const entree = champ.getChildByName('') as HTMLInputElement | null;
+    const input = entree ?? (champ.node.querySelector('input') as HTMLInputElement);
+    input.value = pseudo() ?? '';
+
+    const verifier = (): boolean => {
+      const v = input.value.trim();
+      const ok = pseudoValide(v);
+      aide.setText(
+        v.length === 0
+          ? ''
+          : ok
+            ? ''
+            : 'De 2 à 14 caractères : lettres, chiffres, espace, tiret, apostrophe.'
       );
-      lettres.push(lettre);
+      valider.setAlpha(ok ? 1 : 0.35);
+      return ok;
+    };
+    input.addEventListener('input', verifier);
+    verifier();
+    // Le focus à l'ouverture évite un toucher de plus, et fait monter le
+    // clavier du téléphone au bon moment.
+    window.setTimeout(() => input.focus(), 60);
 
-      const fleche = (dy: number, sens: number): void => {
-        ajouter(
-          this.add
-            .text(x, h * 0.5 + dy, sens > 0 ? '▲' : '▼', {
-              fontFamily: GAME_FONT,
-              fontSize: fontPx(44),
-              color: '#7fd4ff',
-            })
-            .setOrigin(0.5)
-            .setInteractive({ useHandCursor: true })
-            .on('pointerdown', () => {
-              sfx.click();
-              choix[i] = (choix[i] + sens + LETTRES.length) % LETTRES.length;
-              lettre.setText(LETTRES[choix[i]]);
-            })
-        );
-      };
-      fleche(-px(90), 1);
-      fleche(px(90), -1);
-    }
-
-    const valider = ajouter(
-      this.add
-        .text(w / 2, h * 0.76, 'VALIDER', {
-          fontFamily: GAME_FONT,
-          fontSize: fontPx(38),
-          fontStyle: '700',
-          color: '#0b2a3a',
-          backgroundColor: '#ffcf40',
-          padding: { x: px(28), y: px(12) },
-        })
-        .setOrigin(0.5)
-        .setInteractive({ useHandCursor: true })
-    );
-    valider.on('pointerdown', () => {
+    const soumettre = (): void => {
+      if (!verifier()) {
+        return;
+      }
       sfx.click();
+      const choisi = input.value.trim();
       for (const o of groupe) {
         o.destroy();
       }
       this.rafraichirPiedDePage();
       this.message('Inscription…\nTes records déjà enregistrés partent aussi.');
-      // inscrire() dépose la dernière partie puis les records en mémoire. Il
-      // attend entre deux envois (la base refuse deux dépôts à moins de quinze
-      // secondes), donc on redessine le tableau APRÈS — sinon il s'afficherait
-      // encore vide alors que les scores sont en route.
-      void inscrire(choix.map((k) => LETTRES[k]).join('')).then(() => {
+      void inscrire(choisi).then(() => {
         if (this.scene.isActive()) {
           this.rafraichirPiedDePage();
           this.charger();
         }
       });
+    };
+
+    valider.setInteractive({ useHandCursor: true }).on('pointerdown', soumettre);
+    // La touche Entrée vaut validation : c'est le geste attendu dans un champ,
+    // et sur téléphone c'est le bouton « OK » du clavier.
+    input.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        soumettre();
+      }
     });
   }
 

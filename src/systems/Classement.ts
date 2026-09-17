@@ -12,10 +12,15 @@ import { getBestScore } from '../utils/bestScore';
  * d'erreur, on n'attend pas, on ne bloque rien. Le classement est un bonus,
  * jamais une dépendance.
  *
- * AUCUNE DONNÉE PERSONNELLE. Trois lettres façon borne d'arcade et un
- * identifiant tiré au hasard, gardé dans le navigateur. Pas de compte, pas
- * d'e-mail, pas d'adresse conservée : il n'y a rien à protéger ici, et c'est
- * le choix qui coûte le moins cher à tout le monde.
+ * UN PSEUDO LIBRE, ET CE N'EST PLUS ANODIN. Avec trois lettres d'arcade, la
+ * base ne pouvait contenir aucune donnée personnelle — par construction. Un
+ * champ libre, si : quelqu'un peut y taper son vrai nom. Il n'y a ni compte ni
+ * e-mail, et rien n'est recoupé avec quoi que ce soit, mais la promesse n'est
+ * plus « il n'y a rien à protéger », elle est « on n'en demande pas ».
+ *
+ * La contrepartie de la liberté est la modération : forme imposée, liste de
+ * mots refusés, et suppression possible depuis le tableau de bord — RLS
+ * n'accorde de DELETE à personne d'autre.
  *
  * SUR LA TRICHE, soyons honnêtes. Un jeu qui tourne dans le navigateur et qui
  * envoie son score à une API peut toujours être trompé : la clé ci-dessous est
@@ -35,7 +40,7 @@ const SUPABASE_URL = 'https://rktueomslxjqtvighgcg.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_R20Ob1300eTJrl0r5D87Ng_4JO1w9vW';
 
 const CLE_JOUEUR = 'kout-sab-joueur';
-const CLE_INITIALES = 'kout-sab-initiales';
+const CLE_PSEUDO = 'kout-sab-pseudo';
 const CLE_FILE = 'kout-sab-envois-en-attente';
 const CLE_DERNIER = 'kout-sab-dernier-resultat';
 const CLE_IMPORTE = 'kout-sab-records-importes';
@@ -45,7 +50,7 @@ const FILE_MAX = 12;
 const DELAI_MS = 6000;
 
 export interface Entree {
-  initiales: string;
+  pseudo: string;
   score: number;
   /** null pour un record importé : le jeu ne gardait alors pas les fruits. */
   fruits: number | null;
@@ -55,7 +60,7 @@ export interface Entree {
 interface Envoi {
   mode: GameMode;
   jour: string | null;
-  initiales: string;
+  pseudo: string;
   score: number;
   fruits: number | null;
   combo_max: number;
@@ -112,15 +117,39 @@ export function idJoueur(): string {
   return neuf;
 }
 
-/** Les trois lettres du joueur, ou null tant qu'il ne les a pas choisies. */
-export function initiales(): string | null {
-  const v = lireLocal(CLE_INITIALES);
-  return v !== null && /^[A-Z]{3}$/.test(v) ? v : null;
+/**
+ * La forme qu'un pseudo doit avoir, ici ET dans la base.
+ *
+ * DEUX FOIS LA MÊME RÈGLE, ET CE N'EST PAS UN OUBLI. Celle du client rend la
+ * main tout de suite quand on tape, celle de la base est la seule qui compte —
+ * un formulaire se contourne, une contrainte non. Si elles divergeaient un
+ * jour, c'est la base qui aurait raison, et le joueur verrait un refus qu'il
+ * n'a pas mérité : les garder identiques est donc une obligation.
+ *
+ * De 2 à 14 caractères, commençant par une lettre ou un chiffre. Lettres
+ * accentuées comprises (on est à La Réunion), chiffres, espace, tiret,
+ * apostrophe, point. Rien d'autre : ni URL, ni caractère invisible, ni emoji.
+ */
+export const PSEUDO_MOTIF = /^[A-Za-zÀ-ÖØ-öø-ÿ0-9][A-Za-zÀ-ÖØ-öø-ÿ0-9 '.-]{1,13}$/;
+export const PSEUDO_MAX = 14;
+
+/** Vrai si ce pseudo a une chance d'être accepté par la base. */
+export function pseudoValide(valeur: string): boolean {
+  const propre = valeur.trim();
+  return PSEUDO_MOTIF.test(propre) && !/  /.test(propre);
 }
 
-export function definirInitiales(valeur: string): void {
-  const propre = valeur.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3).padEnd(3, 'A');
-  ecrireLocal(CLE_INITIALES, propre);
+/** Le pseudo du joueur, ou null tant qu'il ne l'a pas choisi. */
+export function pseudo(): string | null {
+  const v = lireLocal(CLE_PSEUDO);
+  return v !== null && pseudoValide(v) ? v : null;
+}
+
+export function definirPseudo(valeur: string): void {
+  const propre = valeur.trim().replace(/\s+/g, ' ').slice(0, PSEUDO_MAX);
+  if (pseudoValide(propre)) {
+    ecrireLocal(CLE_PSEUDO, propre);
+  }
 }
 
 function lireFile(): Envoi[] {
@@ -218,14 +247,14 @@ export async function envoyer(
   fruits: number | null,
   comboMax: number
 ): Promise<boolean> {
-  const lettres = initiales();
-  if (lettres === null) {
-    return false; // pas encore d'initiales : rien à déposer
+  const nom = pseudo();
+  if (nom === null) {
+    return false; // pas encore de pseudo : rien à déposer
   }
   const envoi: Envoi = {
     mode,
     jour: mode === 'daily' ? todayKey() : null,
-    initiales: lettres,
+    pseudo: nom,
     score,
     fruits,
     combo_max: comboMax,
@@ -260,7 +289,7 @@ async function lire(chemin: string): Promise<Entree[]> {
   }
 }
 
-const CHAMPS = 'initiales,score,fruits,combo_max';
+const CHAMPS = 'pseudo,score,fruits,combo_max';
 
 /** Le classement du Défi du jour — celui du jour demandé, aujourd'hui par défaut. */
 export function lireDefi(jour = todayKey(), limite = 20): Promise<Entree[]> {
@@ -289,7 +318,7 @@ export function lireRecords(mode: 'classic' | 'chrono', limite = 20): Promise<En
  * Le résultat est donc mis de côté et déposé dès que les initiales existent.
  */
 export function retenirResultat(mode: GameMode, score: number, fruits: number, comboMax: number): void {
-  if (initiales() !== null) {
+  if (pseudo() !== null) {
     return; // rien à retenir : il est déjà parti
   }
   const r: Resultat = { mode, score, fruits, comboMax };
@@ -322,7 +351,7 @@ function lireDernier(): Resultat | null {
  * est celui du JOUR. Y verser un record d'une autre journée n'aurait aucun sens.
  */
 export async function importerRecords(): Promise<number> {
-  if (lireLocal(CLE_IMPORTE) !== null || initiales() === null) {
+  if (lireLocal(CLE_IMPORTE) !== null || pseudo() === null) {
     return 0;
   }
   ecrireLocal(CLE_IMPORTE, todayKey());
@@ -340,17 +369,20 @@ export async function importerRecords(): Promise<number> {
 }
 
 /**
- * Enregistre les initiales ET rattrape ce qui attendait : les records déjà en
+ * Enregistre le pseudo ET rattrape ce qui attendait : les records déjà en
  * mémoire, puis la partie qui vient de se terminer. C'est le seul point
- * d'entrée à appeler après le choix des lettres.
+ * d'entrée à appeler après le choix du pseudo.
  *
  * Mesuré : moins de deux secondes. La première version en prenait plus de
  * quarante — elle attendait quinze secondes entre chaque dépôt pour contourner
  * la limite de cadence, au lieu d'exempter les imports, que l'index unique
  * borne déjà à un par mode.
  */
-export async function inscrire(lettres: string): Promise<void> {
-  definirInitiales(lettres);
+export async function inscrire(nom: string): Promise<void> {
+  definirPseudo(nom);
+  if (pseudo() === null) {
+    return; // pseudo refusé par la forme : rien ne part
+  }
   // L'IMPORT D'ABORD, LA PARTIE ENSUITE, et l'ordre n'est pas indifférent.
   // Les records importés échappent à la limite de cadence (l'index unique les
   // borne déjà à un par mode), la partie non. En commençant par eux, les trois
