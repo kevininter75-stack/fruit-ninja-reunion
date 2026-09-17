@@ -1,4 +1,4 @@
-package com.kevininter.fruitninjareunion;
+package com.kevininter.koutsab;
 
 import com.getcapacitor.BridgeActivity;
 

@@ -6,7 +6,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
  * aucun plugin natif n'est nécessaire pour cette version.
  */
 const config: CapacitorConfig = {
-  appId: 'com.kevininter.fruitninjareunion',
+  appId: 'com.kevininter.koutsab',
   appName: "Kout Sab'",
   webDir: 'dist',
   android: {
