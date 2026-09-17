@@ -16,6 +16,8 @@ import {
   pseudo,
   pseudoValide,
   inscrire,
+  reserver,
+  codeDeReprise,
   PSEUDO_MAX,
   type Entree,
 } from '../systems/Classement';
@@ -418,22 +420,97 @@ export class ClassementScene extends Phaser.Scene {
     verifier();
     window.setTimeout(() => input.focus(), 60);
 
+    // --- Le champ du code de reprise, caché tant qu'il ne sert pas ---
+    //
+    // Il n'apparaît QUE si le pseudo demandé appartient déjà à quelqu'un. Le
+    // montrer d'emblée obligerait tout le monde à se demander ce que c'est,
+    // pour un cas qui ne concerne qu'un joueur sur dix.
+    const champCode = document.createElement('input');
+    champCode.type = 'text';
+    champCode.maxLength = 6;
+    champCode.autocomplete = 'off';
+    champCode.placeholder = 'CODE';
+    Object.assign(champCode.style, {
+      width: `${Math.round(pw * 0.3)}px`,
+      padding: `${Math.round(ph * 0.03)}px`,
+      borderRadius: `${Math.round(ph * 0.03)}px`,
+      border: `${Math.max(2, Math.round(ph * 0.008))}px solid #ffa07a`,
+      background: '#07202d',
+      color: '#ffffff',
+      fontFamily: GAME_FONT,
+      fontSize: `${Math.round(ph * 0.09)}px`,
+      textAlign: 'center',
+      textTransform: 'uppercase',
+      outline: 'none',
+      boxSizing: 'border-box',
+    });
+    const boiteCode = this.add.dom(px0, py0 + ph * 0.21, champCode).setDepth(302).setVisible(false);
+    groupe.push(boiteCode);
+    let modeReprise = false;
+
     const soumettre = (): void => {
       if (!verifier()) {
         return;
       }
       sfx.click();
       const choisi = input.value.trim();
-      for (const o of groupe) {
-        o.destroy();
-      }
-      this.rafraichirPiedDePage();
-      this.message('Inscription…\nTes records déjà enregistrés partent aussi.');
-      void inscrire(choisi).then(() => {
-        if (this.scene.isActive()) {
-          this.rafraichirPiedDePage();
-          this.charger();
+      const code = modeReprise ? champCode.value.trim() : undefined;
+      aide.setText('Vérification…').setColor('#cfe3ef');
+      valider.setAlpha(0.35);
+
+      void reserver(choisi, code).then((issue) => {
+        if (!this.scene.isActive()) {
+          return;
         }
+        if (!issue.ok) {
+          valider.setAlpha(1);
+          aide.setColor('#ffa07a');
+          if (issue.raison === 'pris') {
+            // Le pseudo appartient à quelqu'un. Deux issues pour le joueur :
+            // c'est le sien et il a son code, ou il en choisit un autre.
+            modeReprise = true;
+            boiteCode.setVisible(true);
+            champCode.value = codeDeReprise() ?? '';
+            aide.setText(
+              'Ce pseudo est déjà pris.\nSi c\'est le tien, entre ton code de reprise. Sinon, choisis-en un autre.'
+            );
+            valider.setText('REPRENDRE');
+          } else if (issue.raison === 'refuse') {
+            aide.setText('Ce pseudo n\'est pas accepté. Essaie autre chose.');
+          } else if (issue.raison === 'forme') {
+            aide.setText('De 2 à 14 caractères : lettres, chiffres, espace, tiret, apostrophe.');
+          } else {
+            aide.setText('Impossible de joindre le classement. Réessaie plus tard.');
+          }
+          return;
+        }
+
+        const retenu = issue.code;
+        for (const o of groupe) {
+          o.destroy();
+        }
+        this.rafraichirPiedDePage();
+        this.message('Inscription…\nTes records déjà enregistrés partent aussi.');
+        void inscrire(choisi).then(() => {
+          if (!this.scene.isActive()) {
+            return;
+          }
+          this.rafraichirPiedDePage();
+          // LE CODE S'AFFICHE, ET ON LAISSE LE TEMPS DE LE NOTER. C'est la
+          // seule fois où le joueur le voit : la base ne le rend plus jamais,
+          // pas même à lui, pour qu'une lecture de l'API ne puisse pas servir
+          // à voler un pseudo.
+          this.message(
+            'Pseudo réservé : ' + choisi + '\n\nTon code de reprise : ' + retenu +
+              '\nNote-le : il te servira à reprendre ce pseudo sur un autre appareil.',
+            '#ffcf40'
+          );
+          this.time.delayedCall(8000, () => {
+            if (this.scene.isActive()) {
+              this.charger();
+            }
+          });
+        });
       });
     };
 

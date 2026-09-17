@@ -44,6 +44,7 @@ const CLE_PSEUDO = 'kout-sab-pseudo';
 const CLE_FILE = 'kout-sab-envois-en-attente';
 const CLE_DERNIER = 'kout-sab-dernier-resultat';
 const CLE_IMPORTE = 'kout-sab-records-importes';
+const CLE_CODE = 'kout-sab-code-reprise';
 /** Au-delà, on abandonne : une file qui gonfle est une fuite, pas une file. */
 const FILE_MAX = 12;
 /** Le jeu ne doit jamais attendre le réseau. */
@@ -438,4 +439,83 @@ export async function inscrire(nom: string): Promise<void> {
  */
 export function doitDeposer(mode: GameMode, nouveauRecord: boolean): boolean {
   return mode === 'daily' || nouveauRecord;
+}
+
+/** Le code de reprise du joueur, remis lors de la réservation de son pseudo. */
+export function codeDeReprise(): string | null {
+  const v = lireLocal(CLE_CODE);
+  return v !== null && /^[0-9A-F]{6}$/.test(v) ? v : null;
+}
+
+/** Appelle une fonction de la base. Les erreurs remontent en texte. */
+async function appeler(fonction: string, corps: object): Promise<{ ok: boolean; valeur: unknown }> {
+  const controleur = new AbortController();
+  const minuteur = window.setTimeout(() => controleur.abort(), DELAI_MS);
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fonction}`, {
+      method: 'POST',
+      signal: controleur.signal,
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(corps),
+    });
+    const valeur: unknown = await r.json().catch(() => null);
+    return { ok: r.ok, valeur };
+  } catch {
+    return { ok: false, valeur: null };
+  } finally {
+    window.clearTimeout(minuteur);
+  }
+}
+
+/** Ce pseudo est-il encore libre ? `null` si la question n'a pas pu être posée. */
+export async function pseudoLibre(nom: string): Promise<boolean | null> {
+  const r = await appeler('pseudo_libre', { p_pseudo: nom });
+  return r.ok && typeof r.valeur === 'boolean' ? r.valeur : null;
+}
+
+export type Reservation =
+  | { ok: true; code: string }
+  | { ok: false; raison: 'pris' | 'refuse' | 'forme' | 'reseau' };
+
+/**
+ * Réserve un pseudo, ou le reprend avec son code.
+ *
+ * UN PSEUDO APPARTIENT À QUELQU'UN, et la base le fait respecter : un score
+ * portant un nom qu'on n'a pas réservé est refusé, même déposé à la main sur
+ * l'API. C'est la seule façon de tenir la promesse « ton pseudo n'est pas
+ * copiable » sans demander de compte.
+ *
+ * LE CODE DE REPRISE EXISTE PARCE QUE SANS COMPTE, « TOI » N'EST QU'UN
+ * NAVIGATEUR. Une réservation sèche enfermerait le joueur dehors de son propre
+ * nom dès qu'il change d'appareil ou vide son stockage. Six caractères remis
+ * une fois règlent le problème sans rien imposer.
+ */
+export async function reserver(nom: string, code?: string): Promise<Reservation> {
+  const r = await appeler('reserver_pseudo', {
+    p_pseudo: nom,
+    p_joueur: idJoueur(),
+    p_code: code ?? null,
+  });
+  if (r.ok && typeof r.valeur === 'string') {
+    ecrireLocal(CLE_CODE, r.valeur);
+    return { ok: true, code: r.valeur };
+  }
+  const message =
+    typeof r.valeur === 'object' && r.valeur !== null && 'message' in r.valeur
+      ? String((r.valeur as { message: unknown }).message)
+      : '';
+  if (message.includes('deja pris')) {
+    return { ok: false, raison: 'pris' };
+  }
+  if (message.includes('refuse')) {
+    return { ok: false, raison: 'refuse' };
+  }
+  if (message.includes('invalide') || message.includes('reduit')) {
+    return { ok: false, raison: 'forme' };
+  }
+  return { ok: false, raison: 'reseau' };
 }
