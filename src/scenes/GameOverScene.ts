@@ -467,6 +467,42 @@ export class GameOverScene extends Phaser.Scene {
       });
     }
 
+    // APPEL À L'ACTION QUAND LE SCORE NE COMPTE PAS ENCORE.
+    //
+    // C'était le trou : un joueur venait de faire un score, il n'apparaissait
+    // nulle part, et RIEN ne lui disait pourquoi. Il fallait deviner qu'un
+    // bouton du menu menait à un écran où un lien en bas de page ouvrait une
+    // saisie. Personne ne devine ça.
+    //
+    // Le message le dit au moment où ça l'intéresse — il a un score sous les
+    // yeux — et le bouton l'emmène droit à la saisie. Son score est déjà mis
+    // de côté (cf. retenirResultat) : il partira sans qu'il ait à rejouer.
+    if (pseudo() === null) {
+      const y = portrait ? h * 0.655 : h * 0.70;
+      const invite = this.add
+        .text(w / 2, y, 'Ton score n’est pas encore au classement', {
+          fontFamily: GAME_FONT,
+          fontSize: fontPx(26),
+          color: '#ffd9a0',
+          align: 'center',
+        })
+        .setOrigin(0.5);
+      this.reveal(invite, 7);
+      this.makeButton(
+        w / 2,
+        y + px(58),
+        px(340),
+        px(66),
+        '🏆  Entrer au classement',
+        0x2f8f5b,
+        8,
+        () => {
+          sfx.click();
+          fadeToScene(this, 'ClassementScene', { mode: this.mode, saisir: true });
+        }
+      );
+    }
+
     this.makeButton(menuX, menuY, px(224), px(70), 'Menu', 0x2d3a4a, defi ? 9 : 8, () => {
       sfx.click();
       fadeToScene(this, 'MenuScene');

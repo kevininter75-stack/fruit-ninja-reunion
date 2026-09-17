@@ -57,8 +57,12 @@ export class ClassementScene extends Phaser.Scene {
     super({ key: 'ClassementScene' });
   }
 
-  init(data: { mode?: GameMode }): void {
+  /** Vrai quand on arrive ici pour s'inscrire, pas pour regarder. */
+  private saisieAuLancement = false;
+
+  init(data: { mode?: GameMode; saisir?: boolean }): void {
     this.modeAffiche = data.mode ?? 'daily';
+    this.saisieAuLancement = data.saisir === true;
     this.zoneListe = [];
     this.onglets = [];
     this.requete = 0;
@@ -89,6 +93,12 @@ export class ClassementScene extends Phaser.Scene {
     this.creerBoutonRetour();
     this.charger();
     fadeIn(this);
+    // Venu de l'écran de fin pour s'inscrire : le panneau s'ouvre tout seul.
+    // Le faire chercher un lien en bas d'écran alors qu'il vient de cliquer
+    // « Entrer au classement » serait lui demander de le dire deux fois.
+    if (this.saisieAuLancement && pseudo() === null) {
+      this.time.delayedCall(260, () => this.ouvrirSelecteur());
+    }
   }
 
   private creerOnglets(): void {
@@ -277,95 +287,135 @@ export class ClassementScene extends Phaser.Scene {
   }
 
   /**
-   * Le choix du pseudo : un vrai champ de saisie posé sur le canvas.
+   * Le choix du pseudo : un panneau, et un vrai champ de saisie.
    *
-   * POURQUOI UN ÉLÉMENT HTML ET PAS UN CLAVIER DESSINÉ. Réécrire un clavier
-   * dans Phaser, c'est réécrire aussi les accents, la sélection, le
-   * copier-coller et les suggestions — pour un champ qu'on remplit UNE FOIS
-   * dans la vie du joueur. Le champ du système fait tout cela, et le clavier
-   * qu'il ouvre est celui que la personne connaît déjà.
+   * DEUX DÉFAUTS CORRIGÉS ICI, ET AUCUN N'ÉTAIT UNE QUESTION DE GOÛT.
    *
-   * La validation est dite AVANT le refus : le bouton reste éteint tant que le
-   * pseudo ne passe pas, avec la raison sous le champ. Envoyer pour apprendre
-   * que c'est refusé serait la pire des deux façons.
+   *   1. Le texte sortait à 13,3 px — la taille par défaut d'un <input> dans
+   *      le navigateur, c'est-à-dire AUCUN style appliqué. La cause : les
+   *      styles étaient écrits dans un attribut `style="…"` où j'interpolais
+   *      GAME_FONT, qui vaut `"Fredoka", "Trebuchet MS", sans-serif` — avec des
+   *      guillemets DOUBLES. Le premier fermait l'attribut, et tout ce qui
+   *      suivait (taille, alignement) partait à la poubelle. Les styles sont
+   *      donc posés en propriétés JavaScript : plus aucun texte à échapper,
+   *      donc plus aucune façon de se faire piéger.
+   *
+   *   2. LE PANNEAU SE MESURE EN PARTS D'ÉCRAN, jamais en tailles fixes.
+   *      C'est ce qui le rend juste aussi bien sur un téléphone que sur un
+   *      moniteur : tout ici est une fraction de `pw` et `ph`, eux-mêmes des
+   *      fractions de la scène.
+   *
+   *      Et le champ HTML se mesure DANS LA MÊME UNITÉ que le reste. Phaser
+   *      applique au conteneur DOM la même échelle qu'au canvas — vérifié, sa
+   *      transform vaut exactement le facteur d'affichage (0,5417 sur un
+   *      téléphone en paysage). Le dimensionner en pixels d'écran, comme je
+   *      l'avais d'abord fait, appliquait donc la réduction DEUX FOIS : le
+   *      champ occupait 48 % de la largeur sur grand écran et 19 % sur
+   *      téléphone, pour un réglage censé être le même.
    */
   private ouvrirSelecteur(): void {
     const w = this.scale.width;
     const h = this.scale.height;
 
-    const voile = this.add.rectangle(0, 0, w, h, 0x05141d, 0.92).setOrigin(0).setDepth(300).setInteractive();
+    const voile = this.add.rectangle(0, 0, w, h, 0x05141d, 0.93).setOrigin(0).setDepth(300).setInteractive();
     const groupe: Phaser.GameObjects.GameObject[] = [voile];
 
+    // Le panneau occupe une PART de l'écran, jamais une taille fixe : c'est ce
+    // qui le rend juste aussi bien sur un téléphone que sur un moniteur.
+    const pw = Math.min(w * 0.8, h * 1.25);
+    const ph = h * 0.62;
+    const px0 = w / 2;
+    const py0 = h / 2;
+    const cadre = this.add.graphics().setDepth(301);
+    cadre.fillStyle(0x0e2b3c, 1);
+    cadre.fillRoundedRect(px0 - pw / 2, py0 - ph / 2, pw, ph, px(22));
+    cadre.lineStyle(px(4), 0x7fd4ff, 0.85);
+    cadre.strokeRoundedRect(px0 - pw / 2, py0 - ph / 2, pw, ph, px(22));
+    groupe.push(cadre);
+
     const titre = this.add
-      .text(w / 2, h * 0.3, 'TON PSEUDO', {
+      .text(px0, py0 - ph * 0.34, 'TON PSEUDO', {
         fontFamily: DISPLAY_FONT,
-        fontSize: fontPx(52),
+        fontSize: `${Math.round(ph * 0.14)}px`,
         color: '#ffcf40',
         stroke: '#1d2731',
         strokeThickness: px(8),
       })
       .setOrigin(0.5)
-      .setDepth(301);
+      .setDepth(302);
     groupe.push(titre);
 
-    const champ = this.add
-      .dom(w / 2, h * 0.47)
-      .createFromHTML(
-        `<input type="text" maxlength="${PSEUDO_MAX}" autocomplete="off" autocapitalize="words"
-           spellcheck="false" placeholder="Ton nom de joueur"
-           style="width:${px(520)}px;padding:${px(14)}px ${px(18)}px;border-radius:${px(12)}px;
-                  border:${px(3)}px solid #7fd4ff;background:#0e2b3c;color:#ffffff;
-                  font-family:${GAME_FONT};font-size:${px(34)}px;text-align:center;outline:none;">`
-      )
-      .setDepth(301);
+    const consigne = this.add
+      .text(px0, py0 - ph * 0.19, 'Il apparaîtra à côté de ton score dans le classement.', {
+        fontFamily: GAME_FONT,
+        fontSize: `${Math.round(ph * 0.062)}px`,
+        color: '#cfe3ef',
+        align: 'center',
+        wordWrap: { width: pw * 0.86 },
+      })
+      .setOrigin(0.5)
+      .setDepth(302);
+    groupe.push(consigne);
+
+    // --- Le champ, dimensionné comme tout le reste : en unités logiques ---
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.maxLength = PSEUDO_MAX;
+    input.autocomplete = 'off';
+    input.spellcheck = false;
+    input.placeholder = 'Ton nom de joueur';
+    Object.assign(input.style, {
+      width: `${Math.round(pw * 0.74)}px`,
+      padding: `${Math.round(ph * 0.035)}px ${Math.round(pw * 0.04)}px`,
+      borderRadius: `${Math.round(ph * 0.03)}px`,
+      border: `${Math.max(2, Math.round(ph * 0.008))}px solid #7fd4ff`,
+      background: '#07202d',
+      color: '#ffffff',
+      fontFamily: GAME_FONT,
+      fontSize: `${Math.round(ph * 0.105)}px`,
+      textAlign: 'center',
+      outline: 'none',
+      boxSizing: 'border-box',
+    });
+    const champ = this.add.dom(px0, py0 + ph * 0.02, input).setDepth(302);
     groupe.push(champ);
 
     const aide = this.add
-      .text(w / 2, h * 0.58, '', {
+      .text(px0, py0 + ph * 0.22, '', {
         fontFamily: GAME_FONT,
-        fontSize: fontPx(22),
+        fontSize: `${Math.round(ph * 0.055)}px`,
         color: '#ffa07a',
         align: 'center',
-        wordWrap: { width: w * 0.8 },
+        wordWrap: { width: pw * 0.86 },
       })
       .setOrigin(0.5)
-      .setDepth(301);
+      .setDepth(302);
     groupe.push(aide);
 
     const valider = this.add
-      .text(w / 2, h * 0.72, 'VALIDER', {
+      .text(px0, py0 + ph * 0.38, 'VALIDER', {
         fontFamily: GAME_FONT,
-        fontSize: fontPx(38),
+        fontSize: `${Math.round(ph * 0.1)}px`,
         fontStyle: '700',
         color: '#0b2a3a',
         backgroundColor: '#ffcf40',
-        padding: { x: px(28), y: px(12) },
+        padding: { x: Math.round(pw * 0.06), y: Math.round(ph * 0.035) },
       })
       .setOrigin(0.5)
-      .setDepth(301);
+      .setDepth(302);
     groupe.push(valider);
 
-    const entree = champ.getChildByName('') as HTMLInputElement | null;
-    const input = entree ?? (champ.node.querySelector('input') as HTMLInputElement);
     input.value = pseudo() ?? '';
 
     const verifier = (): boolean => {
       const v = input.value.trim();
       const ok = pseudoValide(v);
-      aide.setText(
-        v.length === 0
-          ? ''
-          : ok
-            ? ''
-            : 'De 2 à 14 caractères : lettres, chiffres, espace, tiret, apostrophe.'
-      );
+      aide.setText(v.length === 0 || ok ? '' : 'De 2 à 14 caractères : lettres, chiffres, espace, tiret, apostrophe.');
       valider.setAlpha(ok ? 1 : 0.35);
       return ok;
     };
     input.addEventListener('input', verifier);
     verifier();
-    // Le focus à l'ouverture évite un toucher de plus, et fait monter le
-    // clavier du téléphone au bon moment.
     window.setTimeout(() => input.focus(), 60);
 
     const soumettre = (): void => {
@@ -388,8 +438,6 @@ export class ClassementScene extends Phaser.Scene {
     };
 
     valider.setInteractive({ useHandCursor: true }).on('pointerdown', soumettre);
-    // La touche Entrée vaut validation : c'est le geste attendu dans un champ,
-    // et sur téléphone c'est le bouton « OK » du clavier.
     input.addEventListener('keydown', (e: KeyboardEvent) => {
       if (e.key === 'Enter') {
         e.preventDefault();
