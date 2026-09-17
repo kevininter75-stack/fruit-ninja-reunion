@@ -44,7 +44,17 @@ import { music } from './MusicManager';
 export function installAppLifecycle(): void {
   deverrouillerAudioAuPremierGeste();
 
+  /** Sommeil différé, pour ne pas couper le son sur un clic hors fenêtre. */
+  let minuteurSommeil: number | null = null;
+  const annulerSommeil = (): void => {
+    if (minuteurSommeil !== null) {
+      window.clearTimeout(minuteurSommeil);
+      minuteurSommeil = null;
+    }
+  };
+
   const endormir = (): void => {
+    annulerSommeil();
     // L'ordre compte : couper l'ordonnanceur AVANT de suspendre le contexte.
     // L'inverse laisserait un tour de minuteur programmer des notes contre une
     // horloge déjà figée.
@@ -53,9 +63,30 @@ export function installAppLifecycle(): void {
   };
 
   const reveiller = (): void => {
+    annulerSommeil();
     resumeAudio();
     music.wake();
   };
+
+  /**
+   * SUR UN ORDINATEUR, UNE FENÊTRE CACHÉE N'EST PAS « HIDDEN ».
+   *
+   * C'est le défaut que Kevin a constaté : le séga tournait en boucle derrière
+   * ses autres fenêtres. `document.hidden` ne passe à vrai qu'à la réduction de
+   * la fenêtre ou au changement d'onglet — une fenêtre simplement passée
+   * DERRIÈRE une autre reste « visible » pour le navigateur. Un jeu ouvert dans
+   * un coin de l'écran continuait donc de jouer sa musique indéfiniment.
+   *
+   * La perte de focus comble ce trou. Mais elle se déclenche aussi pour des
+   * riens — un clic dans la barre d'adresse, un raccourci système — d'où le
+   * délai : si le focus revient dans la demi-seconde, on n'a rien coupé du
+   * tout. Sans lui, le moindre aller-retour hacherait la musique.
+   */
+  window.addEventListener('blur', () => {
+    annulerSommeil();
+    minuteurSommeil = window.setTimeout(endormir, DELAI_PERTE_FOCUS_MS);
+  });
+  window.addEventListener('focus', reveiller);
 
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
@@ -123,6 +154,15 @@ function deverrouillerAudioAuPremierGeste(): void {
     window.addEventListener(evenement, reveiller, true);
   }
 }
+
+/**
+ * Délai avant d'endormir le son sur une perte de focus.
+ *
+ * Assez long pour absorber un clic dans la barre d'adresse ou un raccourci
+ * système, assez court pour qu'on n'entende pas le jeu depuis une autre
+ * fenêtre.
+ */
+const DELAI_PERTE_FOCUS_MS = 500;
 
 /** Les gestes que les navigateurs acceptent comme autorisation de jouer du son. */
 const GESTES = ['pointerdown', 'pointerup', 'touchstart', 'touchend', 'keydown', 'click'];

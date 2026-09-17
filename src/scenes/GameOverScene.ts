@@ -24,7 +24,7 @@ import { addVignette, fadeIn, fadeToScene } from '../utils/ui';
 import { prefersReducedMotion } from '../utils/settings';
 import { buildShareText, getStreak } from '../utils/dailyChallenge';
 import { mutationDuJour, objectifDuJour } from '../utils/mutations';
-import { envoyer, initiales } from '../systems/Classement';
+import { envoyer, initiales, retenirResultat } from '../systems/Classement';
 import { RECORD, BOMBE } from '../utils/creole';
 
 /** Données passées par la GameScene à la fin d'une partie. */
@@ -120,6 +120,12 @@ export class GameOverScene extends Phaser.Scene {
     // envoyer — il les choisira depuis l'écran de classement.
     if (initiales() !== null) {
       void envoyer(this.mode, this.finalScore, this.fruitsSliced, this.bestCombo);
+    } else {
+      // Pas encore d'initiales : le résultat est mis de côté et partira dès
+      // qu'elles existeront. Sans ça, le PREMIER score d'un nouveau joueur —
+      // souvent le plus beau — serait perdu, et il devrait rejouer après avoir
+      // découvert l'écran de classement.
+      retenirResultat(this.mode, this.finalScore, this.fruitsSliced, this.bestCombo);
     }
     const medal = this.medalIndex();
 

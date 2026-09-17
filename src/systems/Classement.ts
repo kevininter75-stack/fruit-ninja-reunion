@@ -1,5 +1,6 @@
 import type { GameMode } from '../utils/constants';
 import { todayKey } from '../utils/jour';
+import { getBestScore } from '../utils/bestScore';
 
 /**
  * Le classement en ligne : trois tableaux, un par mode.
@@ -36,6 +37,8 @@ const SUPABASE_KEY = 'sb_publishable_R20Ob1300eTJrl0r5D87Ng_4JO1w9vW';
 const CLE_JOUEUR = 'kout-sab-joueur';
 const CLE_INITIALES = 'kout-sab-initiales';
 const CLE_FILE = 'kout-sab-envois-en-attente';
+const CLE_DERNIER = 'kout-sab-dernier-resultat';
+const CLE_IMPORTE = 'kout-sab-records-importes';
 /** Au-delà, on abandonne : une file qui gonfle est une fuite, pas une file. */
 const FILE_MAX = 12;
 /** Le jeu ne doit jamais attendre le réseau. */
@@ -44,7 +47,8 @@ const DELAI_MS = 6000;
 export interface Entree {
   initiales: string;
   score: number;
-  fruits: number;
+  /** null pour un record importé : le jeu ne gardait alors pas les fruits. */
+  fruits: number | null;
   combo_max: number;
 }
 
@@ -53,9 +57,17 @@ interface Envoi {
   jour: string | null;
   initiales: string;
   score: number;
-  fruits: number;
+  fruits: number | null;
   combo_max: number;
   joueur: string;
+}
+
+/** Une partie terminée avant que le joueur n'ait choisi ses initiales. */
+interface Resultat {
+  mode: GameMode;
+  score: number;
+  fruits: number;
+  comboMax: number;
 }
 
 function lireLocal(cle: string): string | null {
@@ -203,7 +215,7 @@ export async function viderLaFile(): Promise<void> {
 export async function envoyer(
   mode: GameMode,
   score: number,
-  fruits: number,
+  fruits: number | null,
   comboMax: number
 ): Promise<boolean> {
   const lettres = initiales();
@@ -266,4 +278,88 @@ export function lireDefi(jour = todayKey(), limite = 20): Promise<Entree[]> {
  */
 export function lireRecords(mode: 'classic' | 'chrono', limite = 20): Promise<Entree[]> {
   return lire(`records?mode=eq.${mode}&select=${CHAMPS}&order=score.desc&limit=${limite}`);
+}
+
+/**
+ * Retient la dernière partie tant que le joueur n'a pas ses initiales.
+ *
+ * SANS ÇA, LE PREMIER SCORE EST PERDU — et c'est souvent le meilleur. Quelqu'un
+ * à qui on partage le lien joue, fait un beau score, et rien ne part : il lui
+ * faudrait découvrir l'écran de classement, choisir ses lettres, puis rejouer.
+ * Le résultat est donc mis de côté et déposé dès que les initiales existent.
+ */
+export function retenirResultat(mode: GameMode, score: number, fruits: number, comboMax: number): void {
+  if (initiales() !== null) {
+    return; // rien à retenir : il est déjà parti
+  }
+  const r: Resultat = { mode, score, fruits, comboMax };
+  ecrireLocal(CLE_DERNIER, JSON.stringify(r));
+}
+
+function lireDernier(): Resultat | null {
+  try {
+    const brut = lireLocal(CLE_DERNIER);
+    if (brut === null) {
+      return null;
+    }
+    const r = JSON.parse(brut) as Resultat;
+    return typeof r.score === 'number' && typeof r.mode === 'string' ? r : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Dépose les records déjà en mémoire dans le navigateur, une seule fois.
+ *
+ * Le jeu ne gardait que le SCORE de chaque record, jamais le nombre de fruits —
+ * or c'est lui qui fonde le contrôle de plausibilité. Ces records partent donc
+ * avec `fruits: null`, ce que la base accepte par une voie à part : plafonnée à
+ * 30 000 points, limitée à un seul import par navigateur et par mode, et
+ * fermée au Défi du jour, qui se joue et ne s'importe pas.
+ *
+ * Le Défi est exclu pour une deuxième raison, plus importante : son classement
+ * est celui du JOUR. Y verser un record d'une autre journée n'aurait aucun sens.
+ */
+export async function importerRecords(): Promise<number> {
+  if (lireLocal(CLE_IMPORTE) !== null || initiales() === null) {
+    return 0;
+  }
+  ecrireLocal(CLE_IMPORTE, todayKey());
+  let deposes = 0;
+  for (const mode of ['classic', 'chrono'] as const) {
+    const record = getBestScore(mode);
+    if (record <= 0) {
+      continue;
+    }
+    if (await envoyer(mode, record, null, 0)) {
+      deposes++;
+    }
+  }
+  return deposes;
+}
+
+/**
+ * Enregistre les initiales ET rattrape ce qui attendait : les records déjà en
+ * mémoire, puis la partie qui vient de se terminer. C'est le seul point
+ * d'entrée à appeler après le choix des lettres.
+ *
+ * Mesuré : moins de deux secondes. La première version en prenait plus de
+ * quarante — elle attendait quinze secondes entre chaque dépôt pour contourner
+ * la limite de cadence, au lieu d'exempter les imports, que l'index unique
+ * borne déjà à un par mode.
+ */
+export async function inscrire(lettres: string): Promise<void> {
+  definirInitiales(lettres);
+  // L'IMPORT D'ABORD, LA PARTIE ENSUITE, et l'ordre n'est pas indifférent.
+  // Les records importés échappent à la limite de cadence (l'index unique les
+  // borne déjà à un par mode), la partie non. En commençant par eux, les trois
+  // dépôts passent d'affilée ; dans l'autre sens, la partie aurait armé le
+  // compteur de quinze secondes et les records seraient partis en file.
+  await importerRecords();
+  const dernier = lireDernier();
+  if (dernier !== null) {
+    ecrireLocal(CLE_DERNIER, '');
+    await envoyer(dernier.mode, dernier.score, dernier.fruits, dernier.comboMax);
+  }
 }

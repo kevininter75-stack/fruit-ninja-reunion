@@ -10,7 +10,7 @@ import { addVignette, fadeIn, fadeToScene } from '../utils/ui';
 import { AnimatedBackground } from '../entities/AnimatedBackground';
 import { SceneGrading } from '../systems/SceneGrading';
 import { sfx } from '../systems/SfxManager';
-import { lireDefi, lireRecords, initiales, definirInitiales, type Entree } from '../systems/Classement';
+import { lireDefi, lireRecords, initiales, inscrire, type Entree } from '../systems/Classement';
 import { mutationDuJour } from '../utils/mutations';
 
 /**
@@ -231,7 +231,14 @@ export class ClassementScene extends Phaser.Scene {
         // Les chiffres alignés à droite : un classement se lit en colonne.
         this.add.text(gauche + px(330), y, `${e.score}`, style).setOrigin(1, 0.5),
         this.add
-          .text(gauche + px(500), y, `${e.fruits} fruits`, { ...style, fontSize: fontPx(20), color: '#9fb4c2' })
+          .text(
+            gauche + px(500),
+            y,
+            // Un record importé d'avant le classement n'a pas de compte de
+            // fruits : on le dit, plutôt que d'afficher « 0 fruits ».
+            e.fruits === null ? 'record importé' : `${e.fruits} fruits`,
+            { ...style, fontSize: fontPx(20), color: '#9fb4c2' }
+          )
           .setOrigin(1, 0.5)
       );
     });
@@ -351,14 +358,21 @@ export class ClassementScene extends Phaser.Scene {
     );
     valider.on('pointerdown', () => {
       sfx.click();
-      definirInitiales(choix.map((k) => LETTRES[k]).join(''));
       for (const o of groupe) {
         o.destroy();
       }
       this.rafraichirPiedDePage();
-      // Le tableau se redessine : les lignes du joueur doivent s'allumer tout
-      // de suite, sinon on ne sait pas si le choix a été pris en compte.
-      this.charger();
+      this.message('Inscription…\nTes records déjà enregistrés partent aussi.');
+      // inscrire() dépose la dernière partie puis les records en mémoire. Il
+      // attend entre deux envois (la base refuse deux dépôts à moins de quinze
+      // secondes), donc on redessine le tableau APRÈS — sinon il s'afficherait
+      // encore vide alors que les scores sont en route.
+      void inscrire(choix.map((k) => LETTRES[k]).join('')).then(() => {
+        if (this.scene.isActive()) {
+          this.rafraichirPiedDePage();
+          this.charger();
+        }
+      });
     });
   }
 
