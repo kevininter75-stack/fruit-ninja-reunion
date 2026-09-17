@@ -9,6 +9,7 @@ import {
   TRANCHE_JUS,
   TRANCHE_JUS_VOLUME,
   TRANCHE_JUS_RETARD,
+  TRANCHE_JUS_EXPOSANT,
 } from '../utils/constants';
 
 /**
@@ -362,11 +363,22 @@ export class SfxManager {
     // gicle plus longtemps que le letchi, mais pas systématiquement.
     const longJus = radius > 62 ? Math.random() < 0.8 : Math.random() < 0.25;
     const [jOff, jDur] = TRANCHE_JUS[longJus ? 1 : 0];
-    // v au carré : sur une rafale, le jus s'efface plus vite que la lame. Treize
-    // éclatements humides en une seconde font de la bouillie, treize craquements
-    // font un combo. On garde le tranchant net et on rend l'humidité aux coupes
-    // isolées, qui sont celles où on l'entend.
-    this.jouerRegion(ctx, planche, jOff, jDur, vitesse, TRANCHE_JUS_VOLUME * v * v, TRANCHE_JUS_RETARD);
+    // Le jus s'efface plus vite que la lame en rafale — treize éclatements
+    // humides en une seconde font de la bouillie, treize craquements font un
+    // combo — mais moins brutalement qu'au carré, qui le faisait disparaître.
+    //
+    // Et son retard suit la vitesse de lecture : un échantillon joué plus vite
+    // atteint son pic plus tôt, donc le jus doit avancer d'autant pour rester
+    // dans la décroissance de la lame et non dedans (cf. TRANCHE_JUS_RETARD).
+    this.jouerRegion(
+      ctx,
+      planche,
+      jOff,
+      jDur,
+      vitesse,
+      TRANCHE_JUS_VOLUME * Math.pow(v, TRANCHE_JUS_EXPOSANT),
+      TRANCHE_JUS_RETARD / vitesse
+    );
   }
 
   /**

@@ -723,9 +723,32 @@ export const TRANCHE_JUS: ReadonlyArray<readonly [number, number]> = [
   [1.4261, 0.15], // court : pour les petits fruits
   [1.5961, 0.36], // long : la papaye pisse plus longtemps que le letchi
 ];
-export const TRANCHE_JUS_VOLUME = 0.3;
-/** Le couteau entre, PUIS la chair cède. Dix-huit millisecondes plus tard. */
-export const TRANCHE_JUS_RETARD = 0.018;
+export const TRANCHE_JUS_VOLUME = 0.48;
+/**
+ * Le retard du jus sur la lame — et ce réglage n'est PAS cosmétique.
+ *
+ * Il valait 18 ms, et le jus s'entendait à peine. Ce n'était pas un problème de
+ * volume : mesuré sur les huit coups, la lame culmine entre 19 et 38 ms (28 ms
+ * en moyenne). Le jus partait donc en plein dans le pic du couteau, et se
+ * faisait masquer par lui — deux sons qui se disputent la même milliseconde,
+ * c'est le plus fort qu'on entend, pas les deux.
+ *
+ * À 42 ms il tombe APRÈS le pic le plus tardif, dans la décroissance de la
+ * lame, là où il a de la place. Le couteau entre, atteint la planche, et c'est
+ * alors que la chair cède — ce qui est aussi l'ordre réel des choses.
+ *
+ * Divisé par la vitesse de lecture à l'usage : un échantillon joué plus vite
+ * atteint son pic plus tôt, le jus doit le suivre.
+ */
+export const TRANCHE_JUS_RETARD = 0.042;
+/**
+ * Exposant d'atténuation du jus en rafale.
+ *
+ * Le carré était trop brutal — sur un combo, la chair disparaissait presque.
+ * 1,5 garde l'intention (le jus s'efface plus vite que la lame, pour que
+ * treize coupes fassent un combo et non de la bouillie) sans la vider.
+ */
+export const TRANCHE_JUS_EXPOSANT = 1.5;
 /** Position et durée de chaque coup, en secondes, dans la planche. */
 export const TRANCHE_COUPS: ReadonlyArray<readonly [number, number]> = [
   [0.0, 0.187],
