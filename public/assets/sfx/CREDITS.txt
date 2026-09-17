@@ -1,18 +1,41 @@
 Bruitages de Kout Sab'
 ======================
 
-tranche.wav
------------
-Source   : « Cut vegetables and fruits », par JARASNAT
-URL      : https://pixabay.com/sound-effects/household-cut-vegetables-and-fruits-221532/
-Licence  : Pixabay Content License — usage commercial libre, attribution non
-           exigée. Elle est donnée ici parce que le travail de quelqu'un se
-           cite, même quand la licence ne l'oblige pas.
+tranche.wav — une seule planche, deux sources, dix morceaux
+-----------------------------------------------------------
+Le fichier contient huit coups de couteau puis deux éclatements humides. Le
+premier son est la LAME (sec, craquant, la planche derrière), le second est la
+CHAIR. Joués ensemble ils font une coupe ; séparément, chacun n'en fait que la
+moitié. La table des positions vit dans src/utils/constants.ts
+(TRANCHE_COUPS et TRANCHE_JUS).
 
-Transformation : l'original dure 12,30 s (mp3 mono 256 kbps) et ne contient que
-0,73 s d'audio utile, répartie en huit coups de couteau. Les huit ont été
-extraits, normalisés au pic, munis d'un fondu d'entrée de 1,5 ms et de sortie
-de 30 ms, puis remis bout à bout avec 20 ms de silence de garde entre eux.
-Résultat : WAV mono 44,1 kHz 16 bits, 1,43 s, 123 Ko.
+1) Les huit coups de couteau
+   Source  : « Cut vegetables and fruits », par JARASNAT
+   URL     : https://pixabay.com/sound-effects/household-cut-vegetables-and-fruits-221532/
+   Licence : Pixabay Content License — usage commercial libre, attribution non
+             exigée. Donnée ici parce que le travail de quelqu'un se cite, même
+             quand la licence ne l'oblige pas.
+   Traitement : l'original dure 12,30 s et ne contient que 0,73 s d'audio utile,
+             en huit coups. Les huit ont été détectés par enveloppe RMS,
+             extraits, normalisés au pic 0,92.
 
-La table des positions vit dans src/utils/constants.ts (TRANCHE_COUPS).
+2) Les deux éclatements humides
+   Source  : « Squish impact », par Bertsz
+   URL     : https://freesound.org/people/Bertsz/sounds/500912/
+   Licence : Creative Commons 0 (domaine public). Aucune restriction.
+   Traitement : coupe-bas à 150 Hz, puis normalisation au pic 0,85. Mesuré :
+             l'énergie dans la bande que rend un haut-parleur de téléphone
+             (200 Hz – 10 kHz) passe de 73,8 % à 91,8 %, sans que l'équilibre
+             du son bouge — on ne retire que l'infra-grave inaudible sur
+             mobile, qui ne servait qu'à manger de la marge. Deux longueurs
+             ont été gardées : 0,15 s pour les petits fruits, 0,36 s pour les
+             gros.
+   Note    : c'est l'aperçu haute qualité de Freesound, le fichier d'origine
+             étant derrière un compte. Si tu télécharges le WAV original depuis
+             ton compte, dépose-le et on régénère la planche sans perte.
+
+Commun aux dix morceaux : fondu d'entrée de 1,5 ms, fondu de sortie de 30 ms,
+20 ms de silence de garde entre deux. Format WAV mono 44,1 kHz 16 bits, 1,98 s,
+170 Ko — en WAV et pas en mp3 parce qu'un mp3 se décode avec un bourrage
+d'encodeur en tête qui décalerait toute la table, or on découpe à
+l'échantillon près.

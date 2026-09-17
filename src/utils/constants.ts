@@ -704,6 +704,28 @@ export const FUSE_SPARK_EVERY = 2; // une salve d'étincelles toutes N frames
  */
 export const TEX_TRANCHE_FICHIER = 'assets/sfx/tranche.wav';
 export const TRANCHE_VOLUME = 0.34;
+/**
+ * L'éclatement humide, posé SOUS le coup de couteau.
+ *
+ * Source : « Squish impact » de Bertsz, sur Freesound, en CC0 — domaine public,
+ * donc aucune question à se poser sur un dépôt ouvert. L'auteur le décrit comme
+ * du vrai fruit servant à composer un squish, et c'est exactement ce qui
+ * manquait : le premier son est la LAME (sec, craquant, la planche derrière),
+ * celui-ci est la CHAIR. Les deux ensemble font une coupe ; l'un sans l'autre
+ * n'en fait que la moitié.
+ *
+ * Traité par un simple coupe-bas à 150 Hz. Mesuré : l'énergie utile passe de
+ * 73,8 % à 91,8 % sans que l'équilibre du son bouge — on ne retire que
+ * l'infra-grave qu'aucun haut-parleur de téléphone ne restitue et qui ne
+ * servait qu'à manger de la marge avant normalisation.
+ */
+export const TRANCHE_JUS: ReadonlyArray<readonly [number, number]> = [
+  [1.4261, 0.15], // court : pour les petits fruits
+  [1.5961, 0.36], // long : la papaye pisse plus longtemps que le letchi
+];
+export const TRANCHE_JUS_VOLUME = 0.3;
+/** Le couteau entre, PUIS la chair cède. Dix-huit millisecondes plus tard. */
+export const TRANCHE_JUS_RETARD = 0.018;
 /** Position et durée de chaque coup, en secondes, dans la planche. */
 export const TRANCHE_COUPS: ReadonlyArray<readonly [number, number]> = [
   [0.0, 0.187],

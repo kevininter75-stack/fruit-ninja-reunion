@@ -6,6 +6,9 @@ import {
   TEX_TRANCHE_FICHIER,
   TRANCHE_VOLUME,
   TRANCHE_COUPS,
+  TRANCHE_JUS,
+  TRANCHE_JUS_VOLUME,
+  TRANCHE_JUS_RETARD,
 } from '../utils/constants';
 
 /**
@@ -347,21 +350,54 @@ export class SfxManager {
       Math.min(1.3, Math.max(0.82, Math.sqrt(58 / Math.max(radius, 20)))) *
       (0.96 + Math.random() * 0.08);
 
+    this.jouerRegion(ctx, planche, offset, duree, vitesse, TRANCHE_VOLUME * v, 0);
+
+    // LA CHAIR, SOUS LA LAME. Le premier échantillon est un couteau — sec,
+    // craquant, avec la planche derrière. Celui-ci est ce que la lame ouvre.
+    // Joués ensemble, et dans cet ordre, ils font une coupe ; séparément,
+    // chacun n'en fait que la moitié.
+    //
+    // Le choix du long ou du court suit la taille du fruit, avec une part de
+    // hasard pour qu'un même letchi ne sonne pas deux fois pareil : la papaye
+    // gicle plus longtemps que le letchi, mais pas systématiquement.
+    const longJus = radius > 62 ? Math.random() < 0.8 : Math.random() < 0.25;
+    const [jOff, jDur] = TRANCHE_JUS[longJus ? 1 : 0];
+    // v au carré : sur une rafale, le jus s'efface plus vite que la lame. Treize
+    // éclatements humides en une seconde font de la bouillie, treize craquements
+    // font un combo. On garde le tranchant net et on rend l'humidité aux coupes
+    // isolées, qui sont celles où on l'entend.
+    this.jouerRegion(ctx, planche, jOff, jDur, vitesse, TRANCHE_JUS_VOLUME * v * v, TRANCHE_JUS_RETARD);
+  }
+
+  /**
+   * Joue une région de la planche : un morceau, une vitesse, un niveau.
+   *
+   * LES DEUX DURÉES NE SONT PAS DANS LA MÊME HORLOGE, et s'être trompé là-dessus
+   * coûtait un défaut audible. Le 3e argument de start() se compte en temps de
+   * TAMPON : à vitesse 0,79 il faut lui passer 0,187 et non 0,236, sinon la
+   * lecture traverse le silence de garde et mord 29 ms sur le morceau suivant —
+   * une seconde attaque tronquée, collée à la première. Vérifié en rendu hors
+   * ligne : duration=0,2 à vitesse 0,5 sort bien 0,4 s sans jamais déborder.
+   * stop(), lui, se compte en temps de SORTIE : là, diviser est correct.
+   */
+  private jouerRegion(
+    ctx: AudioContext,
+    planche: AudioBuffer,
+    offset: number,
+    duree: number,
+    vitesse: number,
+    volume: number,
+    retard: number
+  ): void {
     const src = ctx.createBufferSource();
     src.buffer = planche;
     src.playbackRate.value = vitesse;
     const gain = ctx.createGain();
-    gain.gain.value = TRANCHE_VOLUME * v;
+    gain.gain.value = volume;
     src.connect(gain).connect(this.bus(ctx));
-    // LES DEUX DURÉES NE SONT PAS DANS LA MÊME HORLOGE, et s'être trompé là-dessus
-    // coûtait un défaut audible. Le 3e argument de start() se compte en temps de
-    // TAMPON : à vitesse 0,79 il faut lui passer 0,187 et non 0,236, sinon la
-    // lecture traverse le silence de garde et mord 29 ms sur le coup suivant —
-    // une seconde attaque tronquée, collée à la première. Vérifié en rendu hors
-    // ligne : duration=0,2 à vitesse 0,5 sort bien 0,4 s sans jamais déborder.
-    // stop(), lui, se compte en temps de SORTIE : là, diviser est correct.
-    src.start(ctx.currentTime, offset, duree);
-    src.stop(ctx.currentTime + duree / vitesse + 0.02);
+    const t = ctx.currentTime + retard;
+    src.start(t, offset, duree);
+    src.stop(t + duree / vitesse + 0.02);
   }
 
   /**
