@@ -1,0 +1,18 @@
+Bruitages de Kout Sab'
+======================
+
+tranche.wav
+-----------
+Source   : « Cut vegetables and fruits », par JARASNAT
+URL      : https://pixabay.com/sound-effects/household-cut-vegetables-and-fruits-221532/
+Licence  : Pixabay Content License — usage commercial libre, attribution non
+           exigée. Elle est donnée ici parce que le travail de quelqu'un se
+           cite, même quand la licence ne l'oblige pas.
+
+Transformation : l'original dure 12,30 s (mp3 mono 256 kbps) et ne contient que
+0,73 s d'audio utile, répartie en huit coups de couteau. Les huit ont été
+extraits, normalisés au pic, munis d'un fondu d'entrée de 1,5 ms et de sortie
+de 30 ms, puis remis bout à bout avec 20 ms de silence de garde entre eux.
+Résultat : WAV mono 44,1 kHz 16 bits, 1,43 s, 123 Ko.
+
+La table des positions vit dans src/utils/constants.ts (TRANCHE_COUPS).

@@ -688,6 +688,34 @@ export const FUSE_SPARK_EVERY = 2; // une salve d'étincelles toutes N frames
  * la lame. Ce qui fait entendre une mèche, ce sont les CRÉPITEMENTS — de
  * minuscules claquements irréguliers. Le souffle ne fait que les porter.
  */
+/**
+ * La planche de tranchage : huit vrais coups de couteau dans un seul fichier.
+ *
+ * Source : « Cut vegetables and fruits » de JARASNAT, sur Pixabay, sous Pixabay
+ * Content License (usage commercial libre, attribution non exigée — on la donne
+ * quand même, cf. public/assets/sfx/CREDITS.txt). L'original dure 12,3 s dont
+ * 0,73 s d'audio utile : les huit coups ont été extraits, normalisés au pic et
+ * remis bout à bout, ce qui fait 123 Ko au lieu de 385.
+ *
+ * FORMAT WAV, ET C'EST VOULU. Un mp3 se décode avec un bourrage d'encodeur en
+ * tête, qui décalerait toute la table ci-dessous de quelques millisecondes — or
+ * on découpe ce fichier à l'échantillon près. Le WAV n'a pas ce défaut, et
+ * 123 Ko décodés une fois au démarrage ne coûtent rien.
+ */
+export const TEX_TRANCHE_FICHIER = 'assets/sfx/tranche.wav';
+export const TRANCHE_VOLUME = 0.34;
+/** Position et durée de chaque coup, en secondes, dans la planche. */
+export const TRANCHE_COUPS: ReadonlyArray<readonly [number, number]> = [
+  [0.0, 0.187],
+  [0.207, 0.137],
+  [0.364, 0.127],
+  [0.511, 0.197],
+  [0.728, 0.097],
+  [0.845, 0.172],
+  [1.0371, 0.172],
+  [1.229, 0.177],
+];
+
 export const MECHE_VOLUME = 0.055;
 /** Probabilité de crépitement par image (~3 par seconde et par pétard). */
 export const MECHE_CREPITEMENT = 0.05;

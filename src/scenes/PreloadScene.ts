@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { sfx } from '../systems/SfxManager';
 import {
   PORTRAIT_WIDTH,
   PORTRAIT_HEIGHT,
@@ -64,6 +65,12 @@ export class PreloadScene extends Phaser.Scene {
   private legende?: Phaser.GameObjects.Text;
 
   create(): void {
+    // La planche de tranchage part en fond dès le préchargement : la
+    // récupération n'a pas besoin d'un contexte audio, seul le décodage en a
+    // un. Le fichier est donc déjà là quand le joueur touche l'écran pour la
+    // première fois, et la première coupe sonne comme les suivantes.
+    sfx.precharger();
+
     this.buildLoadingScreen();
 
     // Les textures sont générées EN TÂCHES, une par frame, au lieu d'un seul

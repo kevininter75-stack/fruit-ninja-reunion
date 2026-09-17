@@ -14,7 +14,7 @@
  * immédiatement ; le client se recharge alors une fois (voir main.ts,
  * écouteur 'controllerchange'). Incrémenter CACHE_NAME purge l'ancien cache.
  */
-const CACHE_NAME = 'fnr-v3';
+const CACHE_NAME = 'fnr-v4';
 const PRECACHE = [
   '.',
   'index.html',
@@ -23,6 +23,13 @@ const PRECACHE = [
   // jeu ATTEND son chargement pour démarrer (cf. main.ts). Sans elle en
   // cache, la première partie hors-ligne resterait bloquée sur l'attente.
   'fonts/fredoka-latin.woff2',
+  // Shrikhand porte les titres et les exclamations. Elle manquait ici : hors
+  // ligne, main.ts attendait trois secondes pour rien avant de se rabattre sur
+  // la police système, et le jeu s'ouvrait dans la mauvaise voix.
+  'fonts/shrikhand-latin.woff2',
+  // Le bruit de tranchage : 123 Ko, décodés une fois au démarrage. Sans lui en
+  // cache, une partie hors ligne retomberait sur le tranchage synthétisé.
+  'assets/sfx/tranche.wav',
   'icons/icon-192.png',
   'icons/icon-512.png',
   'icons/icon-192-maskable.png',

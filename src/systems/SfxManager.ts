@@ -1,6 +1,12 @@
 import { getAudioContext } from '../utils/audioContext';
 import { isMuted } from '../utils/settings';
-import { MECHE_VOLUME, MECHE_CREPITEMENT } from '../utils/constants';
+import {
+  MECHE_VOLUME,
+  MECHE_CREPITEMENT,
+  TEX_TRANCHE_FICHIER,
+  TRANCHE_VOLUME,
+  TRANCHE_COUPS,
+} from '../utils/constants';
 
 /**
  * Effets sonores placeholder synthétisés en Web Audio — aucun fichier requis.
@@ -32,6 +38,14 @@ export class SfxManager {
   private mecheGain: GainNode | null = null;
   /** Le contexte auquel appartient tout ce qui est mis en cache ci-dessus. */
   private ctxCourant: AudioContext | null = null;
+  /** Octets bruts de la planche de tranchage, récupérés avant tout contexte. */
+  private trancheBrut: ArrayBuffer | null = null;
+  /** La planche décodée, prête à être jouée par morceaux. */
+  private trancheBuffer: AudioBuffer | null = null;
+  /** Décodage en cours : sans ce témoin, chaque coupe en relancerait un. */
+  private trancheDecodage = false;
+  /** Dernier coup joué : on ne rejoue jamais le même deux fois de suite. */
+  private dernierCoup = -1;
 
   /**
    * Le contexte audio du moment — et le seul endroit qui constate qu'il change.
@@ -227,6 +241,65 @@ export class SfxManager {
    * passent donc à 72 % : mesure à l'appui, une salve de six porte deux fois
    * l'énergie d'une coupe isolée pour la même crête, sans jamais écrêter.
    */
+  /**
+   * Va chercher la planche de tranchage, AVANT même qu'un contexte audio existe.
+   *
+   * La récupération réseau ne demande aucune permission ; seul le décodage a
+   * besoin d'un AudioContext, lequel n'apparaît qu'au premier geste du joueur.
+   * Séparer les deux fait que le fichier est déjà en mémoire quand ce geste
+   * arrive, et que la toute première coupe sonne comme les suivantes.
+   *
+   * BASE_URL et pas un chemin absolu : le jeu est servi depuis la racine en
+   * local et depuis /fruit-ninja-reunion/ sur GitHub Pages.
+   */
+  precharger(): void {
+    if (this.trancheBrut !== null) {
+      return;
+    }
+    const base = import.meta.env.BASE_URL;
+    fetch(base + TEX_TRANCHE_FICHIER)
+      .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
+      .then((buf) => {
+        this.trancheBrut = buf;
+      })
+      .catch(() => {
+        // Réseau absent, fichier manquant : on ne fait rien. slice() retombera
+        // sur la synthèse, qui n'a besoin de rien et ne peut pas échouer.
+      });
+  }
+
+  /**
+   * La planche décodée, ou null tant qu'elle ne l'est pas.
+   *
+   * Le décodage est asynchrone et ne peut donc pas servir la coupe qui le
+   * déclenche : celle-là partira en synthèse, et toutes les suivantes auront
+   * le vrai son. C'est quelques dizaines de millisecondes une fois par partie.
+   */
+  private tranche(ctx: AudioContext): AudioBuffer | null {
+    if (this.trancheBuffer !== null) {
+      return this.trancheBuffer;
+    }
+    if (this.trancheBrut === null || this.trancheDecodage) {
+      return null;
+    }
+    this.trancheDecodage = true;
+    // decodeAudioData consomme (« détache ») le tampon qu'on lui passe : sans
+    // cette copie, un second appel recevrait un ArrayBuffer de longueur zéro.
+    ctx
+      .decodeAudioData(this.trancheBrut.slice(0))
+      .then((buffer) => {
+        this.trancheBuffer = buffer;
+        this.trancheDecodage = false;
+      })
+      .catch(() => {
+        // Format refusé par ce navigateur : on abandonne la planche pour de
+        // bon plutôt que de retenter à chaque fruit tranché.
+        this.trancheBrut = null;
+        this.trancheDecodage = false;
+      });
+    return null;
+  }
+
   slice(radius = 60): void {
     const ctx = this.context();
     if (ctx === null) {
@@ -236,6 +309,71 @@ export class SfxManager {
     this.dernierTranchage = ctx.currentTime;
     const v = serre ? 0.72 : 1;
 
+    const planche = this.tranche(ctx);
+    if (planche !== null) {
+      this.trancheReelle(ctx, planche, radius, v);
+      return;
+    }
+    this.trancheSynthetique(ctx, radius, v);
+  }
+
+  /**
+   * UN VRAI COUP DE COUTEAU, pris dans la planche de huit.
+   *
+   * Ce que la synthèse n'atteindra jamais : le bruit d'une lame qui traverse
+   * de la chair est fait de centaines de micro-ruptures de fibres, toutes
+   * différentes. On peut en imiter l'enveloppe, pas la matière.
+   *
+   * DEUX CHOSES EMPÊCHENT LA MITRAILLETTE. D'abord on ne rejoue jamais le même
+   * coup deux fois de suite : huit échantillons tirés au hasard donneraient un
+   * doublon une fois sur huit, et l'oreille repère un doublon immédiatement.
+   * Ensuite la vitesse de lecture porte un tremblement de ±4 %, si bien que
+   * deux occurrences du même coup ne sont jamais tout à fait identiques.
+   *
+   * LA HAUTEUR SUIT LA TAILLE DU FRUIT, comme le faisait le « ploc » synthétique
+   * — mais ici en ralentissant l'échantillon entier, ce qui est exactement ce
+   * qui distingue un gros objet d'un petit : tout descend, pas seulement une
+   * note. Un letchi claque, une papaye sourd.
+   */
+  private trancheReelle(ctx: AudioContext, planche: AudioBuffer, radius: number, v: number): void {
+    let index = Math.floor(Math.random() * TRANCHE_COUPS.length);
+    if (index === this.dernierCoup) {
+      index = (index + 1) % TRANCHE_COUPS.length;
+    }
+    this.dernierCoup = index;
+    const [offset, duree] = TRANCHE_COUPS[index];
+
+    const vitesse =
+      Math.min(1.3, Math.max(0.82, Math.sqrt(58 / Math.max(radius, 20)))) *
+      (0.96 + Math.random() * 0.08);
+
+    const src = ctx.createBufferSource();
+    src.buffer = planche;
+    src.playbackRate.value = vitesse;
+    const gain = ctx.createGain();
+    gain.gain.value = TRANCHE_VOLUME * v;
+    src.connect(gain).connect(this.bus(ctx));
+    // LES DEUX DURÉES NE SONT PAS DANS LA MÊME HORLOGE, et s'être trompé là-dessus
+    // coûtait un défaut audible. Le 3e argument de start() se compte en temps de
+    // TAMPON : à vitesse 0,79 il faut lui passer 0,187 et non 0,236, sinon la
+    // lecture traverse le silence de garde et mord 29 ms sur le coup suivant —
+    // une seconde attaque tronquée, collée à la première. Vérifié en rendu hors
+    // ligne : duration=0,2 à vitesse 0,5 sort bien 0,4 s sans jamais déborder.
+    // stop(), lui, se compte en temps de SORTIE : là, diviser est correct.
+    src.start(ctx.currentTime, offset, duree);
+    src.stop(ctx.currentTime + duree / vitesse + 0.02);
+  }
+
+  /**
+   * Le tranchage de repli, entièrement synthétisé.
+   *
+   * Il sert tant que la planche n'est pas décodée, et pour toujours si elle ne
+   * peut pas l'être — fichier absent, réseau coupé au premier lancement,
+   * format refusé. Un jeu qui perd son bruitage doit devenir moins bon, pas
+   * muet.
+   */
+  private trancheSynthetique(ctx: AudioContext, radius: number, v: number): void {
+    void ctx;
     // 1. La peau qui cède : très court, très haut. C'est l'instant du contact.
     this.playNoise(ctx, 'highpass', 4200, 3000, 0.7, 0.26 * v, 0.012);
     // 2. L'éclat humide : bande étroite qui plonge vite. Elle reste ENTRE
