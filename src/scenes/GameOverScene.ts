@@ -24,7 +24,7 @@ import { addVignette, fadeIn, fadeToScene } from '../utils/ui';
 import { prefersReducedMotion } from '../utils/settings';
 import { buildShareText, getStreak } from '../utils/dailyChallenge';
 import { mutationDuJour, objectifDuJour } from '../utils/mutations';
-import { envoyer, pseudo, retenirResultat } from '../systems/Classement';
+import { envoyer, pseudo, retenirResultat, doitDeposer } from '../systems/Classement';
 import { RECORD, BOMBE } from '../utils/creole';
 
 /** Données passées par la GameScene à la fin d'une partie. */
@@ -56,6 +56,8 @@ const REASON_DISPLAY: Record<GameOverReason, { title: string; subtitle: string; 
  */
 export class GameOverScene extends Phaser.Scene {
   private finalScore = 0;
+  /** Record battu ? Calculé dans create(), relu par createButtons(). */
+  private nouveauRecord = false;
   private mode: GameMode = 'classic';
   private reason: GameOverReason = 'lives';
   private fruitsSliced = 0;
@@ -111,6 +113,7 @@ export class GameOverScene extends Phaser.Scene {
     const display = REASON_DISPLAY[this.reason];
     // Le record est calculé AVANT tout affichage : la célébration dépend de lui
     const isNewRecord = saveBestScore(this.mode, this.finalScore);
+    this.nouveauRecord = isNewRecord;
 
     // LE SCORE PART EN SILENCE, ET SANS QU'ON L'ATTENDE. Le joueur n'a rien à
     // valider et ne voit aucune roue tourner : soit ça passe, soit ça part dans
@@ -118,7 +121,14 @@ export class GameOverScene extends Phaser.Scene {
     // attendrait le réseau serait un écran de fin cassé.
     // Tant que le joueur n'a pas choisi ses trois lettres, il n'y a rien à
     // envoyer — il les choisira depuis l'écran de classement.
-    if (pseudo() !== null) {
+    // SEULEMENT AU RECORD. Une partie qui ne bat pas le meilleur score du
+    // joueur n'a rien à faire dans la base : le tableau n'en montre qu'un par
+    // personne et par mode, donc elle ne changerait rien à l'affichage tout en
+    // faisant grossir la table. Le Défi du jour fait exception — il se classe à
+    // la journée (cf. doitDeposer).
+    if (!doitDeposer(this.mode, isNewRecord)) {
+      // Rien à faire : le record déjà en ligne est meilleur.
+    } else if (pseudo() !== null) {
       void envoyer(this.mode, this.finalScore, this.fruitsSliced, this.bestCombo);
     } else {
       // Pas encore de pseudo : le résultat est mis de côté et partira dès
@@ -477,7 +487,10 @@ export class GameOverScene extends Phaser.Scene {
     // Le message le dit au moment où ça l'intéresse — il a un score sous les
     // yeux — et le bouton l'emmène droit à la saisie. Son score est déjà mis
     // de côté (cf. retenirResultat) : il partira sans qu'il ait à rejouer.
-    if (pseudo() === null) {
+    // L'invitation n'a de sens que si ce score-là mérite de monter. Après une
+    // partie qui ne bat pas son propre record, proposer de s'inscrire pour
+    // rien serait trompeur.
+    if (pseudo() === null && doitDeposer(this.mode, this.nouveauRecord)) {
       const y = portrait ? h * 0.655 : h * 0.70;
       const invite = this.add
         .text(w / 2, y, 'Ton score n’est pas encore au classement', {

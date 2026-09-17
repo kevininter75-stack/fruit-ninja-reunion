@@ -291,10 +291,16 @@ async function lire(chemin: string): Promise<Entree[]> {
 
 const CHAMPS = 'pseudo,score,fruits,combo_max';
 
-/** Le classement du Défi du jour — celui du jour demandé, aujourd'hui par défaut. */
+/**
+ * Le classement du Défi du jour — celui du jour demandé, aujourd'hui par défaut.
+ *
+ * Passe par la vue `classement_defi`, qui ne garde qu'UNE ligne par joueur et
+ * par jour. L'index unique de la table ne couvrait que le navigateur : la même
+ * personne, sur son téléphone puis sur son ordinateur, y figurait deux fois.
+ */
 export function lireDefi(jour = todayKey(), limite = 20): Promise<Entree[]> {
   return lire(
-    `scores?mode=eq.daily&jour=eq.${jour}&select=${CHAMPS}&order=score.desc&limit=${limite}`
+    `classement_defi?jour=eq.${jour}&select=${CHAMPS}&order=score.desc&limit=${limite}`
   );
 }
 
@@ -304,6 +310,10 @@ export function lireDefi(jour = todayKey(), limite = 20): Promise<Entree[]> {
  * Passe par la vue `records`, qui ne garde que le MEILLEUR score de chaque
  * joueur. Sans elle, quelqu'un qui joue beaucoup occuperait tout le tableau
  * avec ses vingt meilleures parties, ce qui n'intéresse personne.
+ *
+ * Le dédoublonnage se fait sur le PSEUDO — sans accent ni majuscule — et non
+ * sur l'identifiant de navigateur : la même personne sur deux appareils ne
+ * doit pas occuper deux lignes.
  */
 export function lireRecords(mode: 'classic' | 'chrono', limite = 20): Promise<Entree[]> {
   return lire(`records?mode=eq.${mode}&select=${CHAMPS}&order=score.desc&limit=${limite}`);
@@ -320,6 +330,13 @@ export function lireRecords(mode: 'classic' | 'chrono', limite = 20): Promise<En
 export function retenirResultat(mode: GameMode, score: number, fruits: number, comboMax: number): void {
   if (pseudo() !== null) {
     return; // rien à retenir : il est déjà parti
+  }
+  // On ne garde que le MEILLEUR des résultats en attente, pas le dernier. Un
+  // joueur peut enchaîner cinq parties avant de s'inscrire ; ce serait dommage
+  // que ce soit la plus mauvaise qui monte.
+  const enAttente = lireDernier();
+  if (enAttente !== null && enAttente.mode === mode && enAttente.score >= score) {
+    return;
   }
   const r: Resultat = { mode, score, fruits, comboMax };
   ecrireLocal(CLE_DERNIER, JSON.stringify(r));
@@ -350,7 +367,7 @@ function lireDernier(): Resultat | null {
  * Le Défi est exclu pour une deuxième raison, plus importante : son classement
  * est celui du JOUR. Y verser un record d'une autre journée n'aurait aucun sens.
  */
-export async function importerRecords(): Promise<number> {
+export async function importerRecords(dejaCouverts: ReadonlySet<GameMode> = new Set()): Promise<number> {
   if (lireLocal(CLE_IMPORTE) !== null || pseudo() === null) {
     return 0;
   }
@@ -358,7 +375,7 @@ export async function importerRecords(): Promise<number> {
   let deposes = 0;
   for (const mode of ['classic', 'chrono'] as const) {
     const record = getBestScore(mode);
-    if (record <= 0) {
+    if (record <= 0 || dejaCouverts.has(mode)) {
       continue;
     }
     if (await envoyer(mode, record, null, 0)) {
@@ -388,10 +405,37 @@ export async function inscrire(nom: string): Promise<void> {
   // borne déjà à un par mode), la partie non. En commençant par eux, les trois
   // dépôts passent d'affilée ; dans l'autre sens, la partie aurait armé le
   // compteur de quinze secondes et les records seraient partis en file.
-  await importerRecords();
+  // LA PARTIE EN ATTENTE D'ABORD, LES RECORDS ENSUITE — et si les deux portent
+  // sur le même mode et le même score, on ne dépose que la partie : elle, au
+  // moins, sait combien de fruits ont été tranchés. Un « record importé » à
+  // côté d'une vraie ligne serait un doublon sans intérêt.
   const dernier = lireDernier();
+  const couverts = new Set<GameMode>();
   if (dernier !== null) {
     ecrireLocal(CLE_DERNIER, '');
-    await envoyer(dernier.mode, dernier.score, dernier.fruits, dernier.comboMax);
+    if (await envoyer(dernier.mode, dernier.score, dernier.fruits, dernier.comboMax)) {
+      if (dernier.score >= getBestScore(dernier.mode)) {
+        couverts.add(dernier.mode);
+      }
+    }
   }
+  await importerRecords(couverts);
+}
+
+/**
+ * Faut-il déposer le résultat de cette partie ?
+ *
+ * SEULEMENT SI C'EST UN RECORD — sauf au Défi du jour, et cette exception n'en
+ * est pas une quand on y regarde. Le Défi se classe À LA JOURNÉE : son tableau
+ * est remis à zéro chaque matin, et chacun n'a qu'une tentative. Le gagner
+ * exige donc d'y déposer sa partie du jour, qu'elle batte ou non le meilleur
+ * Défi de sa vie. La contrainte d'unicité côté base garantit déjà qu'il n'y en
+ * aura qu'une.
+ *
+ * Pour le Classique et le Chrono, en revanche, seul le meilleur score compte
+ * et le tableau n'en montre qu'un par joueur. Déposer les parties perdantes ne
+ * ferait que remplir la base sans rien changer à l'affichage.
+ */
+export function doitDeposer(mode: GameMode, nouveauRecord: boolean): boolean {
+  return mode === 'daily' || nouveauRecord;
 }
