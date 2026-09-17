@@ -1,0 +1,52 @@
+name: Garder le classement éveillé
+
+# POURQUOI CE FICHIER EXISTE.
+#
+# Supabase met en pause un projet du plan gratuit après SEPT jours sans
+# activité. Sans cette visite, un joueur qui arrive après dix jours de calme
+# trouverait un classement vide le temps que la base redémarre — une trentaine
+# de secondes pendant lesquelles le jeu a l'air cassé alors qu'il va bien.
+#
+# TOUS LES TROIS JOURS, ET PAS TOUS LES SIX. Le seuil est à sept : un intervalle
+# de six ne laisse aucune marge, et une seule exécution ratée (panne GitHub,
+# coupure chez Supabase) suffirait à laisser passer le délai. À trois jours, une
+# visite peut échouer sans conséquence — la suivante arrive encore au sixième
+# jour. C'est la différence entre un garde-fou et un vœu.
+#
+# Une simple requête de lecture suffit à compter comme activité. La clé
+# ci-dessous est publique par conception (c'est RLS qui protège la table), elle
+# est déjà dans le paquet du jeu : rien à cacher ici.
+
+on:
+  schedule:
+    # Tous les 3 jours à 04:12 UTC — soit 08:12 à La Réunion. L'heure décalée
+    # évite les minutes rondes, où tous les cron du monde se déclenchent en même
+    # temps et où GitHub met les exécutions en file d'attente.
+    - cron: '12 4 */3 * *'
+  # Déclenchement manuel, pour réveiller la base sans attendre.
+  workflow_dispatch:
+
+jobs:
+  reveiller:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Interroger le classement
+        run: |
+          URL="https://rktueomslxjqtvighgcg.supabase.co/rest/v1/scores?select=id&limit=1"
+          CLE="sb_publishable_R20Ob1300eTJrl0r5D87Ng_4JO1w9vW"
+          # Cinq tentatives espacées : un projet en pause répond d'abord 521 le
+          # temps de redémarrer. Abandonner à la première réponse laisserait
+          # croire à un échec alors que le réveil est justement en cours.
+          for essai in 1 2 3 4 5; do
+            code=$(curl -s -o /tmp/reponse -w "%{http_code}" --max-time 30 \
+              -H "apikey: $CLE" -H "Authorization: Bearer $CLE" "$URL")
+            echo "tentative $essai : HTTP $code"
+            if [ "$code" = "200" ]; then
+              echo "classement joignable, projet éveillé"
+              exit 0
+            fi
+            sleep 30
+          done
+          echo "::error::le classement n'a pas répondu après 5 tentatives (dernier code : $code)"
+          cat /tmp/reponse | head -20
+          exit 1
