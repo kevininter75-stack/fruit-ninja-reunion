@@ -1,9 +1,9 @@
 Bruitages de Kout Sab'
 ======================
 
-tranche.wav — une seule planche, deux sources, dix morceaux
------------------------------------------------------------
-Le fichier contient huit coups de couteau puis deux éclatements humides. Le
+tranche.wav — une seule planche, deux sources, huit morceaux
+------------------------------------------------------------
+Le fichier contient six coups de couteau puis deux éclatements humides. Le
 premier son est la LAME (sec, craquant, la planche derrière), le second est la
 CHAIR. Joués ensemble ils font une coupe ; séparément, chacun n'en fait que la
 moitié. La table des positions vit dans src/utils/constants.ts
@@ -16,8 +16,24 @@ moitié. La table des positions vit dans src/utils/constants.ts
              exigée. Donnée ici parce que le travail de quelqu'un se cite, même
              quand la licence ne l'oblige pas.
    Traitement : l'original dure 12,30 s et ne contient que 0,73 s d'audio utile,
-             en huit coups. Les huit ont été détectés par enveloppe RMS,
-             extraits, normalisés au pic 0,92.
+             en huit coups, détectés par enveloppe RMS.
+
+             LA PLANCHE À DÉCOUPER A ÉTÉ RETIRÉE. Dans le jeu, le fruit est en
+             l'air : le « boum » du couteau sur le bois est un artefact de
+             studio, et c'était la partie la plus longue et la plus sonore de
+             chaque échantillon. Elle se repère au basculement du timbre —
+             énergie au-dessus de 2,5 kHz comparée à celle sous 700 Hz : le
+             craquement des fibres sort clair, l'impact sur le bois sort sourd.
+             Mesuré : la planche entre entre 20 et 42 ms selon le coup.
+
+             Deux coups sur huit écartés : l'un sans basculement net, l'autre
+             plat (7 dB de facteur de crête) — du bruit, pas un craquement.
+             Les six restants font 20 à 42 ms, avec 14 à 17,6 dB de crête.
+
+             Normalisés sur le RMS (0,075) et non sur le pic : sur des
+             transitoires aussi courts et de formes si différentes, le pic
+             laissait 16 dB d'écart de niveau PERÇU entre les coupes. Plafond
+             à 0,95 contre l'écrêtage.
 
 2) Les deux éclatements humides
    Source  : « Squish impact », par Bertsz
@@ -35,7 +51,7 @@ moitié. La table des positions vit dans src/utils/constants.ts
              ton compte, dépose-le et on régénère la planche sans perte.
 
 Commun aux dix morceaux : fondu d'entrée de 1,5 ms, fondu de sortie de 30 ms,
-20 ms de silence de garde entre deux. Format WAV mono 44,1 kHz 16 bits, 1,98 s,
-170 Ko — en WAV et pas en mp3 parce qu'un mp3 se décode avec un bourrage
+20 ms de silence de garde entre deux. Format WAV mono 44,1 kHz 16 bits, 0,86 s,
+74 Ko — en WAV et pas en mp3 parce qu'un mp3 se décode avec un bourrage
 d'encodeur en tête qui décalerait toute la table, or on découpe à
 l'échantillon près.

@@ -689,21 +689,55 @@ export const FUSE_SPARK_EVERY = 2; // une salve d'étincelles toutes N frames
  * minuscules claquements irréguliers. Le souffle ne fait que les porter.
  */
 /**
- * La planche de tranchage : huit vrais coups de couteau dans un seul fichier.
+ * La planche de tranchage : six coups de couteau, deux éclatements humides.
  *
- * Source : « Cut vegetables and fruits » de JARASNAT, sur Pixabay, sous Pixabay
- * Content License (usage commercial libre, attribution non exigée — on la donne
- * quand même, cf. public/assets/sfx/CREDITS.txt). L'original dure 12,3 s dont
- * 0,73 s d'audio utile : les huit coups ont été extraits, normalisés au pic et
- * remis bout à bout, ce qui fait 123 Ko au lieu de 385.
+ * Source des coups : « Cut vegetables and fruits » de JARASNAT, sur Pixabay,
+ * sous Pixabay Content License. Source du jus : « Squish impact » de Bertsz,
+ * sur Freesound, en CC0. Les deux sont cités dans public/assets/sfx/CREDITS.txt.
+ *
+ * LA PLANCHE À DÉCOUPER A ÉTÉ RETIRÉE, et c'est la bonne décision : dans le jeu
+ * le fruit est EN L'AIR. Le « boum » du couteau qui touche le bois est un
+ * artefact de studio qui n'a rien à faire ici — et c'était de loin la partie la
+ * plus longue et la plus sonore de chaque échantillon.
+ *
+ * Elle se repère au basculement du timbre. En comparant l'énergie au-dessus de
+ * 2,5 kHz à celle sous 700 Hz, le craquement de la peau et des fibres sort
+ * clair (tilt positif ou proche de zéro) et l'impact sur le bois sort sourd
+ * (tilt franchement négatif). Sur le premier coup : tilt +6 / +4 / +6 pendant
+ * l'entrée, +2 au pic, puis −5 dès la 20e milliseconde. C'est là qu'on coupe.
+ * Mesuré sur les huit coups, la planche entre entre 20 et 42 ms.
+ *
+ * Deux coups sur huit ont été écartés : l'un n'avait aucun basculement net,
+ * l'autre était plat (7 dB de facteur de crête, souffle à 9 dB sous le pic) —
+ * du bruit, pas un craquement. Les six qui restent ont 14 à 17,6 dB de crête.
+ *
+ * NORMALISÉS SUR LE RMS, PAS SUR LE PIC. Une fois la planche partie il ne reste
+ * que des transitoires de 20 à 42 ms, de formes très différentes : normalisés
+ * au pic, leurs niveaux PERÇUS s'étalaient sur 16 dB, si bien que certaines
+ * coupes auraient été inaudibles et d'autres fortes. Le RMS mesure ce que
+ * l'oreille entend ; un plafond à 0,95 évite l'écrêtage sur les plus pointus.
+ *
+ * Résultat : 74 Ko au lieu de 170, pour un son plus juste.
  *
  * FORMAT WAV, ET C'EST VOULU. Un mp3 se décode avec un bourrage d'encodeur en
  * tête, qui décalerait toute la table ci-dessous de quelques millisecondes — or
- * on découpe ce fichier à l'échantillon près. Le WAV n'a pas ce défaut, et
- * 123 Ko décodés une fois au démarrage ne coûtent rien.
+ * on découpe ce fichier à l'échantillon près.
  */
 export const TEX_TRANCHE_FICHIER = 'assets/sfx/tranche.wav';
-export const TRANCHE_VOLUME = 0.34;
+/** Position et durée de chaque coup, en secondes, dans la planche. */
+export const TRANCHE_COUPS: ReadonlyArray<readonly [number, number]> = [
+  [0.0, 0.02],
+  [0.04, 0.0274],
+  [0.0874, 0.0299],
+  [0.1373, 0.0324],
+  [0.1898, 0.0324],
+  [0.2422, 0.0424],
+];
+
+// 0,42 et non 0,34 : retirer la planche a fait perdre 1,8 dB de niveau
+// perçu (RMS moyen 0,092 -> 0,075). On le rend, sinon la coupe s'entendrait
+// moins bien alors qu'elle sonne mieux.
+export const TRANCHE_VOLUME = 0.42;
 /**
  * L'éclatement humide, posé SOUS le coup de couteau.
  *
@@ -720,8 +754,8 @@ export const TRANCHE_VOLUME = 0.34;
  * servait qu'à manger de la marge avant normalisation.
  */
 export const TRANCHE_JUS: ReadonlyArray<readonly [number, number]> = [
-  [1.4261, 0.15], // court : pour les petits fruits
-  [1.5961, 0.36], // long : la papaye pisse plus longtemps que le letchi
+  [0.3046, 0.15], // court : pour les petits fruits
+  [0.4746, 0.36], // long : la papaye pisse plus longtemps que le letchi
 ];
 export const TRANCHE_JUS_VOLUME = 0.48;
 /**
@@ -742,14 +776,18 @@ export const TRANCHE_JUS_VOLUME = 0.48;
  *      pour se lire comme une suite. C'est la pire zone des deux.
  *   85 ms — au-delà de cette zone, l'oreille enchaîne d'elle-même : la lame
  *      coupe, PUIS le fruit éclate. Un lien de cause à effet, pas un doublon.
- *      Assez loin pour se distinguer, assez près pour rester un seul geste —
- *      au-delà de ~200 ms ce seraient deux actions séparées.
+ *   55 ms — VALEUR ACTUELLE, et le retrait de la planche à découper l'impose.
+ *      Les trois valeurs ci-dessus se mesuraient contre une lame qui durait
+ *      97 à 197 ms ; sans le bois, elle n'en dure plus que 20 à 42. À 85 ms le
+ *      jus arrivait bien après la fin du craquement, donc trop détaché. À 55 ms
+ *      il part une quinzaine de millisecondes après, ce qui garde l'enchaînement
+ *      sans recoller les deux sons.
  *
  * Divisé par la vitesse de lecture à l'usage : un gros fruit joue tout plus
  * lentement et met plus longtemps à céder. Mesuré : 63 ms sur un letchi,
  * 105 ms sur une papaye.
  */
-export const TRANCHE_JUS_RETARD = 0.085;
+export const TRANCHE_JUS_RETARD = 0.055;
 /**
  * Exposant d'atténuation du jus en rafale.
  *
@@ -758,17 +796,6 @@ export const TRANCHE_JUS_RETARD = 0.085;
  * treize coupes fassent un combo et non de la bouillie) sans la vider.
  */
 export const TRANCHE_JUS_EXPOSANT = 1.5;
-/** Position et durée de chaque coup, en secondes, dans la planche. */
-export const TRANCHE_COUPS: ReadonlyArray<readonly [number, number]> = [
-  [0.0, 0.187],
-  [0.207, 0.137],
-  [0.364, 0.127],
-  [0.511, 0.197],
-  [0.728, 0.097],
-  [0.845, 0.172],
-  [1.0371, 0.172],
-  [1.229, 0.177],
-];
 
 export const MECHE_VOLUME = 0.055;
 /** Probabilité de crépitement par image (~3 par seconde et par pétard). */
