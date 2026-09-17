@@ -725,22 +725,31 @@ export const TRANCHE_JUS: ReadonlyArray<readonly [number, number]> = [
 ];
 export const TRANCHE_JUS_VOLUME = 0.48;
 /**
- * Le retard du jus sur la lame — et ce réglage n'est PAS cosmétique.
+ * Le retard du jus sur la lame — le réglage le plus délicat des deux sons.
  *
- * Il valait 18 ms, et le jus s'entendait à peine. Ce n'était pas un problème de
- * volume : mesuré sur les huit coups, la lame culmine entre 19 et 38 ms (28 ms
- * en moyenne). Le jus partait donc en plein dans le pic du couteau, et se
- * faisait masquer par lui — deux sons qui se disputent la même milliseconde,
- * c'est le plus fort qu'on entend, pas les deux.
+ * TROIS VALEURS, ET CHACUNE A APPRIS QUELQUE CHOSE.
  *
- * À 42 ms il tombe APRÈS le pic le plus tardif, dans la décroissance de la
- * lame, là où il a de la place. Le couteau entre, atteint la planche, et c'est
- * alors que la chair cède — ce qui est aussi l'ordre réel des choses.
+ *   18 ms — le jus s'entendait à peine. Pas un problème de volume : la lame
+ *      culmine entre 19 et 38 ms selon le coup, et le jus partait juste avant.
+ *      Comparés fenêtre par fenêtre, le jus dominait sur 30 fenêtres sur 36,
+ *      mais le trou tombait pile au pic de la lame, 8 dB dessous. Vingt
+ *      millisecondes de masquage seulement — sauf que ce sont celles qui
+ *      suivent l'attaque, c'est-à-dire là où l'oreille décide de ce qu'elle
+ *      vient d'entendre.
+ *   42 ms — le masquage disparaît (36 fenêtres sur 36), mais Kevin entend
+ *      « deux sons collés ». Et il a raison : entre 20 et 50 ms d'écart, deux
+ *      sons sont TROP LOIN pour fusionner en un seul événement et TROP PRÈS
+ *      pour se lire comme une suite. C'est la pire zone des deux.
+ *   85 ms — au-delà de cette zone, l'oreille enchaîne d'elle-même : la lame
+ *      coupe, PUIS le fruit éclate. Un lien de cause à effet, pas un doublon.
+ *      Assez loin pour se distinguer, assez près pour rester un seul geste —
+ *      au-delà de ~200 ms ce seraient deux actions séparées.
  *
- * Divisé par la vitesse de lecture à l'usage : un échantillon joué plus vite
- * atteint son pic plus tôt, le jus doit le suivre.
+ * Divisé par la vitesse de lecture à l'usage : un gros fruit joue tout plus
+ * lentement et met plus longtemps à céder. Mesuré : 63 ms sur un letchi,
+ * 105 ms sur une papaye.
  */
-export const TRANCHE_JUS_RETARD = 0.042;
+export const TRANCHE_JUS_RETARD = 0.085;
 /**
  * Exposant d'atténuation du jus en rafale.
  *
