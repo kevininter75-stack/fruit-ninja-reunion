@@ -24,6 +24,7 @@ import {
   INTENSITY_RAMP_FRUITS_CHRONO,
   CHRONO_INTENSITE_DEPART,
   INTENSITY_RAMP_FRUITS,
+  CELERITE_MAX,
   OVERDRIVE_RAMP_MS,
   SPAWN_INTERVAL_FLOOR_MS,
   BOMB_EVERY_FRUITS_OVERDRIVE,
@@ -279,6 +280,29 @@ export class SpawnManager {
   }
 
   /**
+   * La célérité courante : 1 au départ, CELERITE_MAX à plein régime.
+   *
+   * Elle multiplie les vitesses, et la gravité suit au CARRÉ — c'est ce qui
+   * garde exactement les mêmes arcs, simplement parcourus plus vite.
+   */
+  private celerite(): number {
+    return Phaser.Math.Linear(1, CELERITE_MAX, this.getIntensity());
+  }
+
+  /**
+   * La gravité EFFECTIVE du moment.
+   *
+   * Tous les calculs de trajectoire passent par ici et non par GRAVITY_Y :
+   * viser un sommet avec la constante pendant que le monde tire plus fort
+   * ferait culminer les fruits trop bas, et certains sortiraient par le côté
+   * avant d'être attrapables.
+   */
+  private gravite(): number {
+    const k = this.celerite();
+    return GRAVITY_Y * k * k;
+  }
+
+  /**
    * Les vagues de découverte — un fruit, puis deux — n'existent qu'en
    * Classique. Elles apprennent le jeu à qui le découvre ; en Chrono elles
    * mangeraient les dix premières secondes d'une partie qui n'en dure que
@@ -435,6 +459,12 @@ export class SpawnManager {
    * game over annule les lancers encore en attente.
    */
   private spawnWave(): void {
+    // LE MONDE SUIT LA CÉLÉRITÉ. Les vitesses de lancement sont calculées avec
+    // this.gravite() : si la gravité réelle du monde ne suivait pas, les arcs
+    // ne culmineraient pas où on les vise. On la recale donc à chaque salve —
+    // la montée est assez lente pour qu'un objet déjà en vol ne voie rien.
+    this.scene.physics.world.gravity.y = this.gravite();
+
     // Tant qu'un piment est en scène, on suspend les lancers : la frénésie
     // doit être un moment à elle. Continuer à envoyer des fruits par-dessus
     // rendait la séquence illisible et injustement difficile.
@@ -659,9 +689,9 @@ export class SpawnManager {
     p.x = rndBetween(Math.round(width * 0.2), Math.round(width * 0.8));
     p.y = height + rayon;
     const sommet = height * rndFloat(SIDE_SOMMET_MIN, SIDE_SOMMET_MAX);
-    p.velocityY = -Math.sqrt(2 * GRAVITY_Y * (p.y - sommet));
+    p.velocityY = -Math.sqrt(2 * this.gravite() * (p.y - sommet));
     // Dérive douce vers le centre, comme les grappes : il reste dans le champ.
-    p.velocityX = (p.x < width / 2 ? 1 : -1) * width * rndFloat(0.05, 0.12);
+    p.velocityX = (p.x < width / 2 ? 1 : -1) * width * rndFloat(0.05, 0.12) * this.celerite();
     return p;
   }
 
@@ -695,11 +725,11 @@ export class SpawnManager {
     // près de deux secondes de présence utile à l'écran. Le sommet est visé
     // directement, donc il ne sort jamais par le haut.
     const sommet = height * rndFloat(SIDE_SOMMET_MIN, SIDE_SOMMET_MAX);
-    p.velocityY = -Math.sqrt(2 * GRAVITY_Y * Math.max(p.y - sommet, height * 0.2));
+    p.velocityY = -Math.sqrt(2 * this.gravite() * Math.max(p.y - sommet, height * 0.2));
     if (Number.isNaN(traverse)) {
       // Le piment : il n'a pas besoin de traverser, on l'attrape au vol et il
       // se cale de lui-même au premier coup (cf. settlePiment).
-      p.velocityX = (fromLeft ? 1 : -1) * width * FRENZY_CROSS_FACTOR;
+      p.velocityX = (fromLeft ? 1 : -1) * width * FRENZY_CROSS_FACTOR * this.celerite();
     } else {
       // Le cyclone : il traverse pour de bon, donc sa vitesse se déduit de la
       // distance voulue et de sa durée de vol réelle.
@@ -734,7 +764,7 @@ export class SpawnManager {
       // On vise un SOMMET, pas une montée : le point le plus haut du vol est
       // ainsi garanti dans l'écran (cf. DELUGE_SOMMET_MIN dans constants.ts).
       const sommet = height * rndFloat(DELUGE_SOMMET_MIN, DELUGE_SOMMET_MAX);
-      const vy = -Math.sqrt(2 * GRAVITY_Y * Math.max(y - sommet, height * 0.12));
+      const vy = -Math.sqrt(2 * this.gravite() * Math.max(y - sommet, height * 0.12));
       // La vitesse horizontale se DÉDUIT de la distance qu'on veut lui faire
       // parcourir : le fruit traverse vraiment l'écran, quel que soit l'arc
       // qui vient d'être tiré (cf. DELUGE_TRAVEL_MIN dans constants.ts).
@@ -755,7 +785,7 @@ export class SpawnManager {
    */
   private dureeDeVol(y0: number, vy0: number, yFin: number): number {
     const c = y0 - yFin;
-    return (-vy0 + Math.sqrt(vy0 * vy0 - 2 * GRAVITY_Y * c)) / GRAVITY_Y;
+    return (-vy0 + Math.sqrt(vy0 * vy0 - 2 * this.gravite() * c)) / this.gravite();
   }
 
   /**
@@ -856,14 +886,14 @@ export class SpawnManager {
     const apex = isCluster
       ? 0.8 * height
       : rndFloat(APEX_FRACTION_MIN, APEX_FRACTION_MAX) * height;
-    p.velocityY = -Math.sqrt(2 * GRAVITY_Y * apex);
+    p.velocityY = -Math.sqrt(2 * this.gravite() * apex);
 
     if (isCluster) {
       // Dérive commune et faible : la grappe reste groupée
-      p.velocityX = (baseX < width / 2 ? 1 : -1) * width * 0.04;
+      p.velocityX = (baseX < width / 2 ? 1 : -1) * width * 0.04 * this.celerite();
     } else {
       const towardCenter = p.x < width / 2 ? 1 : -1;
-      p.velocityX = towardCenter * rndBetween(20, Math.round(width * LAUNCH_VX_FACTOR));
+      p.velocityX = towardCenter * rndBetween(20, Math.round(width * LAUNCH_VX_FACTOR)) * this.celerite();
     }
     return p;
   }

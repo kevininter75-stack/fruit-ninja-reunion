@@ -16,6 +16,8 @@ import {
   TRANCHE_CORPS_PENTE,
   TRANCHE_CORPS_MIN,
   TRANCHE_CORPS_MAX,
+  COMBO_NOTE_VOLUME,
+  COMBO_ECLAT_VOLUME,
   TRANCHE_JUS_EXPOSANT,
 } from '../utils/constants';
 
@@ -700,14 +702,22 @@ export class SfxManager {
     const notes = Math.min(Math.max(count, 3), 6);
     // Do majeur pentatonique, sur deux octaves.
     const degres = [0, 2, 4, 7, 9, 12, 14, 16];
+    const ctx = this.context();
     for (let i = 0; i < notes; i++) {
       const hz = 523.25 * Math.pow(2, degres[i] / 12);
-      this.playTone('triangle', hz, hz, 0.17, 0.2, i * 0.055);
+      const quand = i * 0.055;
+      this.playTone('triangle', hz, hz, 0.17, COMBO_NOTE_VOLUME, quand);
+      // UN ÉCLAT AU-DESSUS DE CHAQUE NOTE. La bande 5-11 kHz est la seule que
+      // la coupe laisse libre : le corps grave vit sous 1,2 kHz, la lame entre
+      // 1,5 et 4. Un combo qui sonne dans l'aigu s'entend donc PAR-DESSUS les
+      // trois coupes qui le déclenchent, au lieu de lutter avec elles.
+      if (ctx !== null) {
+        this.playNoise(ctx, 'highpass', 5200, 9000, 0.7, COMBO_ECLAT_VOLUME, 0.09, quand);
+      }
     }
     if (count >= 6) {
       // Frappe grave sous l'arpège : le poids du geste.
       this.playTone('sine', 180, 70, 0.3, 0.34);
-      const ctx = this.context();
       if (ctx !== null) {
         this.playNoise(ctx, 'lowpass', 700, 120, 1, 0.2, 0.22);
       }

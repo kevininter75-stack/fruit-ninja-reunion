@@ -233,6 +233,44 @@ export const CHRONO_BOMBE_PENALITE_MS = 10_000;
  */
 export const INTENSITY_RAMP_FRUITS = 170;
 
+/**
+ * LA CÉLÉRITÉ : tout va légèrement plus vite à mesure que la partie monte.
+ *
+ * Relevé par Kevin sur Fruit Ninja : la vitesse des fruits et des bombes y
+ * augmente progressivement. Chez nous, seule la CADENCE montait — on recevait
+ * plus de salves, mais chaque fruit gardait exactement le même vol du début à
+ * la fin. Deux choses différentes, et la seconde manquait.
+ *
+ * COMMENT, SANS DÉFORMER LES ARCS. Multiplier les vitesses par k ET la
+ * gravité par k² donne rigoureusement la même trajectoire, parcourue k fois
+ * plus vite. Le sommet reste à la même fraction de l'écran — ce qui compte,
+ * car les arcs sont calés pour que rien ne sorte par le haut — mais le fruit
+ * y monte et en redescend plus tôt. Monter simplement les vitesses aurait
+ * envoyé les fruits hors du cadre.
+ *
+ * 1,18 et pas davantage : « légèrement », a dit Kevin. À plein régime le vol
+ * dure 15 % de moins, ce qui se sent sans rendre le jeu injouable — et ça
+ * s'ajoute à une cadence déjà à son plancher.
+ */
+export const CELERITE_MAX = 1.18;
+
+/**
+ * LE COMBO, ET POURQUOI ON NE L'ENTENDAIT PLUS.
+ *
+ * L'arpège existait depuis longtemps, à 0,20 par note. Or une coupe empile
+ * maintenant 0,42 de lame, 0,48 de chair et 0,75 de corps grave — et un combo,
+ * par définition, en déclenche trois ou plus dans la même demi-seconde. La
+ * note se retrouvait quinze décibels sous ce qui la déclenchait : elle jouait,
+ * mais personne ne l'entendait.
+ *
+ * Le corps grave qu'on vient d'ajouter à la coupe a donc aggravé un défaut
+ * qui existait déjà. On monte le niveau — et surtout on déplace le combo dans
+ * la bande 5-11 kHz, la seule que la coupe laisse libre.
+ */
+export const COMBO_NOTE_VOLUME = 0.34;
+/** L'éclat aigu posé sur chaque note, là où la coupe ne va pas. */
+export const COMBO_ECLAT_VOLUME = 0.22;
+
 // Intervalle bruité de ±18 % : sans ça le spawn est un métronome, et l'oreille
 // comme l'œil s'y habituent — le jeu perd toute tension.
 export const SPAWN_INTERVAL_JITTER = 0.18;
@@ -1082,6 +1120,20 @@ export const REWARD_SPREAD_PX = px(150);
 export const COLOR_POINTS = '#ffffff';
 export const COLOR_CRIT = '#ffd700';
 export const COLOR_COMBO = '#ffe066';
+/**
+ * Le temps perdu sur une bombe, en Chrono.
+ *
+ * PAS EN ROUGE, et c'est une correction. La bombe porte déjà « -10 » peint en
+ * rouge sur son corps : voir deux « -10 » rouges au même instant, l'un sur
+ * l'objet et l'autre qui s'en échappe, ne dit pas si l'on vient de perdre dix
+ * secondes ou si l'on lit simplement l'étiquette de la bombe.
+ *
+ * Le cyan est celui du libellé « TEMPS » du bandeau : la bulle appartient
+ * visiblement au compteur, donc à la seule chose qu'elle fait bouger. Il ne
+ * peut pas non plus se confondre avec les points, qui sortent en blanc, ni
+ * avec les critiques, en or.
+ */
+export const COLOR_TEMPS_PERDU = '#9fd0e6';
 export const COLOR_CYCLONE = '#ff8c5a';
 export const COLOR_BONUS = '#8ef2c8';
 

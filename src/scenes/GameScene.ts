@@ -110,6 +110,7 @@ import {
   COLOR_POINTS,
   COLOR_CRIT,
   COLOR_COMBO,
+  COLOR_TEMPS_PERDU,
   COLOR_CYCLONE,
   COLOR_BONUS,
   type GameMode,
@@ -2390,7 +2391,7 @@ export class GameScene extends Phaser.Scene {
     // L'unite reste affichee : les gains de points sortent dans le meme style
     // (« +50 »), et un « -10 » nu se lirait comme une perte de points.
     const secondes = Math.round(CHRONO_BOMBE_PENALITE_MS / 1000);
-    this.showPopup(bx, by - px(20), `-${secondes} s`, '#ff5252', px(52));
+    this.showPopup(bx, by - px(20), `-${secondes} s`, COLOR_TEMPS_PERDU, px(52));
 
     // Le compteur encaisse le coup : c'est là que le joueur doit regarder.
     // La couleur est pilotée par updateChrono, qui respecte cette échéance.
