@@ -9,6 +9,13 @@ import {
   TRANCHE_JUS,
   TRANCHE_JUS_VOLUME,
   TRANCHE_JUS_RETARD,
+  TRANCHE_CORPS_VOLUME,
+  TRANCHE_CORPS_MONTEE,
+  TRANCHE_CORPS_EXTINCTION,
+  TRANCHE_CORPS_BASE,
+  TRANCHE_CORPS_PENTE,
+  TRANCHE_CORPS_MIN,
+  TRANCHE_CORPS_MAX,
   TRANCHE_JUS_EXPOSANT,
 } from '../utils/constants';
 
@@ -370,6 +377,7 @@ export class SfxManager {
     // Et son retard suit la vitesse de lecture : un échantillon joué plus vite
     // atteint son pic plus tôt, donc le jus doit avancer d'autant pour rester
     // dans la décroissance de la lame et non dedans (cf. TRANCHE_JUS_RETARD).
+    const retardJus = TRANCHE_JUS_RETARD / vitesse;
     this.jouerRegion(
       ctx,
       planche,
@@ -377,8 +385,56 @@ export class SfxManager {
       jDur,
       vitesse,
       TRANCHE_JUS_VOLUME * Math.pow(v, TRANCHE_JUS_EXPOSANT),
-      TRANCHE_JUS_RETARD / vitesse
+      retardJus
     );
+
+    // LE POIDS, SOUS LES DEUX. Voir TRANCHE_CORPS_VOLUME : la lame et la chair
+    // vivent toutes deux dans l'aigu, et il manquait le choc.
+    this.corpsDeChair(ctx, radius, v, retardJus);
+  }
+
+  /**
+   * Le corps de la chair : le choc sourd d'un fruit qui s'ouvre.
+   *
+   * Du bruit dans une bande étroite qui DESCEND pendant l'extinction — c'est
+   * l'effondrement. Une hauteur fixe donnerait un tambour ; ce qu'on veut,
+   * c'est quelque chose qui cède.
+   *
+   * Le toit à 1,5 kHz n'est pas cosmétique : il garantit que ce son n'entre
+   * jamais dans la bande de la lame, qu'il doit soutenir et non masquer.
+   */
+  private corpsDeChair(ctx: AudioContext, radius: number, v: number, retard: number): void {
+    const centre = Math.min(
+      TRANCHE_CORPS_MAX,
+      Math.max(TRANCHE_CORPS_MIN, TRANCHE_CORPS_BASE - radius * TRANCHE_CORPS_PENTE)
+    );
+    const t = ctx.currentTime + retard;
+    const duree = TRANCHE_CORPS_MONTEE + TRANCHE_CORPS_EXTINCTION * 3;
+
+    const src = ctx.createBufferSource();
+    src.buffer = this.getNoise(ctx);
+    const bande = ctx.createBiquadFilter();
+    bande.type = 'bandpass';
+    bande.Q.value = 1.4;
+    bande.frequency.setValueAtTime(centre * 1.35, t);
+    bande.frequency.exponentialRampToValueAtTime(centre * 0.72, t + duree);
+    const toit = ctx.createBiquadFilter();
+    toit.type = 'lowpass';
+    toit.frequency.value = 1500;
+    toit.Q.value = 0.7;
+
+    const gain = ctx.createGain();
+    // Une rampe exponentielle ne part jamais de zéro : on démarre très bas.
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(
+      Math.max(0.0002, TRANCHE_CORPS_VOLUME * v),
+      t + TRANCHE_CORPS_MONTEE
+    );
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + duree);
+
+    src.connect(bande).connect(toit).connect(gain).connect(this.bus(ctx));
+    src.start(t, Math.random() * 0.4);
+    src.stop(t + duree + 0.02);
   }
 
   /**

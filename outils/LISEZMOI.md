@@ -47,3 +47,19 @@ FICHIER=public/assets/sfx/tranche.wav EVENEMENTS=0.0,0.0874 node outils/timbre.m
 
 Gère le mono comme la stéréo. `DECALAGE` ajoute une constante aux instants
 affichés, pratique quand on compare un enregistrement à une vidéo.
+
+## `coupe-rendu.mjs` — assemble une découpe hors ligne
+
+Reproduit la chaîne de `SfxManager.trancheReelle()` : la lame, la chair 55 ms
+après, et le corps grave synthétisé sous les deux. Sert à régler le son sans
+avoir à lancer le jeu, et surtout à le MESURER avant de toucher au code.
+
+```bash
+node outils/coupe-rendu.mjs 60 0.75      # rayon du fruit, volume du corps
+node outils/coupe-rendu.mjs 60 0.75 5000 # + un toit sur le jus (4e argument)
+```
+
+Le toit sur le jus existe ici et **pas** dans le jeu : mesuré, il rapprochait
+la coupe du profil de la référence (46 % d'énergie entre 400 et 1200 Hz au lieu
+de 34 %), mais Kevin a comparé à l'oreille et préféré garder le brillant. C'est
+un réglage d'expérimentation, sa place est dans l'outil.

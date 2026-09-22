@@ -1086,3 +1086,57 @@ export const MUSIQUE_DUREE = 761653 / 48000;
  */
 export const MUSIQUE_RETARD = 1105 / 48000;
 export const MUSIQUE_SURPLUS = 2123 / 48000;
+
+/**
+ * LE CORPS DE LA CHAIR — le poids sous la coupe.
+ *
+ * CE QUI MANQUAIT, ET COMMENT ON L'A SU. Mesuré sur un enregistrement de Fruit
+ * Ninja fourni par Kevin : leurs découpes portent 44 à 56 % de leur énergie
+ * entre 400 et 1200 Hz, avec un centre de gravité entre 640 et 1970 Hz. La
+ * nôtre en portait 7,4 %, centre à 4393 Hz.
+ *
+ * Autrement dit, on avait construit un SIFFLEMENT là où il faut un CHOC. C'est
+ * aussi l'explication du « le jus est pas assez » de Kevin : on a monté le
+ * volume, puis le retard, puis encore le volume — en travaillant un son qui
+ * n'était pas dans le bon registre. Monter un sifflement ne le rend pas charnu.
+ *
+ * Le corps est du bruit passé dans une bande étroite qui DESCEND, parce qu'un
+ * fruit qui cède ne claque pas à hauteur fixe : il s'écrase.
+ */
+export const TRANCHE_CORPS_VOLUME = 0.75;
+/**
+ * Montée de 16 ms, posée sur le même retard que le jus.
+ *
+ * Le pic du corps tombe donc 71 ms après la lame — dans la fenêtre 65-80 ms
+ * mesurée entre le coup de lame et l'impact sur la référence. Ce n'est pas un
+ * réglage à l'oreille : c'est là que l'impact tombe chez eux.
+ */
+export const TRANCHE_CORPS_MONTEE = 0.016;
+export const TRANCHE_CORPS_EXTINCTION = 0.038;
+/**
+ * Le centre du corps suit la taille du fruit, entre 500 et 950 Hz.
+ *
+ * Un letchi s'effondre plus haut qu'une papaye, comme un petit tambour sonne
+ * plus haut qu'un grand. Bornes choisies pour rester dans la bande qu'un
+ * haut-parleur de téléphone restitue — sous 400 Hz on n'entendrait rien.
+ */
+export const TRANCHE_CORPS_BASE = 1204;
+export const TRANCHE_CORPS_PENTE = 7.6;
+export const TRANCHE_CORPS_MIN = 500;
+export const TRANCHE_CORPS_MAX = 950;
+/**
+ * POURQUOI ON NE TOUCHE PAS AU BRILLANT DU JUS, alors que la mesure y invitait.
+ *
+ * Notre échantillon de chair porte 32 % de son énergie au-dessus de 3,5 kHz,
+ * là où la référence n'en a que 2 à 12 %. Un toit à 5 kHz sur le jus faisait
+ * passer la bande du choc de 34 % à 46 %, donc pile dans la fourchette de
+ * Fruit Ninja (44-56 %).
+ *
+ * Kevin a comparé les deux à l'oreille et a choisi de GARDER LE BRILLANT. La
+ * référence sonne mat ; Kout Sab' n'a aucune obligation de l'être, et le
+ * mordant fait partie de ce qu'il veut. On s'arrête donc à 34 % : le poids
+ * qui manquait est là, le tranchant n'a pas été payé pour l'obtenir.
+ *
+ * Le réglage reste disponible dans outils/coupe-rendu.mjs (4e argument) si on
+ * veut y revenir — c'est sa place, pas celle du jeu.
+ */
