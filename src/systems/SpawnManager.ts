@@ -21,6 +21,8 @@ import {
   SPAWN_WARMUP_WAVES,
   INTENSITY_RAMP_MS,
   INTENSITY_RAMP_CHRONO_MS,
+  INTENSITY_RAMP_FRUITS_CHRONO,
+  CHRONO_INTENSITE_DEPART,
   INTENSITY_RAMP_FRUITS,
   OVERDRIVE_RAMP_MS,
   SPAWN_INTERVAL_FLOOR_MS,
@@ -257,14 +259,39 @@ export class SpawnManager {
    * courte, sinon la partie se terminerait avant d'avoir décollé.
    */
   getIntensity(): number {
-    const rampMs = this.mode === 'chrono' ? INTENSITY_RAMP_CHRONO_MS : INTENSITY_RAMP_MS;
+    const chrono = this.mode === 'chrono';
+    const rampMs = chrono ? INTENSITY_RAMP_CHRONO_MS : INTENSITY_RAMP_MS;
     const byTime = (this.scene.time.now - this.startTime) / rampMs;
     // Progression du JOUEUR, mesurée en fruits tranchés et non en points :
     // le score dépend des combos, du combava et de la frénésie, donc il
     // déplaçait la difficulté à chaque rééquilibrage du barème. C'est aussi
     // la mesure de Fruit Ninja : la cadence y monte à mesure que l'on tranche.
-    const byFruits = this.fruitsSliced() / INTENSITY_RAMP_FRUITS;
-    return Phaser.Math.Clamp(Math.max(byTime, byFruits), 0, 1);
+    const cible = chrono ? INTENSITY_RAMP_FRUITS_CHRONO : INTENSITY_RAMP_FRUITS;
+    const byFruits = this.fruitsSliced() / cible;
+    const brut = Phaser.Math.Clamp(Math.max(byTime, byFruits), 0, 1);
+    if (!chrono) {
+      return brut;
+    }
+    // Le Chrono s'ouvre à mi-régime et monte de là : voir
+    // CHRONO_INTENSITE_DEPART. La progression garde toute son amplitude, elle
+    // est simplement repliée dans la moitié haute.
+    return CHRONO_INTENSITE_DEPART + (1 - CHRONO_INTENSITE_DEPART) * brut;
+  }
+
+  /**
+   * Les vagues de découverte — un fruit, puis deux — n'existent qu'en
+   * Classique. Elles apprennent le jeu à qui le découvre ; en Chrono elles
+   * mangeraient les dix premières secondes d'une partie qui n'en dure que
+   * soixante.
+   */
+  private vaguesDouces(): number {
+    // -1 et non 0 : les compteurs partent de zéro, donc rendre 0 laisserait
+    // encore la toute première vague en fruit unique.
+    return this.mode === 'chrono' ? -1 : SPAWN_GENTLE_WAVES;
+  }
+
+  private vaguesEchauffement(): number {
+    return this.mode === 'chrono' ? -1 : SPAWN_WARMUP_WAVES;
   }
 
   /**
@@ -307,15 +334,15 @@ export class SpawnManager {
       interval *= SPAWN_BREATHER_FACTOR;
     }
     // Découverte : les toutes premières vagues laissent franchement respirer
-    return this.waveIndex < SPAWN_GENTLE_WAVES ? interval + 250 : interval;
+    return this.waveIndex < this.vaguesDouces() ? interval + 250 : interval;
   }
 
   /** Tirage pondéré de la forme de salve selon l'intensité. */
   private pickShape(): WaveShape {
-    if (this.waveIndex <= SPAWN_GENTLE_WAVES) {
+    if (this.waveIndex <= this.vaguesDouces()) {
       return 'solo';
     }
-    if (this.waveIndex <= SPAWN_WARMUP_WAVES) {
+    if (this.waveIndex <= this.vaguesEchauffement()) {
       return rnd() < 0.5 ? 'solo' : 'duo';
     }
     const intensity = this.getIntensity();

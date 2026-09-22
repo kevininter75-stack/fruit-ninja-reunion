@@ -176,7 +176,44 @@ export const OVERDRIVE_RAMP_MS = 170_000;
 export const SPAWN_INTERVAL_FLOOR_MS = 520;
 /** Densité de bombes en plein sur-régime (Fruit Ninja : environ une pour six). */
 export const BOMB_EVERY_FRUITS_OVERDRIVE = 4;
-export const INTENSITY_RAMP_CHRONO_MS = 55_000; // Chrono (60 s) : montée plus vive
+/**
+ * LE CHRONO NE DÉMARRE PAS À FROID.
+ *
+ * Le Classique et le Chrono ne racontent pas la même chose. Le Classique est
+ * une endurance : il commence doucement, monte, et finit par avoir raison du
+ * joueur. Le Chrono dure soixante secondes et se mesure en points — une montée
+ * progressive y gaspille la moitié de la partie à ne rien proposer, et le
+ * joueur n'a pas le temps d'atteindre ce pour quoi le mode existe.
+ *
+ * D'où le plancher : le Chrono s'ouvre à mi-régime et monte de là. Les vagues
+ * de découverte (SPAWN_GENTLE_WAVES, SPAWN_WARMUP_WAVES), qui imposent un
+ * fruit puis deux, sont sautées pour la même raison — elles enseignent le jeu,
+ * et on ne vient pas apprendre en Chrono.
+ */
+export const CHRONO_INTENSITE_DEPART = 0.5;
+/** Plein régime à 38 s : les vingt dernières secondes se jouent à fond. */
+export const INTENSITY_RAMP_CHRONO_MS = 38_000;
+/**
+ * Le moteur « fruits » du Chrono, ramené à sa durée.
+ *
+ * Les 170 fruits du Classique sont hors d'atteinte en soixante secondes : le
+ * moteur ne se serait jamais déclenché, et un joueur rapide n'aurait pas pu
+ * accélérer lui-même la partie comme il le fait en Classique.
+ */
+export const INTENSITY_RAMP_FRUITS_CHRONO = 70;
+/**
+ * LA BOMBE EN CHRONO COÛTE DU TEMPS, PAS LA PARTIE.
+ *
+ * Terminer sur une bombe a du sens en Classique : on y joue sa survie, et la
+ * bombe est la mort. En Chrono on joue un total de points sur une durée fixe —
+ * y mettre fin d'un seul coup ne sanctionne pas l'erreur, ça supprime tout le
+ * reste du jeu, y compris ce qui a été bien joué.
+ *
+ * Dix secondes sur soixante, c'est un sixième de la partie : assez cher pour
+ * qu'on évite les bombes, assez peu pour qu'une erreur laisse de quoi se
+ * refaire.
+ */
+export const CHRONO_BOMBE_PENALITE_MS = 10_000;
 /**
  * Nombre de fruits tranchés qui suffit à saturer l'intensité.
  *
@@ -1056,6 +1093,7 @@ export const COLOR_BONUS = '#8ef2c8';
 export const CYCLONE_AURA_SCALE = 4.2;
 export const CYCLONE_AURA_ALPHA_MIN = 0.3;
 export const CYCLONE_AURA_ALPHA_MAX = 0.62;
+
 /**
  * LA BOUCLE MALOYA.
  *

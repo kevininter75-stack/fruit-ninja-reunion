@@ -71,6 +71,7 @@ import {
   SEED_BURST_COUNT,
   BOMB_POOL_SIZE,
   BOMB_GAMEOVER_DELAY_MS,
+  CHRONO_BOMBE_PENALITE_MS,
   JUICE_PARTICLE_COUNT,
   TEX_SPLAT_PREFIX,
   SPLAT_VARIANTS,
@@ -258,6 +259,10 @@ export class GameScene extends Phaser.Scene {
   private delugeFruits = 0;
   private grading!: SceneGrading;
   private chronoEndTime = 0;
+  /** Jusqu'à quand le compteur reste en alerte après un coup de bombe. */
+  private alerteChronoJusqua = 0;
+  /** État courant de l'alerte, pour ne repeindre qu'aux bascules. */
+  private chronoEnAlerte = false;
   /** Avancement à restaurer après une rotation d'écran, sinon null. */
   private resume: RunSnapshot | null = null;
   /** Instant du début de la partie, reporté en arrière après une rotation. */
@@ -958,9 +963,18 @@ export class GameScene extends Phaser.Scene {
     if (seconds !== this.lastShownSecond) {
       this.lastShownSecond = seconds;
       this.infoText.setText(`${seconds} s`);
-      if (seconds <= 5 && seconds > 0) {
-        this.infoText.setColor('#ff5252'); // urgence visuelle en fin de chrono
-      }
+    }
+    // LA COULEUR SUIT SON PROPRE ÉTAT, et non le changement de seconde.
+    //
+    // Le rouge dit deux choses différentes : la fin de chrono, et le coup de
+    // bombe qu'on vient d'encaisser. Les mêler au rafraîchissement du texte ne
+    // marchait pas : une bombe force le réaffichage pour que le temps chute
+    // sous les yeux du joueur, et la couleur se serait donc remise au blanc
+    // dans la même image — l'éclair rouge n'aurait jamais été visible.
+    const alerte = (seconds <= 5 && seconds > 0) || this.time.now < this.alerteChronoJusqua;
+    if (alerte !== this.chronoEnAlerte) {
+      this.chronoEnAlerte = alerte;
+      this.infoText.setColor(alerte ? '#ff5252' : '#ffffff');
     }
     if (remainingMs <= 0) {
       this.gameEnded = true;
@@ -2276,10 +2290,17 @@ export class GameScene extends Phaser.Scene {
     if (this.gameEnded) {
       return;
     }
-    this.gameEnded = true;
     const bx = bomb.x;
     const by = bomb.y;
     bomb.kill();
+
+    // EN CHRONO, LA BOMBE NE TUE PAS : elle vole du temps. La partie continue.
+    if (this.mode === 'chrono') {
+      this.bombeChrono(bx, by);
+      return;
+    }
+
+    this.gameEnded = true;
     this.spawnManager.stop();
     // Tous les gestes en cours sont interrompus
     for (const gesture of this.gestures) {
@@ -2316,6 +2337,60 @@ export class GameScene extends Phaser.Scene {
 
     // Fin différée, un peu allongée pour savourer le ralenti et le zoom
     this.time.delayedCall(BOMB_GAMEOVER_DELAY_MS + 350, () => this.endGame('bomb'));
+  }
+
+  /**
+   * La bombe en Chrono : elle coûte dix secondes, pas la partie.
+   *
+   * POURQUOI LA SANCTION DIFFÈRE. En Classique on joue sa survie et la bombe
+   * est la mort. En Chrono on joue un total de points sur une durée fixe : y
+   * mettre fin d'un seul coup ne sanctionne pas l'erreur, ça efface tout le
+   * reste — y compris ce qui a été bien joué. Dix secondes sur soixante, c'est
+   * un sixième de la partie : assez cher pour qu'on évite les bombes, assez
+   * peu pour qu'il reste de quoi se refaire.
+   *
+   * L'EFFET EST VOLONTAIREMENT PLUS COURT QU'EN CLASSIQUE. Là-bas l'explosion
+   * clôt la partie : on peut prendre une seconde entière de ralenti et de zoom
+   * pour l'encaisser. Ici elle tombe en plein jeu, et ce mode vit de son
+   * rythme — un ralenti à chaque bombe casserait précisément ce qu'on cherche
+   * à tenir. Pas de ralenti physique, pas de zoom, pas de gestes interrompus :
+   * une secousse, un éclair bref, et on continue.
+   */
+  private bombeChrono(bx: number, by: number): void {
+    this.chronoEndTime -= CHRONO_BOMBE_PENALITE_MS;
+    // Le compteur ne se redessine qu'au changement de seconde : sans cette
+    // remise à zéro, le joueur verrait son temps chuter une seconde plus tard,
+    // détaché de l'explosion qui l'a causé.
+    this.lastShownSecond = -1;
+
+    sfx.explosion();
+    this.hitStop(Math.round(HITSTOP_BOMB_MS * 0.45));
+
+    this.juiceEmitter.setParticleTint(0x2a2a33);
+    this.juiceEmitter.emitParticleAt(bx, by, JUICE_PARTICLE_COUNT);
+    this.fuseEmitter.emitParticleAt(bx, by, 18);
+    this.shakeCamera(260, 0.016);
+
+    this.flashRect.setVisible(true).setAlpha(0.7);
+    this.tweens.add({
+      targets: this.flashRect,
+      alpha: 0,
+      duration: 220,
+      onComplete: () => this.flashRect.setVisible(false),
+    });
+
+    const secondes = Math.round(CHRONO_BOMBE_PENALITE_MS / 1000);
+    this.showPopup(bx, by - px(20), `− ${secondes} s`, '#ff5252', px(52));
+
+    // Le compteur encaisse le coup : c'est là que le joueur doit regarder.
+    // La couleur est pilotée par updateChrono, qui respecte cette échéance.
+    this.alerteChronoJusqua = this.time.now + 900;
+    this.tweens.add({
+      targets: this.infoText,
+      scale: { from: 1.35, to: 1 },
+      duration: 380,
+      ease: 'Back.easeOut',
+    });
   }
 
   /**
