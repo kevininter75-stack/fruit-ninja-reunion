@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { sfx } from '../systems/SfxManager';
+import { music } from '../systems/MusicManager';
 import {
   PORTRAIT_WIDTH,
   PORTRAIT_HEIGHT,
@@ -70,6 +71,7 @@ export class PreloadScene extends Phaser.Scene {
     // un. Le fichier est donc déjà là quand le joueur touche l'écran pour la
     // première fois, et la première coupe sonne comme les suivantes.
     sfx.precharger();
+    music.precharger();
 
     this.buildLoadingScreen();
 

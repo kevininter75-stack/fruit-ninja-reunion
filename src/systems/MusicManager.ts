@@ -1,78 +1,98 @@
 import { getAudioContext } from '../utils/audioContext';
 import { isMuted, setMuted } from '../utils/settings';
+import {
+  MUSIQUE_DUREE,
+  MUSIQUE_FICHIER,
+  MUSIQUE_RETARD,
+  MUSIQUE_SURPLUS,
+} from '../utils/constants';
 
 /**
- * Musique d'ambiance placeholder synthétisée en Web Audio — aucun fichier requis.
+ * La musique de fond : une boucle maloya, plus un ressac d'océan.
  *
- * Boucle instrumentale d'inspiration séga (l'identité musicale réunionnaise) :
- * marimba pentatonique, basse ronde, cabosse sur les contretemps, et un
- * ressac d'océan continu en fond. Quand une vraie musique arrivera
- * (public/assets/music/), cette façade sera remplacée sans changer les appels.
+ * CE QUI A REMPLACÉ QUOI. Jusqu'ici la musique était un séga synthétisé note à
+ * note en Web Audio — marimba pentatonique, basse en dent de scie, cabosse,
+ * roulèr — programmé par un ordonnanceur à anticipation. C'était un placeholder
+ * assumé, en attendant une vraie musique. Elle est arrivée : huit mesures de
+ * maloya à 121 BPM, synthétisées instrument par instrument hors du jeu, puis
+ * rendues en un seul fichier.
  *
- * Implémentation : ordonnanceur à anticipation (lookahead scheduling) —
- * un setInterval JS peu précis programme les notes en avance sur l'horloge
- * échantillon de l'AudioContext, qui elle est précise. Motif de 32 croches
- * (4 mesures) en pentatonique de do : aucune note ne peut sonner fausse.
+ * Rien n'y est emprunté, ni enregistrement ni mélodie : aucune question de
+ * licence ne se pose, ni ici ni sur les magasins d'applications.
+ *
+ * POURQUOI UN FICHIER ET NON UNE SYNTHÈSE À L'EXÉCUTION, alors que tout le
+ * reste de ce système est synthétisé. Parce que le rendu de la boucle prend
+ * 4,6 s sur un ordinateur de bureau : un téléphone y passerait dix à quarante
+ * secondes. Le fichier coûte 249 Ko, payés une fois et mis en cache par la PWA.
+ *
+ * CE QUE CE CHANGEMENT A SUPPRIMÉ, ET C'EST UN SOULAGEMENT. L'ancien
+ * ordonnanceur était un setInterval du NAVIGATEUR programmant des notes contre
+ * l'horloge de l'AudioContext. Quand l'application passait en arrière-plan,
+ * l'horloge audio se figeait mais pas le minuteur : il voyait son retard
+ * grandir, programmait des croches en rafale, et le joueur recevait toute la
+ * musique de son absence d'un coup au retour. Il fallait donc arrêter
+ * l'ordonnanceur à la mise en veille et le relancer au réveil.
+ *
+ * Une boucle jouée par un AudioBufferSourceNode ne connaît pas ce problème :
+ * elle vit entièrement sur l'horloge audio. Suspendre le contexte la fige, le
+ * reprendre la fait repartir exactement où elle en était. `suspend()` et
+ * `wake()` n'ont donc plus rien à arrêter — ils ne font plus que tenir le
+ * drapeau à jour.
  */
-
-const BPM = 104;
-const STEP_SECONDS = 60 / BPM / 2; // une croche
-const PATTERN_STEPS = 32; // 4 mesures à 4 temps
-
-// Fréquences des notes utilisées (tempérament égal, la4 = 440 Hz)
-const N = {
-  C2: 65.41, G2: 98.0, A2: 110.0,
-  A3: 220.0, C4: 261.63, D4: 293.66, E4: 329.63, G4: 392.0, A4: 440.0, C5: 523.25,
-} as const;
-
-// Mélodie de marimba (null = silence) — gamme pentatonique de do
-const MELODY: Array<number | null> = [
-  N.C4, null, N.E4, N.G4, N.A4, null, N.G4, N.E4,
-  N.D4, null, N.E4, N.D4, N.C4, null, N.A3, null,
-  N.C4, null, N.E4, N.G4, N.A4, null, N.C5, N.A4,
-  N.G4, null, N.E4, N.D4, N.C4, null, null, null,
-];
-
-// Basse : une note par temps (steps pairs), racine/quinte
-const BASS: Array<number | null> = [
-  N.C2, null, N.G2, null, N.A2, null, N.G2, null,
-  N.C2, null, N.G2, null, N.A2, null, N.G2, null,
-  N.C2, null, N.G2, null, N.A2, null, N.G2, null,
-  N.C2, null, N.A2, null, N.G2, null, N.G2, null,
-];
-
-/**
- * Ou frappe le rouler, dans chaque mesure de huit croches.
- *
- * 3-3-2 : c'est la pulsation du sega et du maloya, celle qui donne le
- * balancement parce qu'elle tombe a cote des temps forts de la basse.
- *
- * Le MENU en garde les deux premieres frappes seulement, et plus doucement :
- * assez pour qu'on entende un morceau et pas une nappe, pas assez pour
- * presser le joueur avant qu'il n'ait choisi son mode. C'est la meme boucle
- * qui prend son elan au lancement de la partie -- le signal le moins couteux
- * pour dire << ca commence >>.
- */
-const ROULER_PARTIE = [0, 3, 6];
-const ROULER_MENU = [0, 3];
 
 const MUSIC_VOLUME = 0.2;
-/** En partie, la boucle monte d'un tiers : c'est ce qui dit que ca commence. */
+/** En partie, la boucle monte d'un tiers : c'est ce qui dit que ça commence. */
 const MUSIC_VOLUME_PARTIE = 0.27;
 
 export class MusicManager {
   private started = false;
   private master: GainNode | null = null;
   private noiseBuffer: AudioBuffer | null = null;
-  private schedulerId: number | null = null;
-  private nextStepTime = 0;
-  private step = 0;
   /** Vrai quand l'application est en arrière-plan (endormie, mais pas arrêtée). */
   private dormante = false;
-  /** Vrai pendant une partie : le roulèr entre, la boucle prend son élan. */
+  /** Vrai pendant une partie : la boucle monte d'un tiers. */
   private enPartie = false;
 
-  /** Démarre la boucle (idempotent — appelé à chaque entrée de scène). */
+  /** Le fichier brut, récupéré avant même qu'un AudioContext existe. */
+  private brut: ArrayBuffer | null = null;
+  private boucle: AudioBuffer | null = null;
+  private decodage = false;
+  private source: AudioBufferSourceNode | null = null;
+
+  /**
+   * Récupère le fichier sans attendre le premier geste du joueur.
+   *
+   * Même partage des rôles que pour les bruitages : le réseau ne demande aucune
+   * permission, seul le décodage a besoin d'un AudioContext, lequel n'apparaît
+   * qu'au premier contact. Séparer les deux fait que la musique démarre à
+   * l'instant du geste au lieu d'arriver quelques centaines de millisecondes
+   * plus tard.
+   *
+   * BASE_URL et pas un chemin absolu : le jeu est servi depuis la racine en
+   * local et depuis /fruit-ninja-reunion/ sur GitHub Pages.
+   */
+  precharger(): void {
+    if (this.brut !== null || this.boucle !== null) {
+      return;
+    }
+    fetch(import.meta.env.BASE_URL + MUSIQUE_FICHIER)
+      .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
+      .then((buf) => {
+        this.brut = buf;
+        // Le contexte peut déjà exister si le joueur a touché l'écran pendant
+        // le téléchargement : dans ce cas on enchaîne sans attendre une scène.
+        const ctx = getAudioContext();
+        if (this.started && ctx !== null) {
+          this.assurerBoucle(ctx);
+        }
+      })
+      .catch(() => {
+        // Réseau absent, fichier manquant : le ressac d'océan joue seul. Le jeu
+        // reste parfaitement jouable, il est simplement plus silencieux.
+      });
+  }
+
+  /** Démarre la musique (idempotent — appelé à chaque entrée de scène). */
   ensureRunning(): void {
     if (this.started) {
       return;
@@ -88,67 +108,114 @@ export class MusicManager {
     this.master.connect(ctx.destination);
 
     this.startOcean(ctx);
+    this.assurerBoucle(ctx);
+  }
 
-    this.startScheduler(ctx);
+  /** Décode le fichier, puis lance la boucle dès qu'elle est prête. */
+  private assurerBoucle(ctx: AudioContext): void {
+    if (this.boucle !== null) {
+      this.lancerBoucle(ctx);
+      return;
+    }
+    if (this.brut === null || this.decodage) {
+      return;
+    }
+    this.decodage = true;
+    // decodeAudioData consomme (« détache ») le tampon qu'on lui passe : sans
+    // cette copie, une seconde tentative recevrait un ArrayBuffer vide.
+    ctx
+      .decodeAudioData(this.brut.slice(0))
+      .then((buffer) => {
+        this.boucle = buffer;
+        this.decodage = false;
+        this.lancerBoucle(ctx);
+      })
+      .catch(() => {
+        // Format refusé par ce navigateur : on abandonne pour de bon plutôt que
+        // de retenter à chaque changement de scène.
+        this.decodage = false;
+        this.brut = null;
+      });
   }
 
   /**
-   * Ordonnanceur : toutes les 50 ms, programme les croches des 120 ms à venir.
+   * Où commence et où finit vraiment la boucle dans le fichier décodé.
    *
-   * C'est un setInterval, donc une horloge du NAVIGATEUR et non celle de
-   * Phaser. Phaser met sa boucle en pause quand la page se cache, mais ce
-   * minuteur-là ne le sait pas : c'est lui qui continuait à jouer du séga
-   * téléphone verrouillé.
+   * Un encodeur MP3 pose un silence devant et complète la fin jusqu'à la trame
+   * suivante. Boucler le fichier entier ferait donc un blanc à chaque tour :
+   * les points de boucle sautent ces deux marges.
+   *
+   * ON LE DÉTECTE, ON NE LE SUPPOSE PAS. Certains décodeurs honorent les
+   * balises d'écart du fichier et rendent déjà la durée exacte — Safari fait
+   * autrement que Chrome. Retrancher un retard qui a déjà été retiré décalerait
+   * la boucle et créerait précisément la couture qu'on veut éviter. La longueur
+   * décodée dit laquelle des deux situations on a.
    */
-  private startScheduler(ctx: AudioContext): void {
-    this.nextStepTime = ctx.currentTime + 0.1;
-    this.schedulerId = window.setInterval(() => {
-      while (this.nextStepTime < ctx.currentTime + 0.12) {
-        this.scheduleStep(ctx, this.step % PATTERN_STEPS, this.nextStepTime);
-        this.nextStepTime += STEP_SECONDS;
-        this.step += 1;
+  private pointsDeBoucle(buffer: AudioBuffer): { debut: number; fin: number } {
+    const surplus = buffer.duration - MUSIQUE_DUREE;
+    const retard = surplus > MUSIQUE_SURPLUS / 2 ? MUSIQUE_RETARD : 0;
+    return { debut: retard, fin: Math.min(retard + MUSIQUE_DUREE, buffer.duration) };
+  }
+
+  private lancerBoucle(ctx: AudioContext): void {
+    if (this.master === null || this.boucle === null || this.source !== null || this.dormante) {
+      return;
+    }
+    const { debut, fin } = this.pointsDeBoucle(this.boucle);
+    const src = ctx.createBufferSource();
+    src.buffer = this.boucle;
+    src.loop = true;
+    src.loopStart = debut;
+    src.loopEnd = fin;
+    src.connect(this.master);
+    src.start(0, debut);
+    this.source = src;
+  }
+
+  private arreterSource(): void {
+    if (this.source !== null) {
+      try {
+        this.source.stop();
+      } catch {
+        // Déjà arrêtée : rien à faire.
       }
-    }, 50);
+      this.source.disconnect();
+      this.source = null;
+    }
   }
 
   /**
-   * Endort la musique quand l'application passe en arrière-plan.
+   * Met la musique en veille quand l'application passe en arrière-plan.
    *
-   * On ARRÊTE l'ordonnanceur, on ne se contente pas de suspendre le contexte.
-   * Sans cela le minuteur continuerait de tourner contre une horloge audio
-   * figée : à chaque tour il verrait `nextStepTime` en retard, programmerait
-   * des croches en rafale, et le joueur recevrait toute la musique de son
-   * absence d'un seul coup au retour.
+   * Il n'y a plus rien à arrêter : c'est la suspension du contexte audio qui
+   * fige la boucle, et elle repart d'elle-même au même endroit. On ne tient
+   * plus que le drapeau, pour que `wake()` sache s'il a quelque chose à faire.
    */
   suspend(): void {
-    if (this.schedulerId !== null) {
-      window.clearInterval(this.schedulerId);
-      this.schedulerId = null;
-    }
     this.dormante = true;
   }
 
-  /** Rend la musique au premier plan, en repartant de l'instant présent. */
+  /** Rend la musique au premier plan. */
   wake(): void {
     if (!this.dormante) {
       return;
     }
     this.dormante = false;
-    if (!this.started || this.schedulerId !== null) {
+    if (!this.started) {
       return;
     }
+    // La boucle a survécu à la veille dans l'immense majorité des cas. Si elle
+    // n'avait jamais démarré — contexte absent au lancement, fichier arrivé
+    // depuis — c'est ici qu'elle prend son départ.
     const ctx = getAudioContext();
     if (ctx !== null) {
-      this.startScheduler(ctx);
+      this.assurerBoucle(ctx);
     }
   }
 
-  /** Arrête l'ordonnanceur (la boucle en cours s'éteint d'elle-même). */
+  /** Arrête la musique. */
   stop(): void {
-    if (this.schedulerId !== null) {
-      window.clearInterval(this.schedulerId);
-      this.schedulerId = null;
-    }
+    this.arreterSource();
     this.started = false;
     this.dormante = false;
   }
@@ -166,129 +233,19 @@ export class MusicManager {
     return muted;
   }
 
-  /** Programme les instruments d'une croche donnée du motif. */
-  private scheduleStep(ctx: AudioContext, patternStep: number, time: number): void {
-    const melodyNote = MELODY[patternStep];
-    if (melodyNote !== null) {
-      this.playMarimba(ctx, melodyNote, time);
-    }
-    const bassNote = BASS[patternStep];
-    if (bassNote !== null) {
-      this.playBass(ctx, bassNote, time);
-    }
-    // Cabosse (shaker) : contretemps accentués, façon séga. Elle frappe plus
-    // fort en partie qu'au menu.
-    if (patternStep % 2 === 1) {
-      const fort = patternStep % 4 === 3;
-      this.playShaker(ctx, time, (fort ? 0.09 : 0.05) * (this.enPartie ? 1.6 : 0.8));
-    }
-    // LE ROULÈR N'ENTRE QU'EN PARTIE. C'est ce qui distingue le menu du match :
-    // même boucle, mais elle se met en marche quand on joue. Une musique qui
-    // change au lancement de la partie, c'est le signal le moins coûteux et le
-    // plus efficace pour dire « ça commence ».
-    //
-    // Motif 3-3-2 sur chaque mesure de huit croches, la pulsation du séga :
-    // elle tombe à côté des temps forts de la basse, et c'est le décalage
-    // entre les deux qui donne le balancement.
-    const dansLaMesure = patternStep % 8;
-    const motif = this.enPartie ? ROULER_PARTIE : ROULER_MENU;
-    if (motif.includes(dansLaMesure)) {
-      const fort = dansLaMesure === 0;
-      const ampleur = this.enPartie ? 1.1 : 0.55;
-      this.playRouler(ctx, time, (fort ? 0.5 : 0.34) * ampleur);
-    }
-  }
-
   /**
-   * Le roulèr : le gros tambour du séga et du maloya.
+   * Menu ou partie.
    *
-   * LA PREMIÈRE VERSION NE SONNAIT PAS COMME UN TAMBOUR, et pour une raison
-   * précise : elle était faite de 100 ms de bruit filtré. Du bruit qui dure,
-   * c'est un « chhh » — un balai, un souffle, tout sauf une peau frappée. Une
-   * frappe est un événement très court suivi d'une RÉSONANCE qui chante.
+   * Le lancement d'une partie fait monter la musique d'un tiers, en une
+   * demi-seconde. C'est assez court pour qu'on le rattache au geste, et assez
+   * long pour que ce ne soit pas un à-coup — le signal le moins coûteux pour
+   * dire « ça commence ».
    *
-   * Ce qui fait entendre un tambour, c'est l'ENVELOPPE DE HAUTEUR. Quand une
-   * peau est frappée, sa tension s'effondre dans les premières millisecondes :
-   * la note part haut et tombe aussitôt. Ici, 430 Hz → 95 Hz en 80 ms. C'est ce
-   * plongeon, et lui seul, qui distingue un tambour d'un simple bourdon grave.
-   * L'ancienne version ne descendait que de 190 à 80 Hz en 140 ms : trop peu,
-   * et trop lentement.
-   *
-   * Trois couches, toutes brèves :
-   *   1. LA MAIN sur la peau : 10 ms de bruit aigu, l'instant du contact ;
-   *   2. LA PEAU : 35 ms autour de 600 Hz — et non 100 ms, c'était là le défaut ;
-   *   3. LA MEMBRANE : le plongeon 430 → 95 Hz, qui résonne 300 ms.
-   *
-   * La couche 2 n'est pas décorative : un tambour qui ne vivrait qu'à 95 Hz
-   * serait muet sur un téléphone, exactement comme l'était la basse en sinus.
-   * C'est elle, entre 350 et 700 Hz, qui porte le rythme sur un petit
-   * haut-parleur, pendant que la membrane donne le poids sur une enceinte.
-   * D'où leur dosage : la peau a été montée et la membrane retenue, parce que
-   * le grave du tambour mangeait la part du mixage qu'un téléphone restitue.
-   *
-   * La hauteur varie légèrement d'une frappe à l'autre : une peau tendue à la
-   * main ne rend jamais deux fois exactement la même note, et sans cette
-   * variation le motif devient une boîte à rythmes.
-   */
-  private playRouler(ctx: AudioContext, time: number, volume: number): void {
-    if (this.master === null) {
-      return;
-    }
-    const tension = 0.94 + Math.random() * 0.12;
-
-    // 1. La main sur la peau.
-    const main = ctx.createBufferSource();
-    main.buffer = this.getNoise(ctx);
-    const aigu = ctx.createBiquadFilter();
-    aigu.type = 'highpass';
-    aigu.frequency.value = 1800;
-    const gMain = ctx.createGain();
-    gMain.gain.setValueAtTime(volume * 0.3, time);
-    gMain.gain.exponentialRampToValueAtTime(0.001, time + 0.012);
-    main.connect(aigu).connect(gMain).connect(this.master);
-    main.start(time, Math.random() * 0.4);
-    main.stop(time + 0.03);
-
-    // 2. La peau : court, et c'est tout l'intérêt.
-    const peau = ctx.createBufferSource();
-    peau.buffer = this.getNoise(ctx);
-    const bande = ctx.createBiquadFilter();
-    bande.type = 'bandpass';
-    bande.Q.value = 1.8;
-    bande.frequency.setValueAtTime(700 * tension, time);
-    bande.frequency.exponentialRampToValueAtTime(340 * tension, time + 0.035);
-    const gPeau = ctx.createGain();
-    gPeau.gain.setValueAtTime(volume * 0.55, time);
-    gPeau.gain.exponentialRampToValueAtTime(0.001, time + 0.04);
-    peau.connect(bande).connect(gPeau).connect(this.master);
-    peau.start(time, Math.random() * 0.4);
-    peau.stop(time + 0.05);
-
-    // 3. La membrane : le plongeon de hauteur, puis la résonance.
-    const membrane = ctx.createOscillator();
-    membrane.type = 'sine';
-    membrane.frequency.setValueAtTime(430 * tension, time);
-    membrane.frequency.exponentialRampToValueAtTime(95 * tension, time + 0.08);
-    const gMembrane = ctx.createGain();
-    gMembrane.gain.setValueAtTime(volume * 0.78, time);
-    gMembrane.gain.exponentialRampToValueAtTime(0.001, time + 0.3);
-    membrane.connect(gMembrane).connect(this.master);
-    membrane.start(time);
-    membrane.stop(time + 0.32);
-  }
-
-  /**
-   * Menu ou partie. Deux choses changent, et il faut les deux.
-   *
-   * Le motif du roulèr d'abord : deux frappes par mesure au menu, trois en
-   * partie. Le NIVEAU ensuite — et c'est lui qui manquait. Mesuré, la boucle
-   * du menu et celle du jeu sortaient à 0,0147 et 0,0152 de moyenne : 3 %
-   * d'écart, c'est-à-dire rien. On changeait le motif sans que personne ne
-   * puisse l'entendre.
-   *
-   * Le lancement d'une partie fait donc aussi monter la musique d'un tiers,
-   * en une demi-seconde. C'est court assez pour qu'on le rattache au geste, et
-   * assez long pour que ce ne soit pas un à-coup.
+   * L'ancienne version changeait aussi le motif du roulèr entre les deux états.
+   * Ça n'a plus lieu d'être : la boucle est un enregistrement, elle ne se
+   * réarrange pas. Le niveau porte donc seul la différence, ce qui est
+   * justement ce que la mesure avait montré de plus efficace — les deux motifs
+   * sortaient à 3 % d'écart, c'est-à-dire inaudibles.
    */
   setEnPartie(enPartie: boolean): void {
     this.enPartie = enPartie;
@@ -320,88 +277,6 @@ export class MusicManager {
       return 0;
     }
     return this.enPartie ? MUSIC_VOLUME_PARTIE : MUSIC_VOLUME;
-  }
-
-  /**
-   * Le marimba, avec sa partielle a l'octave.
-   *
-   * Ce n'est pas un artifice : une lame de marimba sonne sa fondamentale ET
-   * une partielle superieure tres nette, c'est ce qui lui donne son timbre de
-   * bois. La partielle ajoutee ici monte la melodie dans la bande 440-1050 Hz,
-   * celle qu'un haut-parleur de telephone rend le mieux -- la justesse
-   * acoustique et l'audibilite tirent dans le meme sens.
-   */
-  private playMarimba(ctx: AudioContext, freq: number, time: number): void {
-    if (this.master === null) {
-      return;
-    }
-    for (const [rapport, volume, duree] of [[1, 0.42, 0.3], [2, 0.16, 0.18]]) {
-      const osc = ctx.createOscillator();
-      osc.type = 'triangle';
-      osc.frequency.value = freq * rapport;
-      const gain = ctx.createGain();
-      gain.gain.setValueAtTime(volume, time);
-      gain.gain.exponentialRampToValueAtTime(0.001, time + duree);
-      osc.connect(gain).connect(this.master);
-      osc.start(time);
-      osc.stop(time + duree + 0.02);
-    }
-  }
-
-  /**
-   * La basse. Elle etait un SINUS a 65-110 Hz, et c'etait le defaut central de
-   * toute la musique.
-   *
-   * Un sinus n'a aucune harmonique : toute son energie est a sa fondamentale.
-   * A 65 Hz, un haut-parleur de telephone n'en restitue tout simplement RIEN.
-   * Mesure sur l'ancienne version : 95 % de l'energie de la musique tombait
-   * sous 400 Hz, et 5 % seulement dans la bande 400-4000 Hz. Autrement dit, au
-   * telephone, la musique existait dans le code et nulle part a l'oreille.
-   *
-   * Une dent de scie a la meme fondamentale porte des harmoniques a 2f, 3f,
-   * 4f... Un do a 65 Hz fait donc sonner 131, 196, 262, 327 Hz. Le passe-bas a
-   * 1300 Hz garde les premieres et coupe l'agressivite du reste. Sur une bonne
-   * enceinte on entend la vraie note grave ; sur un telephone, l'oreille
-   * reconstruit la fondamentale a partir de ses harmoniques -- c'est la
-   * fondamentale manquante, et c'est exactement ce qui fait qu'une ligne de
-   * basse s'entend sur un petit haut-parleur.
-   */
-  private playBass(ctx: AudioContext, freq: number, time: number): void {
-    if (this.master === null) {
-      return;
-    }
-    const osc = ctx.createOscillator();
-    osc.type = 'sawtooth';
-    osc.frequency.value = freq;
-    const filtre = ctx.createBiquadFilter();
-    filtre.type = 'lowpass';
-    filtre.frequency.value = 1300;
-    filtre.Q.value = 0.8;
-    const gain = ctx.createGain();
-    // Bien plus bas que les 0,55 du sinus : une dent de scie porte beaucoup
-    // plus d'energie a volume egal.
-    gain.gain.setValueAtTime(0.2, time);
-    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.4);
-    osc.connect(filtre).connect(gain).connect(this.master);
-    osc.start(time);
-    osc.stop(time + 0.42);
-  }
-
-  private playShaker(ctx: AudioContext, time: number, volume: number): void {
-    if (this.master === null) {
-      return;
-    }
-    const src = ctx.createBufferSource();
-    src.buffer = this.getNoise(ctx);
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'highpass';
-    filter.frequency.value = 6000;
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(volume, time);
-    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
-    src.connect(filter).connect(gain).connect(this.master);
-    src.start(time);
-    src.stop(time + 0.06);
   }
 
   /** Ressac continu : bruit filtré dont le volume respire lentement. */

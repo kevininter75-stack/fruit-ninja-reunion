@@ -6,3 +6,17 @@ dist/
 
 # fichier temporaire de message de commit
 .commitmsg.txt
+
+# Outil temporaire : enregistreur d'onglet pour récupérer la musique
+enregistreur.html
+
+# WAV d'écoute de la boucle maloya : seul le MP3 encodé part dans le dépôt
+public/assets/music/maloya-*.wav
+ecoute.html
+
+# Enregistrements de reference (analyse seulement, jamais embarques dans le jeu)
+outils/references-*.wav
+
+# Page de comparaison des bruitages : materiel d'ecoute, pas du jeu
+public/ecoute/
+ecoute-coupe.html

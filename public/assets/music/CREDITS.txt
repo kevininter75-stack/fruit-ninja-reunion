@@ -1,0 +1,52 @@
+BOUCLE MALOYA — maloya.mp3
+==========================
+
+ORIGINE : entièrement synthétisée pour Kout Sab'. Aucun enregistrement,
+aucune mélodie et aucun échantillon tiers n'entre dans ce fichier. Il n'y a
+donc aucune licence à respecter, aucune attribution à porter, et rien à
+déclarer lors d'une publication sur un magasin d'applications.
+
+Un instrumental de maloya a servi de RÉFÉRENCE DE MESURE au moment de la
+conception — tempo, équilibre des fréquences, densité. Rien n'en a été copié
+et le fichier de référence n'a jamais quitté la machine de développement.
+
+FABRICATION
+  Chaque instrument est calculé échantillon par échantillon :
+    roulèr  — tambour basse, trois frappes (pleine, claquée, étouffée),
+              chute de hauteur à l'attaque, claquement de paume à 380-950 Hz
+    kayamb  — hochet, bruit filtré au-dessus de 4,2 kHz, trois nuances
+    pikèr   — bambou, bruit large bande très court, hauteur tirée au hasard
+              à chaque coup pour qu'aucune note ne se répète
+    basse   — modale, attaque lente et harmoniques hautes retenues
+
+CARACTÉRISTIQUES
+  121 BPM · 8 mesures · 15,868 s · 48 kHz stéréo · MP3 128 kbit/s · 249 Ko
+
+  La longueur est un nombre ENTIER d'échantillons (761 653) et le tempo s'en
+  déduit : c'est ce qui permet à la fin de retomber exactement sur le début.
+  Les queues de résonance qui dépassent la fin sont réinjectées au début.
+
+CHOIX DE FORMAT
+  MP3 et non Ogg Vorbis ni Opus, qui compressent pourtant mieux : Safari ne
+  lit pas Vorbis, et Opus seulement sur ses versions récentes. Le jeu vise
+  l'App Store, donc il doit se décoder sur iPhone.
+
+  128 kbit/s et non 96 : mesuré, l'écart au raccord de la boucle passe de
+  0,0290 à 0,0078 pour un écart moyen de 0,0091 entre deux échantillons. À 96
+  la couture s'entendait ; à 128 elle passe sous le bruit de fond du signal.
+
+  L'encodeur MP3 insère un silence en tête (1 105 échantillons) et complète la
+  fin : voir MUSIQUE_RETARD dans src/utils/constants.ts et pointsDeBoucle()
+  dans src/systems/MusicManager.ts, qui posent les points de boucle en
+  conséquence.
+
+MESURES DE CONCEPTION (au niveau de jeu, musique à 0,27)
+  Marge du coup de sabre sur le fond musical, bande 1,5-4 kHz : 32,6 dB.
+  La bande où vivent le craquement de lame et l'éclatement du fruit est
+  laissée libre par construction — le kayamb est filtré au-dessus, le pikèr
+  en dessous. La musique ne peut pas couvrir les bruitages.
+
+  Perte sur un haut-parleur de téléphone (coupure à 500 Hz) : 11,3 dB.
+  Le roulèr et la basse portent des harmoniques 2, 3 et 4 volontairement
+  appuyées : elles tombent entre 160 et 450 Hz, et l'oreille reconstitue le
+  grave qu'un petit haut-parleur ne rend pas.

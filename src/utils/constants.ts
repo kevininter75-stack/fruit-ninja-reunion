@@ -1056,3 +1056,33 @@ export const COLOR_BONUS = '#8ef2c8';
 export const CYCLONE_AURA_SCALE = 4.2;
 export const CYCLONE_AURA_ALPHA_MIN = 0.3;
 export const CYCLONE_AURA_ALPHA_MAX = 0.62;
+/**
+ * LA BOUCLE MALOYA.
+ *
+ * Huit mesures à 121 BPM, synthétisées instrument par instrument : roulèr,
+ * kayamb, pikèr, et une basse modale. Rien n'y est emprunté — ni enregistrement
+ * ni mélodie —, donc aucune question de licence ne se pose, jamais.
+ *
+ * TOUT EST EN SECONDES, PAS EN ÉCHANTILLONS. decodeAudioData rééchantillonne le
+ * fichier à la fréquence du contexte, qui est de 44 100 Hz sur une partie des
+ * appareils : un décompte en échantillons y serait faux d'un dixième. C'est la
+ * même raison qui fait que la table des régions de tranche.wav est en secondes.
+ */
+export const MUSIQUE_FICHIER = 'assets/music/maloya.mp3';
+/** Durée utile : 761 653 échantillons à 48 kHz, la longueur exacte du rendu. */
+export const MUSIQUE_DUREE = 761653 / 48000;
+/**
+ * Le silence que l'encodeur MP3 pose devant, et le surplus total qu'il ajoute.
+ *
+ * LAME décale de 1 105 échantillons et complète la fin jusqu'à la trame
+ * suivante : mesuré sur ce fichier, 763 776 échantillons décodés au lieu de
+ * 761 653, soit 2 123 de trop. Boucler ça tel quel ferait un blanc à chaque
+ * tour — d'où les points de boucle posés à la main dans MusicManager.
+ *
+ * Vérifié après encodage : l'écart au raccord tombe à 0,0078 contre 0,0091
+ * d'écart moyen entre deux échantillons, donc sous le bruit de fond du signal.
+ * À 96 kbit/s il montait à 0,0290 et s'entendait : c'est ce qui a fixé le débit
+ * à 128.
+ */
+export const MUSIQUE_RETARD = 1105 / 48000;
+export const MUSIQUE_SURPLUS = 2123 / 48000;
