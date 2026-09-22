@@ -18,7 +18,7 @@ import { seedRandom, clearSeed } from '../utils/rng';
 import type { ScoreSnapshot } from '../systems/ScoreManager';
 import { dailySeed, saveTodayResult } from '../utils/dailyChallenge';
 import { mutationDuJour, objectifDuJour, type Mutation } from '../utils/mutations';
-import { exclamationCombo, FRENESIE, CYCLONE } from '../utils/creole';
+import { exclamationCombo, FRENESIE, CYCLONE, GEL } from '../utils/creole';
 import {
   GRAVITY_Y,
   FRUIT_POOL_SIZE,
@@ -832,7 +832,10 @@ export class GameScene extends Phaser.Scene {
     this.grading.setMode('frenzy');
 
     const gagne = this.scoreManager.addScore(GEL_POINTS);
-    this.showBigBanner('CHRONO GELÉ !', 1.15, longani.x, longani.y, `+${gagne}`);
+    // La voix du jeu, comme pour le cyclone : c'est la formule qui passe en
+    // grand, pas la description du mécanisme. Ce que fait le fruit se voit —
+    // le compteur bleuit et cesse de descendre.
+    this.showBigBanner(GEL, 1.15, longani.x, longani.y, `+${gagne}`);
 
     // Vocabulaire du gros moment, en froid au lieu du chaud du cyclone :
     // l'onde et le jus prennent la couleur du givre.

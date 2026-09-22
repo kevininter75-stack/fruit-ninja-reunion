@@ -74,6 +74,19 @@ export const BOMBE = 'La plané';
 export const CYCLONE = 'Cyclone y débarque !';
 
 /**
+ * Le longani givré est tranché : le chrono s'arrête.
+ *
+ * Mot de Kevin, donné le 22/09/2026 (« la frais y kok! »). Repris tel qu'il
+ * l'a écrit, sans être « corrigé » vers une graphie plus académique — même
+ * règle que pour le cyclone : on n'invente pas, et on ne récrit pas non plus.
+ *
+ * Seules la majuscule initiale et l'espace avant le point d'exclamation ont
+ * été ajoutées, pour suivre la mise en forme des autres exclamations du
+ * fichier. Si même ça dénature la formule, c'est à lui de le dire.
+ */
+export const GEL = 'La frais y kok !';
+
+/**
  * L'exclamation qui convient à un combo de <paramref>fruits</paramref> fruits.
  *
  * TROIS MOTS, TROIS PALIERS, ET C'EST LE MOT QUI CHANGE — pas la fréquence.
