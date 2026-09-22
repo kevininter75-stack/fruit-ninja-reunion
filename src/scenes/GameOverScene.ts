@@ -193,20 +193,13 @@ export class GameOverScene extends Phaser.Scene {
       this.createMedal(L.medalX, L.medalY, medal);
     }
 
-    // --- Record ---
-    this.createRecordLine(h * L.record, isNewRecord);
-
-    // --- Statistiques ---
-    const stats = this.add
-      .text(w / 2, h * L.stats, this.statsLine(), {
-        fontFamily: GAME_FONT,
-        fontSize: fontPx(27),
-        color: '#cfe6f0',
-      })
-      .setOrigin(0.5);
-    this.reveal(stats, 6);
-
-    this.createButtons();
+    // LES BOUTONS D'ABORD, LE TEXTE ENSUITE. L'ordre compte : les boutons sont
+    // ancrés au bas de l'écran, et c'est là où leur pile s'arrête qui dit
+    // jusqu'où le texte peut descendre. L'inverse — poser le texte à une
+    // fraction fixe puis espérer que les boutons tiennent — est exactement ce
+    // qui produisait les chevauchements.
+    const hautDesBoutons = this.createButtons();
+    this.createBlocTexte(hautDesBoutons, isNewRecord);
     addVignette(this);
     fadeIn(this);
   }
@@ -339,8 +332,56 @@ export class GameOverScene extends Phaser.Scene {
     });
   }
 
-  /** « Nouveau record ! » célébré, ou rappel du record courant du mode. */
-  private createRecordLine(y: number, isNewRecord: boolean): void {
+  /**
+   * Le bloc de texte au-dessus des boutons : statistiques, mutation, record.
+   *
+   * Empilé DEPUIS LE BAS lui aussi, en partant de là où s'arrêtent les boutons,
+   * et en utilisant la HAUTEUR RÉELLE de chaque texte plutôt qu'une estimation.
+   * C'est ce qui manquait : la ligne de statistiques était à 0,66 de la hauteur
+   * et l'invitation au classement à 0,655 — deux valeurs choisies séparément,
+   * qui ne pouvaient que se croiser le jour où les deux s'affichent ensemble.
+   * En Défi du jour, où s'ajoute encore le nom de la mutation, quatre textes se
+   * chevauchaient sur moins de trente pixels.
+   */
+  private createBlocTexte(bas: number, isNewRecord: boolean): void {
+    const w = this.scale.width;
+    const ESPACE = px(10);
+    let curseur = bas;
+
+    /** Pose un texte juste au-dessus du précédent, puis l'anime. */
+    const poser = (texte: Phaser.GameObjects.Text, etape: number): number => {
+      curseur -= texte.height / 2;
+      const centre = curseur;
+      texte.setY(centre);
+      curseur -= texte.height / 2 + ESPACE;
+      this.reveal(texte, etape);
+      // On rend la position AVANT animation : reveal() decale l'objet de 26 px
+      // pour le faire monter, donc relire texte.y juste apres serait faux.
+      return centre;
+    };
+
+    const stats = this.add
+      .text(w / 2, 0, this.statsLine(), {
+        fontFamily: GAME_FONT,
+        fontSize: fontPx(27),
+        color: '#cfe6f0',
+      })
+      .setOrigin(0.5);
+    poser(stats, 6);
+
+    this.createRecordLine(poser, isNewRecord);
+  }
+
+  /**
+   * « Nouveau record ! » célébré, ou rappel du record courant du mode.
+   *
+   * Reçoit un poseur qui empile vers le HAUT : les textes sont donc créés dans
+   * l'ordre inverse de la lecture — la ligne du bas d'abord.
+   */
+  private createRecordLine(
+    poser: (texte: Phaser.GameObjects.Text, etape: number) => number,
+    isNewRecord: boolean
+  ): void {
     const w = this.scale.width;
 
     // Le Défi du jour affiche la SÉRIE plutôt que le record. C'est elle qui
@@ -356,10 +397,21 @@ export class GameOverScene extends Phaser.Scene {
       const objectif = objectifDuJour();
       const reussi = this.finalScore >= objectif;
       const mutation = mutationDuJour();
+      const serie = getStreak();
+      const suite = serie > 1 ? ` · série de ${serie} jours 🔥` : '';
+      const ligne = this.add
+        .text(w / 2, 0, `${mutation.nom}${suite}`, {
+          fontFamily: GAME_FONT,
+          fontSize: fontPx(26),
+          color: '#fff3e0',
+        })
+        .setOrigin(0.5);
+      poser(ligne, 6);
+
       const verdict = this.add
         .text(
           w / 2,
-          y,
+          0,
           reussi ? `Objectif atteint ! ${this.finalScore} / ${objectif}` : `Objectif manqué · ${this.finalScore} / ${objectif}`,
           {
             fontFamily: DISPLAY_FONT,
@@ -370,35 +422,24 @@ export class GameOverScene extends Phaser.Scene {
           }
         )
         .setOrigin(0.5);
-      this.reveal(verdict, 5);
-
-      const serie = getStreak();
-      const suite = serie > 1 ? ` · série de ${serie} jours 🔥` : '';
-      const ligne = this.add
-        .text(w / 2, y + px(42), `${mutation.nom}${suite}`, {
-          fontFamily: GAME_FONT,
-          fontSize: fontPx(26),
-          color: '#fff3e0',
-        })
-        .setOrigin(0.5);
-      this.reveal(ligne, 6);
+      poser(verdict, 5);
       return;
     }
 
     if (!isNewRecord) {
       const line = this.add
-        .text(w / 2, y, `Record : ${getBestScore(this.mode)}`, {
+        .text(w / 2, 0, `Record : ${getBestScore(this.mode)}`, {
           fontFamily: GAME_FONT,
           fontSize: fontPx(30),
           color: '#fff3e0',
         })
         .setOrigin(0.5);
-      this.reveal(line, 5);
+      poser(line, 5);
       return;
     }
 
     const record = this.add
-      .text(w / 2, y, `★ ${RECORD} ★\nNouveau record`, {
+      .text(w / 2, 0, `★ ${RECORD} ★\nNouveau record`, {
         fontFamily: GAME_FONT,
         fontSize: fontPx(40),
         fontStyle: '700',
@@ -408,7 +449,7 @@ export class GameOverScene extends Phaser.Scene {
         strokeThickness: px(6),
       })
       .setOrigin(0.5);
-    this.reveal(record, 5);
+    const yRecord = poser(record, 5);
     this.tweens.add({
       targets: record,
       scale: 1.1,
@@ -421,7 +462,7 @@ export class GameOverScene extends Phaser.Scene {
 
     // Gerbe de confettis à l'annonce : le record se fête
     const confetti = this.add
-      .particles(w / 2, y, TEX_JUICE, {
+      .particles(w / 2, yRecord, TEX_JUICE, {
         speed: { min: 180, max: 460 },
         angle: { min: 200, max: 340 },
         scale: { start: 0.9, end: 0 },
@@ -435,7 +476,7 @@ export class GameOverScene extends Phaser.Scene {
       // Confettis supprimés en mouvement réduit : c'est le seul effet
       // plein écran du jeu, et le plus agressif pour une sensibilité visuelle.
       if (!prefersReducedMotion()) {
-        confetti.emitParticleAt(w / 2, y, 40);
+        confetti.emitParticleAt(w / 2, yRecord, 40);
       }
       sfx.bonus();
     });
@@ -449,33 +490,98 @@ export class GameOverScene extends Phaser.Scene {
     return text;
   }
 
-  private createButtons(): void {
+  /**
+   * Les boutons du bas, empilés DEPUIS LE BAS DE L'ÉCRAN.
+   *
+   * LE DÉFAUT QU'ON CORRIGE. Chaque bouton était posé à une fraction fixe de la
+   * hauteur : « Rejouer » à 0,76, « Menu » à 0,93, l'invitation au classement à
+   * 0,655. Tant que l'invitation n'apparaissait pas, ça tenait. Mais elle ne
+   * s'affiche que pour un joueur sans pseudo qui vient de faire un score digne
+   * du classement — et dans ce cas elle se posait PAR-DESSUS « Rejouer »
+   * (chevauchement de 46 px sur un écran de 800), et son texte par-dessus la
+   * ligne de statistiques. Le Défi du jour, qui ajoute « Partager », entassait
+   * quatre éléments dans la même zone.
+   *
+   * Des positions fixes ne peuvent pas s'adapter à un contenu variable. Une
+   * pile, si : chaque élément réserve sa hauteur et pousse le suivant. Ajouter
+   * un bouton demain ne pourra plus rien écraser.
+   */
+  private createButtons(): number {
     const w = this.scale.width;
     const h = this.scale.height;
     const portrait = h > w;
-
     const defi = this.mode === 'daily';
 
-    // Portrait : boutons empilés ; paysage : côte à côte. Le Défi ajoute un
-    // troisième bouton, donc l'écartement se resserre pour qu'ils tiennent.
-    const ecart = defi ? px(210) : px(150);
-    const replayX = portrait ? w / 2 : w / 2 - ecart;
-    const replayY = portrait ? h * 0.76 : h * 0.83;
-    const menuX = portrait ? w / 2 : w / 2 + ecart;
-    const menuY = portrait ? h * 0.93 : h * 0.83;
+    // L'invitation n'a de sens que si ce score-là mérite de monter : après une
+    // partie qui ne bat pas son propre record, proposer de s'inscrire pour rien
+    // serait trompeur.
+    const invite = pseudo() === null && doitDeposer(this.mode, this.nouveauRecord);
 
-    this.makeButton(replayX, replayY, px(264), px(78), 'Rejouer', 0xe0455a, 7, () => {
-      sfx.click();
-      fadeToScene(this, 'GameScene', { mode: this.mode });
-    });
+    const MARGE_BAS = px(30);
+    const ESPACE = px(14);
+    const hMenu = px(70);
+    const hRejouer = px(78);
+    const hPartager = px(70);
+    const hInvite = px(66);
+    const hTexte = px(26) * 1.6;
 
-    if (defi) {
-      this.makeButton(portrait ? w / 2 : w / 2, portrait ? h * 0.845 : h * 0.83,
-        px(236), px(70), 'Partager', 0x2f7d5b, 8, () => {
-        sfx.click();
-        void this.shareResult();
-      });
+    let bas = h - MARGE_BAS;
+    /** Réserve une hauteur au-dessus de ce qui est déjà posé, rend son centre. */
+    const empiler = (hauteur: number): number => {
+      const centre = bas - hauteur / 2;
+      bas -= hauteur + ESPACE;
+      return centre;
+    };
+
+    const lRejouer = px(264);
+    const lPartager = px(236);
+    const lMenu = px(224);
+
+    let yRejouer: number;
+    let yMenu: number;
+    let yPartager = 0;
+    let xRejouer = w / 2;
+    let xMenu = w / 2;
+    let xPartager = w / 2;
+
+    if (portrait) {
+      yMenu = empiler(hMenu);
+      yRejouer = empiler(hRejouer);
+      if (defi) {
+        yPartager = empiler(hPartager);
+      }
+    } else {
+      // Paysage : les boutons tiennent sur une seule rangée, l'écran manquant
+      // de hauteur. C'est donc une seule case dans la pile.
+      yRejouer = empiler(Math.max(hMenu, hRejouer, defi ? hPartager : 0));
+      yMenu = yRejouer;
+      yPartager = yRejouer;
+
+      // LA RANGÉE SE CALCULE À PARTIR DES LARGEURS RÉELLES, pas d'un écartement
+      // choisi à la main. L'ancienne version écartait de 210 px et supposait
+      // que ça suffisait : avec « Partager » au milieu, « Rejouer » mordait de
+      // 40 px dessus et « Partager » de 20 px sur « Menu ». Le même défaut que
+      // sur l'axe vertical, et la même correction — c'est le contenu qui décide
+      // de la place, pas l'inverse.
+      const GOUTTIERE = px(18);
+      const largeurs = defi ? [lRejouer, lPartager, lMenu] : [lRejouer, lMenu];
+      const total =
+        largeurs.reduce((a, b) => a + b, 0) + GOUTTIERE * (largeurs.length - 1);
+      let bord = w / 2 - total / 2;
+      const placer = (largeur: number): number => {
+        const centre = bord + largeur / 2;
+        bord += largeur + GOUTTIERE;
+        return centre;
+      };
+      xRejouer = placer(lRejouer);
+      if (defi) {
+        xPartager = placer(lPartager);
+      }
+      xMenu = placer(lMenu);
     }
+
+    const yInvite = invite ? empiler(hInvite) : 0;
+    const yTexte = invite ? empiler(hTexte) : 0;
 
     // APPEL À L'ACTION QUAND LE SCORE NE COMPTE PAS ENCORE.
     //
@@ -487,25 +593,21 @@ export class GameOverScene extends Phaser.Scene {
     // Le message le dit au moment où ça l'intéresse — il a un score sous les
     // yeux — et le bouton l'emmène droit à la saisie. Son score est déjà mis
     // de côté (cf. retenirResultat) : il partira sans qu'il ait à rejouer.
-    // L'invitation n'a de sens que si ce score-là mérite de monter. Après une
-    // partie qui ne bat pas son propre record, proposer de s'inscrire pour
-    // rien serait trompeur.
-    if (pseudo() === null && doitDeposer(this.mode, this.nouveauRecord)) {
-      const y = portrait ? h * 0.655 : h * 0.70;
-      const invite = this.add
-        .text(w / 2, y, 'Ton score n’est pas encore au classement', {
+    if (invite) {
+      const texte = this.add
+        .text(w / 2, yTexte, 'Ton score n’est pas encore au classement', {
           fontFamily: GAME_FONT,
           fontSize: fontPx(26),
           color: '#ffd9a0',
           align: 'center',
         })
         .setOrigin(0.5);
-      this.reveal(invite, 7);
+      this.reveal(texte, 7);
       this.makeButton(
         w / 2,
-        y + px(58),
+        yInvite,
         px(340),
-        px(66),
+        hInvite,
         '🏆  Entrer au classement',
         0x2f8f5b,
         8,
@@ -516,10 +618,26 @@ export class GameOverScene extends Phaser.Scene {
       );
     }
 
-    this.makeButton(menuX, menuY, px(224), px(70), 'Menu', 0x2d3a4a, defi ? 9 : 8, () => {
+    if (defi) {
+      this.makeButton(xPartager, yPartager, lPartager, hPartager, 'Partager', 0x2f7d5b, 9, () => {
+        sfx.click();
+        void this.shareResult();
+      });
+    }
+
+    this.makeButton(xRejouer, yRejouer, lRejouer, hRejouer, 'Rejouer', 0xe0455a, 10, () => {
+      sfx.click();
+      fadeToScene(this, 'GameScene', { mode: this.mode });
+    });
+
+    this.makeButton(xMenu, yMenu, lMenu, hMenu, 'Menu', 0x2d3a4a, 11, () => {
       sfx.click();
       fadeToScene(this, 'MenuScene');
     });
+
+    // Le haut de la pile : c'est la limite que le bloc de texte ne doit pas
+    // franchir.
+    return bas;
   }
 
   /**
