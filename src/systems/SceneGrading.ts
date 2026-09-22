@@ -48,7 +48,7 @@ const CHAUD_FROID: Matrix5 = [
 ];
 
 /** Intensités de l'étalonnage selon le moment de jeu. */
-export type GradingMode = 'normal' | 'frenzy' | 'danger';
+export type GradingMode = 'normal' | 'frenzy' | 'danger' | 'gel';
 
 export class SceneGrading {
   private readonly fx: Phaser.FX.ColorMatrix | null;
@@ -106,6 +106,28 @@ export class SceneGrading {
             1.09, 0.0, 0.0, 0, 0.012,
             0.0, 1.01, 0.0, 0, 0.0,
             0.0, 0.0, 0.9, 0, 0.0,
+            0, 0, 0, 1, 0,
+          ],
+          true
+        );
+        break;
+
+      case 'gel':
+        // Longani givré : l'image se refroidit franchement et perd de sa
+        // chaleur. C'est le contraire exact de la frénésie, et c'est voulu —
+        // les deux moments forts du jeu doivent se distinguer d'un coup d'œil,
+        // sans quoi on retombe dans le défaut qu'on vient de corriger : deux
+        // événements qui se ressemblent en font un seul.
+        //
+        // Plus bleu que 'danger', mais sans sa désaturation : ici l'action
+        // s'intensifie, elle ne s'éteint pas.
+        fx.saturate(0.2, true);
+        fx.contrast(0.1, true);
+        fx.multiply(
+          [
+            0.86, 0.0, 0.0, 0, 0.0,
+            0.0, 0.97, 0.0, 0, 0.008,
+            0.0, 0.0, 1.16, 0, 0.03,
             0, 0, 0, 1, 0,
           ],
           true

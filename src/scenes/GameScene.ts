@@ -106,6 +106,8 @@ import {
   CYCLONE_DURATION_MS,
   GEL_DURATION_MS,
   GEL_POINTS,
+  GEL_RALENTI,
+  GEL_SORTIE_MS,
   CYCLONE_POINTS,
   REWARD_STAGGER_MS,
   REWARD_SPREAD_PX,
@@ -265,10 +267,8 @@ export class GameScene extends Phaser.Scene {
   private chronoEndTime = 0;
   /** Jusqu'à quand le compteur reste en alerte après un coup de bombe. */
   private alerteChronoJusqua = 0;
-  /** Jusqu'à quand le compteur est gelé par un longani givré. */
-  private gelJusqua = 0;
   /** État courant du compteur, pour ne le repeindre qu'aux bascules. */
-  private etatChrono: 'normal' | 'alerte' | 'gel' = 'normal';
+  private etatChrono: 'normal' | 'alerte' = 'normal';
   /** Avancement à restaurer après une rotation d'écran, sinon null. */
   private resume: RunSnapshot | null = null;
   /** Instant du début de la partie, reporté en arrière après une rotation. */
@@ -504,7 +504,7 @@ export class GameScene extends Phaser.Scene {
     this.annonceMutation();
   }
 
-  update(_time: number, delta: number): void {
+  update(): void {
     if (this.pause?.isPaused) {
       return;
     }
@@ -519,7 +519,6 @@ export class GameScene extends Phaser.Scene {
     this.updateCycloneAura();
     this.updateBrume();
     if (this.mode === 'chrono' && !this.gameEnded) {
-      this.rendreLeTempsGele(delta);
       this.updateChrono();
     }
   }
@@ -792,26 +791,6 @@ export class GameScene extends Phaser.Scene {
     this.spawnRing(papaye.x, papaye.y, 4, 0xff9a4a, 620);
   }
 
-  /**
-   * Rend au compteur le temps qu'il vient de perdre pendant le gel.
-   *
-   * ON REPOUSSE L'ÉCHÉANCE PLUTÔT QUE D'ARRÊTER L'HORLOGE. `chronoEndTime` est
-   * un instant absolu comparé à `time.now`, et `time.now` n'attend personne.
-   * Suspendre vraiment le temps demanderait de compter à part, avec deux
-   * horloges à tenir d'accord — alors que décaler l'échéance de ce qui vient
-   * de s'écouler donne exactement le même résultat, en une ligne, et reste
-   * juste même si une image dure longtemps.
-   */
-  private rendreLeTempsGele(delta: number): void {
-    if (this.time.now < this.gelJusqua) {
-      this.chronoEndTime += delta;
-    }
-  }
-
-  /** Vrai pendant le gel : le HUD le montre, la couleur du compteur change. */
-  private chronoEstGele(): boolean {
-    return this.mode === 'chrono' && this.time.now < this.gelJusqua;
-  }
 
   /**
    * Le longani givré est tranché : le chrono s'arrête et les fruits pleuvent.
@@ -825,16 +804,42 @@ export class GameScene extends Phaser.Scene {
    * de balayer l'écran entier, le joueur ne peut plus viser en même temps.
    */
   private demarrerGel(longani: Fruit): void {
-    this.delugeFruits = 0;
     this.defuseBombs();
-    this.gelJusqua = this.time.now + GEL_DURATION_MS;
-    this.spawnManager.startDeluge(GEL_DURATION_MS);
-    this.grading.setMode('frenzy');
+    // TOUT RALENTIT, SAUF LE COMPTEUR. Les fruits continuent d'arriver au même
+    // rythme — l'ordonnanceur tourne sur l'horloge de la scène, pas sur celle
+    // de la physique — mais ils avancent moins vite : l'écran se remplit, et
+    // l'on peut tout prendre. Chaque fruit coûte en revanche plus de secondes
+    // réelles, et c'est ce qui en fait une décision plutôt qu'un cadeau.
+    this.physics.world.timeScale = GEL_RALENTI;
+    this.grading.setMode('gel');
+
+    // Retour progressif : une reprise nette surprendrait au moment précis où
+    // le joueur a réglé son geste sur le rythme lent.
+    this.time.delayedCall(GEL_DURATION_MS, () => {
+      if (this.gameEnded) {
+        this.physics.world.timeScale = 1;
+        return;
+      }
+      this.grading.setMode('normal');
+      const depart = { v: this.physics.world.timeScale };
+      this.tweens.add({
+        targets: depart,
+        v: 1,
+        duration: GEL_SORTIE_MS,
+        ease: 'Sine.easeIn',
+        onUpdate: () => {
+          this.physics.world.timeScale = depart.v;
+        },
+        onComplete: () => {
+          this.physics.world.timeScale = 1;
+        },
+      });
+    });
 
     const gagne = this.scoreManager.addScore(GEL_POINTS);
     // La voix du jeu, comme pour le cyclone : c'est la formule qui passe en
-    // grand, pas la description du mécanisme. Ce que fait le fruit se voit —
-    // le compteur bleuit et cesse de descendre.
+    // grand, pas la description du mécanisme. Ce que fait le fruit se voit et
+    // s'éprouve — l'écran bleuit et le monde entier lève le pied.
     this.showBigBanner(GEL, 1.15, longani.x, longani.y, `+${gagne}`);
 
     // Vocabulaire du gros moment, en froid au lieu du chaud du cyclone :
@@ -1037,17 +1042,15 @@ export class GameScene extends Phaser.Scene {
     // marchait pas : une bombe force le réaffichage pour que le temps chute
     // sous les yeux du joueur, et la couleur se serait donc remise au blanc
     // dans la même image — l'éclair rouge n'aurait jamais été visible.
-    // GELÉ, EN ALERTE, OU NORMAL — trois états, dans cet ordre de priorité.
-    // Le gel passe devant l'alerte de fin de chrono : pendant qu'il dure, il
-    // n'y a justement plus d'urgence, et laisser le rouge clignoter dirait le
-    // contraire de ce qui se passe.
-    const gele = this.chronoEstGele();
-    const alerte =
-      !gele && ((seconds <= 5 && seconds > 0) || this.time.now < this.alerteChronoJusqua);
-    const etat = gele ? 'gel' : alerte ? 'alerte' : 'normal';
+    // LA COULEUR SUIT SON PROPRE ÉTAT, et non le changement de seconde : une
+    // bombe force le réaffichage du texte, et mêler les deux ferait repasser
+    // la couleur au blanc dans la même image — l'éclair rouge ne serait jamais
+    // visible.
+    const alerte = (seconds <= 5 && seconds > 0) || this.time.now < this.alerteChronoJusqua;
+    const etat = alerte ? 'alerte' : 'normal';
     if (etat !== this.etatChrono) {
       this.etatChrono = etat;
-      this.infoText.setColor(gele ? '#9fe8ff' : alerte ? '#ff5252' : '#ffffff');
+      this.infoText.setColor(alerte ? '#ff5252' : '#ffffff');
     }
     if (remainingMs <= 0) {
       this.gameEnded = true;

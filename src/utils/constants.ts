@@ -255,18 +255,36 @@ export const INTENSITY_RAMP_FRUITS = 170;
 export const CELERITE_MAX = 1.18;
 
 /**
- * LE LONGANI GIVRÉ : le chrono s'arrête, les fruits pleuvent.
+ * LE LONGANI GIVRÉ : tout ralentit.
  *
- * Il remplace le piment en Chrono. Le piment suspendait les salves — sur
- * soixante secondes, c'était du jeu confisqué. Celui-ci suspend le COMPTEUR et
- * ouvre une pluie : le joueur reçoit du jeu gratuit au lieu d'en perdre.
+ * PREMIÈRE VERSION ABANDONNÉE, et la leçon vaut d'être écrite. Il déclenchait
+ * une pluie de fruits en gelant le compteur — or le cyclone déclenche déjà une
+ * pluie. Deux fruits différents pour le même effet : relevé par Kevin en une
+ * partie, et c'est exactement l'objection que j'avais moi-même formulée pour
+ * écarter une autre piste. Un événement ne vaut que par ce qui le distingue
+ * des autres.
  *
- * SIX SECONDES, comme le cyclone. Le déluge qu'il déclenche est le même
- * mécanisme, et deux durées différentes pour un même effet visuel ne feraient
- * qu'embrouiller — le joueur apprend une fois « ça dure à peu près six
- * secondes » et ça vaut pour les deux.
+ * LE RALENTI RÉSOUT AUSSI UN PROBLÈME DE NOM. « Givré » qui fait pleuvoir des
+ * fruits ne veut rien dire. « Givré » qui ralentit tout se comprend sans
+ * explication — le mécanisme et le mot disent enfin la même chose.
+ *
+ * LE COMPTEUR, LUI, CONTINUE DE DESCENDRE. C'est ce qui en fait une décision
+ * plutôt qu'un cadeau : les fruits s'accumulent à l'écran puisqu'ils arrivent
+ * toujours au même rythme mais avancent moins vite, on peut tout prendre — et
+ * chaque fruit coûte davantage de secondes réelles. Geler aussi le temps
+ * reviendrait à la version qu'on vient d'abandonner.
  */
 export const GEL_DURATION_MS = 6000;
+/**
+ * Facteur de ralenti, en timeScale Arcade (> 1 = plus lent).
+ *
+ * 2,2 contre 2,4 pour la bombe : celui-ci dure six secondes et non une demie,
+ * et un ralenti trop appuyé sur cette durée donne l'impression d'un jeu qui
+ * rame plutôt que d'un effet.
+ */
+export const GEL_RALENTI = 2.2;
+/** Retour à la vitesse normale, progressif : une coupure nette surprendrait. */
+export const GEL_SORTIE_MS = 700;
 /** Points donnés à la coupe, comme le cyclone en donne. */
 export const GEL_POINTS = 120;
 /**

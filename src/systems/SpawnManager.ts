@@ -608,7 +608,15 @@ export class SpawnManager {
     if (this.scene.time.now - this.lastSpecialAt < SPECIAL_MIN_GAP_MS) {
       return;
     }
-    if (this.isGelOnStage() || this.isCycloneOnStage() || this.isDeluge()) {
+    // IL PEUT TOMBER PENDANT LE DÉLUGE, et c'est même son meilleur moment :
+    // suggestion de Kevin. Un ralenti au milieu d'une pluie de fruits est
+    // exactement là où il vaut quelque chose — alors qu'un second déluge
+    // par-dessus le premier n'aurait rien voulu dire. Les deux événements se
+    // complètent désormais au lieu de se répéter.
+    //
+    // On évite seulement d'en avoir deux en vol, et de le croiser avec la
+    // papaye cyclone qui, elle, n'est pas encore tranchée.
+    if (this.isGelOnStage() || this.isCycloneOnStage()) {
       return;
     }
     const longani = this.fruits.get() as Fruit | null;
