@@ -47,7 +47,16 @@ const ONGLETS: ReadonlyArray<{ mode: GameMode; libelle: string }> = [
 const LIGNES_MAX = 10;
 
 export class ClassementScene extends Phaser.Scene {
-  private modeAffiche: GameMode = 'daily';
+  /**
+   * Onglet ouvert par défaut : le CLASSIQUE.
+   *
+   * C'est le mode principal du jeu, celui auquel on pense quand on dit
+   * « le classement » — et son tableau est un record de tous les temps, donc
+   * il y a toujours quelque chose à y voir. Le Défi du jour, lui, est vide
+   * chaque matin jusqu'à ce que quelqu'un le relève : ouvrir dessus donnait
+   * l'impression d'un classement désert.
+   */
+  private modeAffiche: GameMode = 'classic';
   /** Tout ce qui se redessine à chaque changement d'onglet. */
   private zoneListe: Phaser.GameObjects.GameObject[] = [];
   private onglets: Phaser.GameObjects.Container[] = [];
@@ -63,7 +72,7 @@ export class ClassementScene extends Phaser.Scene {
   private saisieAuLancement = false;
 
   init(data: { mode?: GameMode; saisir?: boolean }): void {
-    this.modeAffiche = data.mode ?? 'daily';
+    this.modeAffiche = data.mode ?? 'classic';
     this.saisieAuLancement = data.saisir === true;
     this.zoneListe = [];
     this.onglets = [];

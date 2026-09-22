@@ -172,7 +172,7 @@ export class MenuScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true });
     classement.on('pointerdown', () => {
       sfx.click();
-      fadeToScene(this, 'ClassementScene', { mode: 'daily' });
+      fadeToScene(this, 'ClassementScene', { mode: 'classic' });
     });
 
     createMuteButton(this, w - px(52), h - px(52));
