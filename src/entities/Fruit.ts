@@ -29,6 +29,8 @@ export class Fruit extends Phaser.Physics.Arcade.Sprite {
    * inverse du piment cabri, qui lui refuse de se couper.
    */
   public isCyclone = false;
+  /** Longani givré : il arrête le chrono (mode Chrono uniquement). */
+  public isGel = false;
   /** Frénésie amorcée : le piment flotte et compte les coups reçus. */
   public frenzyActive = false;
   /** Nombre de coups encaissés pendant la frénésie. */
@@ -57,12 +59,14 @@ export class Fruit extends Phaser.Physics.Arcade.Sprite {
     velocityX: number,
     velocityY: number,
     isFrenzy = false,
-    isCyclone = false
+    isCyclone = false,
+    isGel = false
   ): void {
     this.variety = variety;
     this.isBonus = isBonus;
     this.isFrenzy = isFrenzy;
     this.isCyclone = isCyclone;
+    this.isGel = isGel;
     this.frenzyActive = false;
     this.slashCount = 0;
     this.lastSlashAt = 0;
@@ -86,7 +90,7 @@ export class Fruit extends Phaser.Physics.Arcade.Sprite {
 
     // Les trois fruits spéciaux pulsent pour attirer l'œil (une allocation
     // par spawn spécial — événement rare, pas de pression GC)
-    if (isBonus || isFrenzy || isCyclone) {
+    if (isBonus || isFrenzy || isCyclone || isGel) {
       this.scene.tweens.add({
         targets: this,
         scale: 1.15,

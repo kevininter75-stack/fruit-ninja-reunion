@@ -255,6 +255,32 @@ export const INTENSITY_RAMP_FRUITS = 170;
 export const CELERITE_MAX = 1.18;
 
 /**
+ * LE LONGANI GIVRÉ : le chrono s'arrête, les fruits pleuvent.
+ *
+ * Il remplace le piment en Chrono. Le piment suspendait les salves — sur
+ * soixante secondes, c'était du jeu confisqué. Celui-ci suspend le COMPTEUR et
+ * ouvre une pluie : le joueur reçoit du jeu gratuit au lieu d'en perdre.
+ *
+ * SIX SECONDES, comme le cyclone. Le déluge qu'il déclenche est le même
+ * mécanisme, et deux durées différentes pour un même effet visuel ne feraient
+ * qu'embrouiller — le joueur apprend une fois « ça dure à peu près six
+ * secondes » et ça vaut pour les deux.
+ */
+export const GEL_DURATION_MS = 6000;
+/** Points donnés à la coupe, comme le cyclone en donne. */
+export const GEL_POINTS = 120;
+/**
+ * Pas avant la douzième seconde, et jamais deux fois en moins de vingt.
+ *
+ * Sur une partie de soixante secondes, ça en autorise deux au mieux. C'est
+ * voulu : un gel gratuit toutes les dix secondes ferait du Chrono un mode où
+ * le compteur ne descend plus, et la contrainte de temps est tout ce qui
+ * distingue ce mode du Classique.
+ */
+export const GEL_SAFE_TIME_MS = 12_000;
+export const GEL_MIN_GAP_MS = 20_000;
+
+/**
  * LE COMBO, ET POURQUOI ON NE L'ENTENDAIT PLUS.
  *
  * L'arpège existait depuis longtemps, à 0,20 par note. Or une coupe empile

@@ -126,6 +126,38 @@ export const CYCLONE_VARIETY: FruitVariety = {
   weight: 0, // jamais tirée au poids : spawn dédié dans le SpawnManager
 };
 
+/**
+ * LE LONGANI GIVRÉ — le fruit qui arrête le temps, en Chrono uniquement.
+ *
+ * POURQUOI IL REMPLACE LE PIMENT ICI. La frénésie du piment suspend les salves
+ * ordinaires : en Classique c'est un moment à part, sur soixante secondes
+ * c'est un morceau de partie confisqué. Celui-ci fait l'inverse — il arrête le
+ * COMPTEUR et ouvre une pluie de fruits. Le joueur y gagne du jeu gratuit au
+ * lieu d'en perdre.
+ *
+ * Il complète aussi la boucle qu'on venait d'ouvrir : depuis que la bombe
+ * coûte dix secondes, le Chrono avait une soustraction et aucune addition.
+ *
+ * LE CHOIX DU FRUIT. Le longani est petit, rond, à chair translucide — la
+ * seule du catalogue qui se prête au givre sans qu'on ait à la redessiner. Et
+ * la gelée blanche des Hauts est un vrai phénomène réunionnais, déjà évoqué
+ * par la mutation « Brume des Hauts ».
+ *
+ * NOM À VALIDER PAR KEVIN, comme les noms d'instruments du maloya : je propose
+ * l'appellation, lui seul est légitime sur le terroir.
+ */
+export const GEL_VARIETY: FruitVariety = {
+  key: 'longane_givre',
+  displayName: 'Longani givré',
+  // Nettement plus gros qu'un longani ordinaire : un fruit spécial doit se
+  // repérer avant d'être identifié, comme la papaye cyclone.
+  radius: px(84),
+  skinColor: 0xbfe6f5,
+  juiceColor: 0xe8fbff,
+  fleshColor: 0xf4fdff,
+  weight: 0, // jamais tiré au poids : spawn dédié dans le SpawnManager
+};
+
 export function wholeTextureKey(variety: FruitVariety): string {
   return `${variety.key}_whole`;
 }

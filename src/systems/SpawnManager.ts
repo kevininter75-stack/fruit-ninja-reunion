@@ -58,6 +58,8 @@ import {
   CYCLONE_SAFE_TIME_MS,
   CYCLONE_SAFE_TIME_CHRONO_MS,
   SPECIAL_MIN_GAP_MS,
+  GEL_SAFE_TIME_MS,
+  GEL_MIN_GAP_MS,
   SIDE_SOMMET_MIN,
   SIDE_SOMMET_MAX,
   FRENZY_CROSS_FACTOR,
@@ -67,6 +69,7 @@ import {
   BONUS_VARIETY,
   FRENZY_VARIETY,
   CYCLONE_VARIETY,
+  GEL_VARIETY,
 } from '../utils/fruitCatalog';
 import { rnd, rndFloat, rndBetween } from '../utils/rng';
 
@@ -143,6 +146,8 @@ export class SpawnManager {
   private delugeUntil = 0;
   /** Dernier fruit cyclone lancé, pour tenir sa cadence d'environ une minute. */
   private lastCycloneAt = -Infinity;
+  /** Dernier longani givré lancé — Chrono uniquement. */
+  private lastGelAt = -Infinity;
   /**
    * Dernier fruit spécial QUEL QU'IL SOIT — piment ou cyclone. Les deux
    * cadences sont indépendantes ; sans ce garde-fou commun elles finissent
@@ -182,6 +187,7 @@ export class SpawnManager {
     this.frenzyOnStage = false;
     this.delugeUntil = 0;
     this.lastCycloneAt = -Infinity;
+    this.lastGelAt = -Infinity;
     this.lastSpecialAt = -Infinity;
     this.scheduleNextWave();
   }
@@ -561,6 +567,59 @@ export class SpawnManager {
     this.maybeSpawnBonus();
     this.maybeSpawnCyclone();
     this.maybeSpawnFrenzy();
+    this.maybeSpawnGel();
+  }
+
+  /** Vrai tant qu'un longani givré est en vol. */
+  private isGelOnStage(): boolean {
+    const children = this.fruits.getChildren();
+    for (let i = 0; i < children.length; i++) {
+      const fruit = children[i] as Fruit;
+      if (fruit.active && fruit.isGel) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Le longani givré : il remplace le piment en Chrono.
+   *
+   * Déclenché au TEMPS et non au score, contrairement au piment. Le Chrono se
+   * joue sur une durée fixe : accrocher son fruit spécial à un palier de score
+   * le rendrait fréquent pour un bon joueur et inexistant pour les autres —
+   * or c'est précisément aux seconds qu'il rend service.
+   *
+   * Il arrive par le côté, comme le cyclone : une trajectoire à part est le
+   * premier signal qu'un fruit n'est pas ordinaire, avant même qu'on l'ait
+   * identifié.
+   */
+  private maybeSpawnGel(): void {
+    if (this.mode !== 'chrono') {
+      return;
+    }
+    if (this.scene.time.now - this.startTime < GEL_SAFE_TIME_MS) {
+      return;
+    }
+    if (this.scene.time.now - this.lastGelAt < GEL_MIN_GAP_MS) {
+      return;
+    }
+    // Un seul fruit spécial à la fois, et jamais deux coup sur coup.
+    if (this.scene.time.now - this.lastSpecialAt < SPECIAL_MIN_GAP_MS) {
+      return;
+    }
+    if (this.isGelOnStage() || this.isCycloneOnStage() || this.isDeluge()) {
+      return;
+    }
+    const longani = this.fruits.get() as Fruit | null;
+    if (longani === null) {
+      return; // pool plein : on retentera à la salve suivante
+    }
+    this.lastGelAt = this.scene.time.now;
+    this.lastSpecialAt = this.scene.time.now;
+    const p = this.computeSideLaunch(GEL_VARIETY.radius, rndFloat(0.8, 1.0));
+    longani.launchAs(GEL_VARIETY, false, p.x, p.y, p.velocityX, p.velocityY, false, false, true);
+    sfx.launch();
   }
 
   /**
@@ -569,6 +628,14 @@ export class SpawnManager {
    * et arrive à un moment que le joueur finit par anticiper.
    */
   private maybeSpawnFrenzy(): void {
+    // PAS DE PIMENT EN CHRONO. La frénésie suspend les salves ordinaires le
+    // temps qu'elle dure : c'est ce qui en fait un moment à part en Classique,
+    // où la partie n'a pas de fin annoncée. Sur soixante secondes, ces
+    // quelques secondes de jeu confisqué sont un morceau de la partie qu'on
+    // retire au joueur — et il ne les récupère pas.
+    if (this.mode === 'chrono') {
+      return;
+    }
     if (this.scene.time.now - this.startTime < FRENZY_SAFE_TIME_MS) {
       return;
     }

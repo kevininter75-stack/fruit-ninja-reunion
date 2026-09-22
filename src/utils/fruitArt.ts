@@ -256,6 +256,7 @@ function traceSilhouette(ctx: CanvasRenderingContext2D, variety: FruitVariety, s
       traceLobed(ctx, c, c, r * 0.96, r, 11, 0.05);
       break;
     case 'longane':
+    case 'longane_givre':
       traceLobed(ctx, c, c, r, r * 0.97, 1, 0);
       break;
     case 'combava_bonus':
@@ -776,6 +777,62 @@ export function paintWhole(
       break;
     }
 
+    case 'longane_givre': {
+      // LA MARQUE DU GIVRE.
+      //
+      // Meme raison que la spirale du cyclone : un fruit special doit se
+      // reconnaitre AVANT d'etre identifie. La couleur seule ne suffit pas --
+      // pale, il pourrait passer pour un fruit ordinaire mal eclaire.
+      //
+      // Une etoile de givre a six branches, plus deux couronnes de cristaux :
+      // c'est le dessin universel du gel, et aucun autre fruit du jeu n'a de
+      // motif rayonnant. La silhouette ronde du longani lui sert de vitre.
+      paintBody(ctx, variety, size, skin, () => {
+        const fond = ctx.createRadialGradient(c, c - r * 0.2, r * 0.1, c, c, r);
+        fond.addColorStop(0, 'rgba(255, 255, 255, 0.85)');
+        fond.addColorStop(0.6, 'rgba(198, 235, 248, 0.35)');
+        fond.addColorStop(1, 'rgba(130, 186, 212, 0.55)');
+        ctx.fillStyle = fond;
+        ctx.fillRect(0, 0, size, size);
+
+        // Les six branches, chacune avec ses barbes -- un flocon.
+        ctx.lineCap = 'round';
+        for (let b = 0; b < 6; b++) {
+          const a = (b / 6) * TAU;
+          const bout = r * 0.78;
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.92)';
+          ctx.lineWidth = Math.max(1.5, r * 0.055);
+          ctx.beginPath();
+          ctx.moveTo(c, c);
+          ctx.lineTo(c + Math.cos(a) * bout, c + Math.sin(a) * bout);
+          ctx.stroke();
+          // Deux paires de barbes par branche, en V vers l'exterieur.
+          for (const t of [0.45, 0.72]) {
+            const bx = c + Math.cos(a) * bout * t;
+            const by = c + Math.sin(a) * bout * t;
+            const longueur = r * 0.2 * (1 - t * 0.5);
+            ctx.lineWidth = Math.max(1, r * 0.032);
+            for (const ecart of [0.55, -0.55]) {
+              ctx.beginPath();
+              ctx.moveTo(bx, by);
+              ctx.lineTo(bx + Math.cos(a + ecart) * longueur, by + Math.sin(a + ecart) * longueur);
+              ctx.stroke();
+            }
+          }
+        }
+        // Coeur lumineux : le givre est plus epais au centre.
+        const coeur = ctx.createRadialGradient(c, c, 0, c, c, r * 0.3);
+        coeur.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+        coeur.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        ctx.fillStyle = coeur;
+        ctx.beginPath();
+        ctx.arc(c, c, r * 0.3, 0, TAU);
+        ctx.fill();
+      });
+      drawStem(ctx, c, c - r * 0.93, r * 0.24, 0.3, '#6f8f9e');
+      break;
+    }
+
     case 'papaye_cyclone': {
       // LA SEULE COULEUR INVENTEE DU CATALOGUE, et c'est assume.
       //
@@ -1181,6 +1238,43 @@ function paintFleshDetails(
   const r = variety.radius;
 
   switch (variety.key) {
+    case 'longane_givre': {
+      // La chair d'un fruit gelé : un noyau pris dans la glace, et des
+      // aiguilles de givre qui rayonnent depuis lui. Sans ça, les moitiés
+      // sortaient en disques blancs — or c'est à la coupe qu'on les regarde
+      // le plus longtemps.
+      const noyau = r * 0.34;
+      const glace = ctx.createRadialGradient(c, c, noyau * 0.4, c, c, r);
+      glace.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+      glace.addColorStop(0.5, 'rgba(214, 242, 252, 0.5)');
+      glace.addColorStop(1, 'rgba(158, 206, 228, 0.35)');
+      ctx.fillStyle = glace;
+      ctx.beginPath();
+      ctx.arc(c, c, r, 0, TAU);
+      ctx.fill();
+
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+      ctx.lineCap = 'round';
+      for (let i = 0; i < 9; i++) {
+        const a = (i / 9) * TAU + 0.2;
+        ctx.lineWidth = Math.max(1, r * 0.035);
+        ctx.beginPath();
+        ctx.moveTo(c + Math.cos(a) * noyau * 0.9, c + Math.sin(a) * noyau * 0.9);
+        ctx.lineTo(c + Math.cos(a) * r * 0.82, c + Math.sin(a) * r * 0.82);
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = '#5b6f7d';
+      ctx.beginPath();
+      ctx.ellipse(c, c + r * 0.05, noyau * 0.85, noyau, 0, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
+      ctx.beginPath();
+      ctx.ellipse(c - noyau * 0.3, c - noyau * 0.25, noyau * 0.3, noyau * 0.2, -0.5, 0, TAU);
+      ctx.fill();
+      break;
+    }
+
     case 'litchi':
     case 'longane': {
       // Chair nacrée translucide + gros noyau brun luisant

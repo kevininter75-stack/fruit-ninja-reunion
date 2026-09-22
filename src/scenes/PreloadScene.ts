@@ -36,6 +36,7 @@ import {
   BONUS_VARIETY,
   FRENZY_VARIETY,
   CYCLONE_VARIETY,
+  GEL_VARIETY,
   type FruitVariety,
   wholeTextureKey,
   halfTextureKeys,
@@ -105,6 +106,7 @@ export class PreloadScene extends Phaser.Scene {
     this.taches.push({ libelle: BONUS_VARIETY.displayName, run: () => this.createVarietyTextures(BONUS_VARIETY) });
     this.taches.push({ libelle: FRENZY_VARIETY.displayName, run: () => this.createVarietyTextures(FRENZY_VARIETY) });
     this.taches.push({ libelle: CYCLONE_VARIETY.displayName, run: () => this.createVarietyTextures(CYCLONE_VARIETY) });
+    this.taches.push({ libelle: GEL_VARIETY.displayName, run: () => this.createVarietyTextures(GEL_VARIETY) });
     this.taches.push({ libelle: 'La lame et le jus', run: () => {
       this.createBombTexture();
       this.createJuiceTexture();
