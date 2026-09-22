@@ -66,6 +66,7 @@ import {
   RING_POOL_SIZE,
   DEPTH_FRENZY_AURA,
   TEX_BOMB,
+  TEX_BOMB_CHRONO,
   TEX_JUICE,
   TEX_SEED,
   SEED_BURST_COUNT,
@@ -366,7 +367,9 @@ export class GameScene extends Phaser.Scene {
     });
     this.bombs = this.physics.add.group({
       classType: Bomb,
-      defaultKey: TEX_BOMB,
+      // La bombe du Chrono porte « -10 » au lieu du X : elle n'y met plus fin
+      // à la partie, elle coûte dix secondes (cf. TEX_BOMB_CHRONO).
+      defaultKey: this.mode === 'chrono' ? TEX_BOMB_CHRONO : TEX_BOMB,
       maxSize: BOMB_POOL_SIZE,
     });
 
@@ -2379,8 +2382,15 @@ export class GameScene extends Phaser.Scene {
       onComplete: () => this.flashRect.setVisible(false),
     });
 
+    // TIRET ORDINAIRE, ET PAS LE SIGNE MOINS TYPOGRAPHIQUE. Fredoka n'a pas
+    // U+2212 : il se rendait en rectangle de substitution, large comme un
+    // chiffre, que Kevin a lu comme une croix rouge. Mesuré : 35 px contre 27
+    // pour le tiret ASCII, soit la largeur d'un « 0 ».
+    //
+    // L'unite reste affichee : les gains de points sortent dans le meme style
+    // (« +50 »), et un « -10 » nu se lirait comme une perte de points.
     const secondes = Math.round(CHRONO_BOMBE_PENALITE_MS / 1000);
-    this.showPopup(bx, by - px(20), `− ${secondes} s`, '#ff5252', px(52));
+    this.showPopup(bx, by - px(20), `-${secondes} s`, '#ff5252', px(52));
 
     // Le compteur encaisse le coup : c'est là que le joueur doit regarder.
     // La couleur est pilotée par updateChrono, qui respecte cette échéance.

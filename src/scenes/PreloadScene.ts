@@ -7,6 +7,7 @@ import {
   LANDSCAPE_WIDTH,
   LANDSCAPE_HEIGHT,
   TEX_BOMB,
+  TEX_BOMB_CHRONO,
   TEX_JUICE,
   TEX_SEED,
   TEX_SPLAT_PREFIX,
@@ -522,6 +523,54 @@ export class PreloadScene extends Phaser.Scene {
    * ressortirait sombre et boueux.
    */
   private createBombTexture(): void {
+    this.peindreBombe(TEX_BOMB, true);
+    // La bombe du Chrono porte son prix au lieu d'un interdit : voir
+    // tamponnerPenalite. Le corps est peint sans marque, puis tamponné.
+    const corps = TEX_BOMB_CHRONO + '_corps';
+    this.peindreBombe(corps, false);
+    this.tamponnerPenalite(corps, TEX_BOMB_CHRONO, BOMB_RADIUS * 2);
+  }
+
+  /**
+   * Tamponne « -10 » sur le corps déjà peint.
+   *
+   * Un Graphics ne sait pas écrire : on passe donc par une RenderTexture, qui
+   * empile le corps puis le texte. Elle n'est PAS détruite — c'est elle qui
+   * porte la texture sauvegardée, la détruire l'emporterait avec.
+   *
+   * Le liseré sombre autour du chiffre n'est pas décoratif : sur un corps
+   * noir, un rouge pur perd son contour et bave. C'est le même traitement que
+   * la croix du Classique.
+   */
+  private tamponnerPenalite(cleCorps: string, cleFinale: string, taille: number): void {
+    const rt = this.make.renderTexture({ width: taille, height: taille }, false);
+    rt.draw(cleCorps, 0, 0);
+    const marque = this.make
+      .text(
+        {
+          x: 0,
+          y: 0,
+          text: '-10',
+          style: {
+            fontFamily: GAME_FONT,
+            fontSize: fontPx(34),
+            fontStyle: '700',
+            color: '#ff5b64',
+            stroke: '#14060a',
+            strokeThickness: px(8),
+          },
+        },
+        false
+      )
+      .setOrigin(0.5);
+    // Même centre que la croix qu'il remplace (cf. cy dans peindreBombe).
+    rt.draw(marque, taille / 2, taille / 2 + px(6));
+    rt.saveTexture(cleFinale);
+    marque.destroy();
+    this.textures.remove(cleCorps);
+  }
+
+  private peindreBombe(cle: string, avecCroix: boolean): void {
     const r = BOMB_RADIUS;
     const size = r * 2;
     const g = this.make.graphics({ x: 0, y: 0 }, false);
@@ -585,20 +634,22 @@ export class PreloadScene extends Phaser.Scene {
     // Elle est bordée de noir avant d'être tracée en rouge : sur un corps
     // sombre, un trait rouge pur perd son contour et bave. Le liseré le
     // détache, exactement comme le contour sombre détache les fruits du ciel.
-    const brasX = demiLargeur * 0.52;
-    const brasY = demiHauteur * 0.34;
-    for (const [epaisseur, couleur, alpha] of [
-      [px(14), 0x14060a, 0.9],
-      [px(9), 0xe02434, 1],
-      [px(3), 0xff8f9a, 0.85],
-    ] as Array<[number, number, number]>) {
-      g.lineStyle(epaisseur, couleur, alpha);
-      g.beginPath();
-      g.moveTo(cx - brasX, cy - brasY);
-      g.lineTo(cx + brasX, cy + brasY);
-      g.moveTo(cx + brasX, cy - brasY);
-      g.lineTo(cx - brasX, cy + brasY);
-      g.strokePath();
+    if (avecCroix) {
+      const brasX = demiLargeur * 0.52;
+      const brasY = demiHauteur * 0.34;
+      for (const [epaisseur, couleur, alpha] of [
+        [px(14), 0x14060a, 0.9],
+        [px(9), 0xe02434, 1],
+        [px(3), 0xff8f9a, 0.85],
+      ] as Array<[number, number, number]>) {
+        g.lineStyle(epaisseur, couleur, alpha);
+        g.beginPath();
+        g.moveTo(cx - brasX, cy - brasY);
+        g.lineTo(cx + brasX, cy + brasY);
+        g.moveTo(cx + brasX, cy - brasY);
+        g.lineTo(cx - brasX, cy + brasY);
+        g.strokePath();
+      }
     }
 
     // Contour sombre, et un liseré clair par-dessus : le pétard est noir, or
@@ -623,7 +674,7 @@ export class PreloadScene extends Phaser.Scene {
     g.fillStyle(0xfff3b0, 1);
     g.fillCircle(cx + px(17), px(8), px(3));
 
-    g.generateTexture(TEX_BOMB, size, size);
+    g.generateTexture(cle, size, size);
     g.destroy();
   }
 

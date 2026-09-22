@@ -602,6 +602,16 @@ export type GameOverReason = 'lives' | 'bomb' | 'time';
 // Bombes
 export const TEX_BOMB = 'bomb';
 /**
+ * La bombe du Chrono, marquée « -10 » au lieu du X rouge.
+ *
+ * La croix dit « ne touche pas », et en Classique c'est vrai : la bombe met
+ * fin à la partie. En Chrono elle ne tue plus, elle coûte dix secondes — la
+ * croix y devient un mensonge, et un mensonge qui fait hésiter le joueur sur
+ * le seul objet dont il doit juger le prix instantanément. Le chiffre dit ce
+ * prix exact.
+ */
+export const TEX_BOMB_CHRONO = 'bomb_chrono';
+/**
  * Le pétard est le plus gros objet du jeu, devant la papaye cyclone (88).
  * C'est délibéré et c'est même la seule chose qui doit l'être : il coûte la
  * partie entière, donc il ne doit jamais pouvoir être confondu avec un fruit
