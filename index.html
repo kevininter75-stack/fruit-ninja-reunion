@@ -18,6 +18,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Kout Sab'" />
     <title>Kout Sab'</title>
+    <link rel="preload" as="image" href="assets/decors/lagon-v1.webp" />
     <style>
       /* Police d'affichage du jeu (SIL OFL, embarquée — cf. public/fonts/OFL.txt).
          Chemin relatif pour l'hébergement en sous-chemin (GitHub Pages).
@@ -65,10 +66,42 @@
         padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
           env(safe-area-inset-left);
       }
+      #startup {
+        position: fixed;
+        inset: 0;
+        z-index: 10;
+        display: grid;
+        place-content: center;
+        text-align: center;
+        color: #fff3e0;
+        background: #103c49 url('assets/decors/lagon-v1.webp') center / cover;
+        font-family: 'Fredoka', 'Trebuchet MS', sans-serif;
+      }
+      #startup::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: rgba(4, 31, 43, .38);
+      }
+      #startup > * { position: relative; }
+      #startup h1 {
+        margin: 0 0 30px;
+        font: 400 clamp(36px, 8vw, 80px) 'Shrikhand', 'Trebuchet MS', sans-serif;
+        text-shadow: 0 3px 8px #103c49;
+      }
+      #startup p {
+        margin: 0;
+        padding: 16px 28px;
+        background: rgba(7, 59, 73, .9);
+        border: 1px solid #9cdae0;
+        border-radius: 18px;
+        font-size: 20px;
+      }
     </style>
   </head>
   <body>
     <div id="game"></div>
+    <div id="startup" role="status" aria-live="polite"><h1>Kout Sab'</h1><p>Chargement…</p></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

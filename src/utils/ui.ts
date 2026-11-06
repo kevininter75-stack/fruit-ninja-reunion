@@ -39,7 +39,7 @@ export function addHudPanel(
   width: number,
   height: number
 ): Phaser.GameObjects.Graphics {
-  const radius = Math.min(height / 2, 26);
+  const radius = Math.min(height / 4, px(20));
   const g = scene.add.graphics().setDepth(49);
 
   // Ombre portée : une plaque sombre décalée sous le cartouche. C'est elle
@@ -48,25 +48,12 @@ export function addHudPanel(
   g.fillStyle(0x000000, 0.28);
   g.fillRoundedRect(x + 2, y + 4, width, height, radius);
 
-  // Corps : dégradé vertical (clair en haut, sombre en bas) obtenu par
-  // bandes horizontales — Graphics ne sait pas remplir avec un dégradé, mais
-  // à cette taille la transition reste invisible.
-  const bands = 14;
-  for (let i = 0; i < bands; i++) {
-    const t = i / (bands - 1);
-    const bandY = y + (height / bands) * i;
-    const bandH = height / bands + 1;
-    g.fillStyle(HUD_PANEL_COLOR, HUD_PANEL_ALPHA * (1.25 - t * 0.45));
-    if (i === 0 || i === bands - 1) {
-      // Bandes extrêmes arrondies pour respecter la forme du cartouche
-      g.fillRoundedRect(x, bandY, width, bandH, radius);
-    } else {
-      g.fillRect(x, bandY, width, bandH);
-    }
-  }
+  // Une surface uniforme laisse le décor peint porter la lumière.
+  g.fillStyle(HUD_PANEL_COLOR, HUD_PANEL_ALPHA);
+  g.fillRoundedRect(x, y, width, height, radius);
 
   // Liseré clair en haut, plus discret en bas : lumière venant du ciel
-  g.lineStyle(2, 0xffffff, 0.32);
+  g.lineStyle(px(1.5), 0x9cdae0, 0.8);
   g.strokeRoundedRect(x, y, width, height, radius);
   g.lineStyle(2, 0xffffff, 0.16);
   g.beginPath();
@@ -115,20 +102,29 @@ export function fadeToScene(scene: Phaser.Scene, key: string, data?: object): vo
  * Bouton muet 🔊/🔇 partagé entre les scènes.
  * Zone tactile généreuse (padding), état persistant via settings.
  */
-export function createMuteButton(scene: Phaser.Scene, x: number, y: number): Phaser.GameObjects.Text {
-  const button = scene.add
-    .text(x, y, isMuted() ? '🔇' : '🔊', {
-      fontSize: fontPx(44),
-      padding: { x: px(14), y: px(14) },
-    })
-    .setOrigin(0.5)
-    .setDepth(90)
-    .setAlpha(0.85)
-    .setInteractive({ useHandCursor: true });
+export function createIconButton(
+  scene: Phaser.Scene, x: number, y: number, texture: string
+): { button: Phaser.GameObjects.Container; icon: Phaser.GameObjects.Image } {
+  const side = px(60);
+  const panel = scene.add.graphics();
+  panel.fillStyle(0x000b14, 0.3).fillRoundedRect(-side / 2, -side / 2 + px(3), side, side, px(18));
+  panel.fillStyle(0x073b49, 0.9).fillRoundedRect(-side / 2, -side / 2, side, side, px(18));
+  panel.lineStyle(px(1.5), 0x9cdae0, 0.85).strokeRoundedRect(-side / 2, -side / 2, side, side, px(18));
+  const icon = scene.add.image(0, 0, texture).setDisplaySize(px(36), px(36)).setTint(0xffefd8);
+  // La cible dépasse le panneau : elle reste confortable en paysage sur téléphone.
+  const button = scene.add.container(x, y, [panel, icon]).setDepth(90).setSize(px(84), px(84));
+  button.setInteractive({ useHandCursor: true });
+  button.on('pointerover', () => icon.setTint(0xffffff));
+  button.on('pointerout', () => icon.setTint(0xffefd8));
+  return { button, icon };
+}
+
+export function createMuteButton(scene: Phaser.Scene, x: number, y: number): Phaser.GameObjects.Container {
+  const { button, icon } = createIconButton(scene, x, y, isMuted() ? 'ui_speaker_slash' : 'ui_speaker_high');
 
   button.on('pointerdown', () => {
     const muted = music.toggleMuted();
-    button.setText(muted ? '🔇' : '🔊');
+    icon.setTexture(muted ? 'ui_speaker_slash' : 'ui_speaker_high');
   });
 
   return button;

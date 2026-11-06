@@ -157,7 +157,7 @@ export class GameOverScene extends Phaser.Scene {
         fontStyle: '700',
         color: display.color,
         stroke: '#1d2731',
-        strokeThickness: px(10),
+        strokeThickness: px(4),
       })
       .setOrigin(0.5);
     this.reveal(title, 0, true);
@@ -184,6 +184,7 @@ export class GameOverScene extends Phaser.Scene {
 
     this.scoreValue = this.add
       .bitmapText(w / 2, h * L.score, FONT_DIGITS, '0', L.scoreSize)
+      .setLetterSpacing(-px(14))
       .setOrigin(0.5, 0);
     this.reveal(this.scoreValue, 2);
     this.countScoreUp();
@@ -608,8 +609,8 @@ export class GameOverScene extends Phaser.Scene {
         yInvite,
         px(340),
         hInvite,
-        '🏆  Entrer au classement',
-        0x2f8f5b,
+        'Entrer au classement',
+        0x0c5362,
         8,
         () => {
           sfx.click();
@@ -625,12 +626,12 @@ export class GameOverScene extends Phaser.Scene {
       });
     }
 
-    this.makeButton(xRejouer, yRejouer, lRejouer, hRejouer, 'Rejouer', 0xe0455a, 10, () => {
+    this.makeButton(xRejouer, yRejouer, lRejouer, hRejouer, 'Rejouer', 0x0c5362, 10, () => {
       sfx.click();
       fadeToScene(this, 'GameScene', { mode: this.mode });
     });
 
-    this.makeButton(xMenu, yMenu, lMenu, hMenu, 'Menu', 0x2d3a4a, 11, () => {
+    this.makeButton(xMenu, yMenu, lMenu, hMenu, 'Menu', 0x073b49, 11, () => {
       sfx.click();
       fadeToScene(this, 'MenuScene');
     });
@@ -709,23 +710,26 @@ export class GameOverScene extends Phaser.Scene {
 
     const g = this.add.graphics();
     g.fillStyle(0x000000, 0.3);
-    g.fillRoundedRect(-width / 2, -height / 2 + 5, width, height, height / 2);
+    const radius = Math.min(px(20), height / 3);
+    g.fillRoundedRect(-width / 2, -height / 2 + px(3), width, height, radius);
     g.fillStyle(fill, 1);
-    g.fillRoundedRect(-width / 2, -height / 2, width, height, height / 2);
-    g.lineStyle(3, 0xffffff, 0.85);
-    g.strokeRoundedRect(-width / 2, -height / 2, width, height, height / 2);
+    g.fillRoundedRect(-width / 2, -height / 2, width, height, radius);
+    g.lineStyle(px(1.5), 0x9cdae0, 0.85);
+    g.strokeRoundedRect(-width / 2, -height / 2, width, height, radius);
     container.add(g);
 
-    container.add(
-      this.add
+    const text = this.add
         .text(0, 0, label, {
           fontFamily: GAME_FONT,
-          fontSize: fontPx(40),
+          fontSize: fontPx(32),
           fontStyle: '700',
-          color: '#ffffff',
+          color: '#fff3df',
         })
-        .setOrigin(0.5)
-    );
+        .setOrigin(0.5);
+    if (text.width > width - px(32)) {
+      text.setFontSize(px(32) * (width - px(32)) / text.width);
+    }
+    container.add(text);
 
     // La zone tactile reste un objet de scène (hors container) : un container
     // n'a pas de taille propre, le rendre interactif demanderait de la fixer

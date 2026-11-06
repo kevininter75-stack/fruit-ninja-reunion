@@ -26,6 +26,7 @@ import {
   DIGIT_CELL_H,
   DIGIT_FONT_SIZE,
   GAME_FONT,
+  DISPLAY_FONT,
   SPRITE_SUPERSAMPLE,
   fontPx,
   px,
@@ -45,17 +46,12 @@ import { paintWhole, paintCut } from '../utils/fruitArt';
 import { ensureBackdropTextures } from '../utils/backdropTextures';
 import { computeViewport } from '../utils/viewport';
 import { paintSphereSheen } from '../utils/surfaceShading';
+import { DECOR_ILLUSTRE, EFFETS_JUS, FICHIERS_FRUITS, clePlancheFruit, creerTexturesIllustrees, creerTextureEffet } from '../utils/visuels';
 
 /**
- * Génération des assets placeholder.
- *
- * Aucun fichier image n'est requis : toutes les textures sont générées
- * procéduralement (canvas 2D). Chaque fruit du catalogue reçoit trois
- * textures ([key]_whole, [key]_half_left, [key]_half_right) — les moitiés
- * sont le même dessin découpé par clipping, avec la chair visible le long
- * de la coupe. Quand les vrais assets arriveront (public/assets/fruits/),
- * il suffira de remplacer ces générations par des this.load.image() :
- * les clés de texture ne changeront pas.
+ * Charge les images peintes puis prépare les textures avec les clés historiques.
+ * Les dessins procéduraux restent un repli si une image ne peut être chargée.
+ * Les rayons, les corps et les animations ne dépendent pas de ces images.
  */
 export class PreloadScene extends Phaser.Scene {
   constructor() {
@@ -67,6 +63,25 @@ export class PreloadScene extends Phaser.Scene {
   private barre?: Phaser.GameObjects.Rectangle;
   private legende?: Phaser.GameObjects.Text;
 
+  preload(): void {
+    this.buildLoadingScreen();
+    const base = import.meta.env.BASE_URL;
+    this.load.image(EFFETS_JUS, `${base}assets/effets/jus-v1.webp`);
+    if (!this.textures.exists(DECOR_ILLUSTRE)) {
+      this.load.image(DECOR_ILLUSTRE, `${base}assets/decors/lagon-v1.webp`);
+    }
+    for (const [cle, fichier] of [['ui_speaker_high', 'speaker-high'], ['ui_speaker_slash', 'speaker-slash'], ['ui_pause', 'pause']]) {
+      this.load.svg(cle, `${base}assets/ui/${fichier}.svg`, { width: 128, height: 128 });
+    }
+    for (const [cle, fichier] of Object.entries(FICHIERS_FRUITS)) {
+      this.load.image(clePlancheFruit(cle), `${base}assets/fruits/illustres/${fichier}-v1.webp`);
+    }
+    this.load.on('progress', (avancement: number) => {
+      this.barre?.setScale(avancement * 0.65, 1);
+      this.legende?.setText('Les images du jeu');
+    });
+  }
+
   create(): void {
     // La planche de tranchage part en fond dès le préchargement : la
     // récupération n'a pas besoin d'un contexte audio, seul le décodage en a
@@ -74,8 +89,6 @@ export class PreloadScene extends Phaser.Scene {
     // première fois, et la première coupe sonne comme les suivantes.
     sfx.precharger();
     music.precharger();
-
-    this.buildLoadingScreen();
 
     // Les textures sont générées EN TÂCHES, une par frame, au lieu d'un seul
     // bloc. Mesuré : 852 ms rien que pour les fruits, suréchantillonnage
@@ -134,7 +147,7 @@ export class PreloadScene extends Phaser.Scene {
     tache.run();
 
     const avancement = this.tacheCourante / this.taches.length;
-    this.barre?.setScale(avancement, 1);
+    this.barre?.setScale(0.65 + avancement * 0.35, 1);
     this.legende?.setText(tache.libelle);
 
     if (this.tacheCourante >= this.taches.length) {
@@ -154,24 +167,37 @@ export class PreloadScene extends Phaser.Scene {
     const h = this.scale.height;
 
     this.add.rectangle(0, 0, w, h, 0x0b2a3a).setOrigin(0);
+    if (this.textures.exists(DECOR_ILLUSTRE)) {
+      const decor = this.add.image(w / 2, h / 2, DECOR_ILLUSTRE);
+      decor.setScale(Math.max(w / decor.width, h / decor.height));
+    }
+    this.add.rectangle(0, 0, w, h, 0x041f2b, 0.38).setOrigin(0);
+    document.getElementById('startup')?.remove();
 
     this.add
-      .text(w / 2, h * 0.4, "Kout Sab'", {
-        fontFamily: GAME_FONT,
-        fontSize: fontPx(64),
+      .text(w / 2, h * 0.39, "Kout Sab'", {
+        fontFamily: DISPLAY_FONT,
+        fontSize: fontPx(80),
         color: '#fff3e0',
+        stroke: '#103c49',
+        strokeThickness: px(4),
       })
       .setOrigin(0.5);
 
-    const largeur = Math.min(w * 0.6, 460);
+    const largeur = Math.min(w * 0.65, px(460));
+    const panneau = this.add.graphics();
+    panneau.fillStyle(0x073b49, 0.9).fillRoundedRect(w / 2 - largeur / 2 - px(30), h * 0.51,
+      largeur + px(60), h * 0.17, px(20));
+    panneau.lineStyle(px(1), 0x9cdae0, 0.6).strokeRoundedRect(w / 2 - largeur / 2 - px(30), h * 0.51,
+      largeur + px(60), h * 0.17, px(20));
     this.add
-      .rectangle(w / 2, h * 0.56, largeur, 10, 0xffffff, 0.16)
+      .rectangle(w / 2, h * 0.56, largeur, px(6), 0xffffff, 0.16)
       .setOrigin(0.5);
 
     // La barre grandit par setScale depuis son bord gauche : redimensionner un
     // rectangle centré le ferait grandir des deux côtés.
     this.barre = this.add
-      .rectangle(w / 2 - largeur / 2, h * 0.56, largeur, 10, 0xffd76a)
+      .rectangle(w / 2 - largeur / 2, h * 0.56, largeur, px(6), 0xffd79d)
       .setOrigin(0, 0.5)
       .setScale(0, 1);
 
@@ -179,7 +205,7 @@ export class PreloadScene extends Phaser.Scene {
       .text(w / 2, h * 0.62, '', {
         fontFamily: GAME_FONT,
         fontSize: fontPx(24),
-        color: '#9fb8c8',
+        color: '#dbedef',
       })
       .setOrigin(0.5);
   }
@@ -300,9 +326,7 @@ export class PreloadScene extends Phaser.Scene {
 
     // Déclaration en police bitmap à chasse fixe : les chiffres partagent la
     // même largeur, la planche est donc régulière et se découpe simplement.
-    this.cache.bitmapFont.add(
-      FONT_DIGITS,
-      Phaser.GameObjects.RetroFont.Parse(this, {
+    const police = Phaser.GameObjects.RetroFont.Parse(this, {
         image: FONT_DIGITS,
         width: w,
         height: h,
@@ -313,8 +337,8 @@ export class PreloadScene extends Phaser.Scene {
         'spacing.x': 0,
         'spacing.y': 0,
         lineSpacing: 0,
-      })
-    );
+      });
+    this.cache.bitmapFont.add(FONT_DIGITS, police);
   }
 
   /** Onde de choc : anneau clair à bord fondu, agrandi puis effacé en tween. */
@@ -431,6 +455,9 @@ export class PreloadScene extends Phaser.Scene {
     // Marge élargie : place pour feuilles/couronnes/halo ET pour l'ombre
     // portée douce qui détache le fruit du décor assombri.
     const size = variety.radius * 2 + px(64);
+    if (creerTexturesIllustrees(this, variety, size)) {
+      return;
+    }
     const variants: Array<'whole' | 'left' | 'right'> = ['whole', 'left', 'right'];
     const halves = halfTextureKeys(variety);
 
@@ -731,6 +758,9 @@ export class PreloadScene extends Phaser.Scene {
 
   /** Goutte de jus : disque à dégradé radial doux (bord fondu), teinté à l'émission. */
   private createJuiceTexture(): void {
+    if (creerTextureEffet(this, 0, TEX_JUICE, px(28))) {
+      return;
+    }
     const size = 28;
     const c = size / 2;
     const tex = this.textures.createCanvas(TEX_JUICE, px(size), px(size));
@@ -757,6 +787,9 @@ export class PreloadScene extends Phaser.Scene {
     const size = 180;
     const c = size / 2;
     for (let variant = 0; variant < SPLAT_VARIANTS; variant++) {
+      if (creerTextureEffet(this, variant + 1, `${TEX_SPLAT_PREFIX}${variant}`, px(size))) {
+        continue;
+      }
       const g = this.make.graphics({ x: 0, y: 0 }, false);
       g.setScale(RENDER_SCALE);
       // Corps principal de la tache
@@ -778,6 +811,9 @@ export class PreloadScene extends Phaser.Scene {
       }
       g.generateTexture(`${TEX_SPLAT_PREFIX}${variant}`, px(size), px(size));
       g.destroy();
+    }
+    if (this.textures.exists(EFFETS_JUS)) {
+      this.textures.remove(EFFETS_JUS);
     }
   }
 }

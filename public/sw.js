@@ -14,7 +14,7 @@
  * immédiatement ; le client se recharge alors une fois (voir main.ts,
  * écouteur 'controllerchange'). Incrémenter CACHE_NAME purge l'ancien cache.
  */
-const CACHE_NAME = 'kout-sab-v1';
+const CACHE_NAME = 'kout-sab-visuel-v2';
 const PRECACHE = [
   '.',
   'index.html',
@@ -30,6 +30,24 @@ const PRECACHE = [
   // Le bruit de tranchage : 123 Ko, décodés une fois au démarrage. Sans lui en
   // cache, une partie hors ligne retomberait sur le tranchage synthétisé.
   'assets/sfx/tranche.wav',
+  // Les images peintes doivent rester disponibles après la première installation.
+  'assets/decors/lagon-v1.webp',
+  'assets/effets/jus-v1.webp',
+  'assets/fruits/illustres/letchi-v1.webp',
+  'assets/fruits/illustres/goyavier-v1.webp',
+  'assets/fruits/illustres/ananas-v1.webp',
+  'assets/fruits/illustres/mangue-v1.webp',
+  'assets/fruits/illustres/passion-v1.webp',
+  'assets/fruits/illustres/pitaya-v1.webp',
+  'assets/fruits/illustres/corossol-v1.webp',
+  'assets/fruits/illustres/carambole-v1.webp',
+  'assets/fruits/illustres/combava-v1.webp',
+  'assets/fruits/illustres/piment-v1.webp',
+  'assets/fruits/illustres/cyclone-v1.webp',
+  'assets/fruits/illustres/longani-v1.webp',
+  'assets/ui/speaker-high.svg',
+  'assets/ui/speaker-slash.svg',
+  'assets/ui/pause.svg',
   'icons/icon-192.png',
   'icons/icon-512.png',
   'icons/icon-192-maskable.png',

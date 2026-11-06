@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { SceneGrading } from '../systems/SceneGrading';
 import { applyShadingTint } from '../utils/surfaceShading';
+import { estFruitIllustre } from '../utils/visuels';
 import {
   type GameMode,
   SLICE_MIN_SPEED,
@@ -76,19 +77,19 @@ export class MenuScene extends Phaser.Scene {
         fontFamily: DISPLAY_FONT,
         fontSize: fontPx(76),
         fontStyle: 'bold',
-        color: '#ffffff',
+        color: '#fff3df',
         align: 'center',
-        stroke: '#2d3a4a',
-        strokeThickness: px(10),
+        stroke: '#103c49',
+        strokeThickness: px(4),
       })
       .setOrigin(0.5);
     title.setAlpha(0).setY(h * 0.12);
     this.tweens.add({ targets: title, alpha: 1, y: h * 0.15, duration: 500, ease: 'Cubic.easeOut' });
 
     this.add
-      .text(w / 2, h * (portrait ? 0.26 : 0.28), 'Tranchez un fruit pour choisir !', {
+      .text(w / 2, h * 0.26, 'Tranchez un fruit pour choisir !', {
         fontFamily: GAME_FONT,
-        fontSize: fontPx(34),
+        fontSize: fontPx(28),
         color: '#fff3e0',
         align: 'center',
       })
@@ -137,9 +138,9 @@ export class MenuScene extends Phaser.Scene {
       this.createEmblem(w * 0.31, premier + pas, chrono, 'chrono', 'CHRONO', `60 s · Record ${getBestScore('chrono')}`, 1.15, 'right');
       this.createEmblem(w * 0.31, premier + pas * 2, daily, 'daily', 'DÉFI DU JOUR', sousTitreDefi, 1.15, 'right', regleDuJour, couleurRegle);
     } else {
-      this.createEmblem(w * 0.22, h * 0.58, classic, 'classic', 'CLASSIQUE', `3 vies · Record ${getBestScore('classic')}`, 1.7, 'below');
-      this.createEmblem(w * 0.5, h * 0.58, chrono, 'chrono', 'CHRONO', `60 s · Record ${getBestScore('chrono')}`, 1.7, 'below');
-      this.createEmblem(w * 0.78, h * 0.58, daily, 'daily', 'DÉFI DU JOUR', sousTitreDefi, 1.7, 'below', regleDuJour, couleurRegle);
+      this.createEmblem(w * 0.22, h * 0.49, classic, 'classic', 'CLASSIQUE', `3 vies · Record ${getBestScore('classic')}`, 1.7, 'below');
+      this.createEmblem(w * 0.5, h * 0.48, chrono, 'chrono', 'CHRONO', `60 s · Record ${getBestScore('chrono')}`, 1.5, 'below');
+      this.createEmblem(w * 0.78, h * 0.49, daily, 'daily', 'DÉFI DU JOUR', sousTitreDefi, 1.7, 'below', regleDuJour, couleurRegle);
     }
 
     // Jus (feedback de coupe) + lame qui suit le doigt
@@ -160,13 +161,13 @@ export class MenuScene extends Phaser.Scene {
     // Le classement se rejoint depuis le menu, pas depuis l'écran de fin : on
     // veut pouvoir aller voir où l'on en est sans avoir à rejouer une partie.
     const classement = this.add
-      .text(px(52), h - px(52), '🏆  Classement', {
+      .text(px(52), h - px(52), 'Classement', {
         fontFamily: GAME_FONT,
         fontSize: fontPx(26),
         fontStyle: '700',
         color: '#ffd9a0',
         stroke: '#1d2731',
-        strokeThickness: px(5),
+        strokeThickness: px(2),
       })
       .setOrigin(0, 0.5)
       .setInteractive({ useHandCursor: true });
@@ -206,17 +207,30 @@ export class MenuScene extends Phaser.Scene {
     // Rayon de coupe = rayon logique du fruit mis à l'échelle
     const radius = variety.radius * scale;
 
+    const aCote = cote === 'right';
+    if (!aCote) {
+      const largeur = this.scale.width * 0.25;
+      const haut = this.scale.height * 0.32;
+      const hauteur = this.scale.height * 0.56;
+      const carte = this.add.graphics().setDepth(-2);
+      carte.fillStyle(0x001e29, 0.25).fillRoundedRect(x - largeur / 2, haut + px(5), largeur, hauteur, px(24));
+      carte.fillStyle(0x073b49, 0.72).fillRoundedRect(x - largeur / 2, haut, largeur, hauteur, px(24));
+      carte.lineStyle(px(1.5), 0x9cdae0, 0.65).strokeRoundedRect(x - largeur / 2, haut, largeur, hauteur, px(24));
+      // Le panneau accompagne l'image ; la cible reste le fruit, comme avant.
+      carte.setName(`carte_${mode}`);
+    }
+
     // Halo chaud qui respire derrière l'emblème → il ressort comme une cible
     const glow = this.add
       .image(x, y, TEX_GLOW)
       .setDisplaySize(radius * 2.9, radius * 2.9)
-      .setAlpha(0.38)
+      .setAlpha(0.12)
       .setDepth(-1)
       .setBlendMode(Phaser.BlendModes.ADD);
     this.tweens.add({
       targets: glow,
       scale: glow.scale * 1.12,
-      alpha: 0.6,
+      alpha: 0.2,
       duration: 1500,
       yoyo: true,
       repeat: -1,
@@ -230,11 +244,13 @@ export class MenuScene extends Phaser.Scene {
     // L'emblème ne tourne pas : son galbe se pose une fois. Sans cela il
     // resterait à l'éclairage « plein soleil » dans lequel les textures sont
     // désormais peintes — plat et surexposé.
-    applyShadingTint(sprite, variety.radius * scale);
-    this.add
+    if (!estFruitIllustre(sprite.texture.key)) {
+      applyShadingTint(sprite, variety.radius * scale);
+      this.add
       .image(x, y, TEX_SHEEN)
       .setDisplaySize(radius * 2, radius * 2)
       .setBlendMode(Phaser.BlendModes.ADD);
+    }
 
     // Ondulation permanente pour attirer l'œil
     this.tweens.add({
@@ -249,26 +265,25 @@ export class MenuScene extends Phaser.Scene {
     // À côté, le texte part du bord droit du fruit et se cale à gauche ;
     // dessous, il reste centré sous lui. Les deux cas ne diffèrent que par
     // ces trois valeurs, le reste du traçé est commun.
-    const aCote = cote === 'right';
     const tx = aCote ? x + radius + px(30) : x;
-    const tyLabel = aCote ? y - px(30) : y + radius + px(16);
-    const tySub = aCote ? y + px(24) : y + radius + px(68);
+    const tyLabel = aCote ? y - px(30) : this.scale.height * 0.665;
+    const tySub = aCote ? y + px(24) : this.scale.height * 0.735;
     const ancre = aCote ? 0 : 0.5;
 
     this.add
       .text(tx, tyLabel, label, {
         fontFamily: DISPLAY_FONT,
-        fontSize: fontPx(46),
+        fontSize: fontPx(36),
         fontStyle: 'bold',
-        color: '#ffffff',
+        color: '#fff3df',
         stroke: '#2d3a4a',
-        strokeThickness: px(6),
+        strokeThickness: px(2),
       })
       .setOrigin(ancre, 0);
     this.add
       .text(tx, tySub, subtitle, {
         fontFamily: GAME_FONT,
-        fontSize: fontPx(26),
+        fontSize: fontPx(22),
         color: '#fff3e0',
       })
       .setOrigin(ancre, 0);
@@ -277,15 +292,15 @@ export class MenuScene extends Phaser.Scene {
       // à côté du fruit c'est ce qui reste jusqu'au bord, dessous c'est le pas
       // entre deux emblèmes. Sans cela, « Brume des Hauts — La brume monte par
       // vagues… » sortirait de l'écran le jour où il tombe.
-      const dispo = aCote ? this.scale.width - tx - px(24) : this.scale.width / 3.4;
+      const dispo = aCote ? this.scale.width - tx - px(24) : this.scale.width * 0.225;
       this.add
-        .text(tx, tySub + px(34), detail, {
+        .text(tx, tySub + px(30), detail, {
           fontFamily: GAME_FONT,
-          fontSize: fontPx(22),
+          fontSize: fontPx(20),
           fontStyle: 'bold',
           color: detailCouleur,
           stroke: '#1d2a36',
-          strokeThickness: px(4),
+          strokeThickness: px(1),
           align: aCote ? 'left' : 'center',
           wordWrap: { width: dispo },
         })

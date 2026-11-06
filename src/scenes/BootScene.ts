@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { DECOR_ILLUSTRE } from '../utils/visuels';
 
 /**
  * Première scène : configuration minimale avant le chargement.
@@ -8,6 +9,11 @@ import Phaser from 'phaser';
 export class BootScene extends Phaser.Scene {
   constructor() {
     super('BootScene');
+  }
+
+  preload(): void {
+    // Le décor léger de l'écran de chargement arrive avant les planches de fruits.
+    this.load.image(DECOR_ILLUSTRE, `${import.meta.env.BASE_URL}assets/decors/lagon-v1.webp`);
   }
 
   create(): void {

@@ -1,4 +1,6 @@
 import Phaser from 'phaser';
+import { DECOR_ILLUSTRE } from '../utils/visuels';
+import { prefersReducedMotion } from '../utils/settings';
 import { backgroundKey, scenePortrait, BG_COUCHES, type BgCouche } from '../utils/viewport';
 import { ensureBackdropTextures } from '../utils/backdropTextures';
 import {
@@ -68,6 +70,22 @@ export class AnimatedBackground {
         .setDepth(PROFONDEURS[i])
         .setScrollFactor(VITESSES[i])
     );
+
+    if (scene.textures.exists(DECOR_ILLUSTRE)) {
+      // La peinture possède déjà ses nuages et sa lumière. Une dérive discrète
+      // accompagne les menus ; la zone de jeu conserve un décor stable.
+      if (parallax && !prefersReducedMotion()) {
+        scene.tweens.add({
+          targets: plans[0],
+          x: -SCREEN_BLEED + w * 0.005,
+          duration: 14000,
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.easeInOut',
+        });
+      }
+      return;
+    }
 
     // Halo de soleil qui respire, en fusion additive pour un vrai rayonnement
     const glow = scene.add

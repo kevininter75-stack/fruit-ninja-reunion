@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { SUN_FRAC_X, SUN_FRAC_Y } from './constants';
 import { backgroundKey, type BgCouche } from './viewport';
+import { DECOR_ILLUSTRE } from './visuels';
 import {
   paintCiel,
   paintCretesLointaines,
@@ -45,6 +46,22 @@ export function ensureBackdropTextures(
     trace(texture.getContext());
     texture.refresh();
   };
+
+  if (scene.textures.exists(DECOR_ILLUSTRE)) {
+    peindre('ciel', (ctx) => {
+      const image = scene.textures.get(DECOR_ILLUSTRE).getSourceImage() as HTMLImageElement;
+      const echelle = Math.max(W / image.width, H / image.height);
+      const largeur = image.width * echelle;
+      const hauteur = image.height * echelle;
+      ctx.drawImage(image, (W - largeur) / 2, (H - hauteur) / 2, largeur, hauteur);
+    });
+    // Le décor peint porte déjà ses reliefs et son avant-plan ; les clés des
+    // quatre plans restent présentes pour les scènes et les rotations existantes.
+    peindre('loin', () => undefined);
+    peindre('proche', () => undefined);
+    peindre('avant', () => undefined);
+    return;
+  }
 
   peindre('ciel', (ctx) => paintCiel(ctx, W, H, SUN_FRAC_X, SUN_FRAC_Y));
   peindre('loin', (ctx) => paintCretesLointaines(ctx, W, H));

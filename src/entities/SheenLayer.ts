@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { TEX_SHEEN, DEPTH_SHEEN } from '../utils/constants';
 import { applyShadingTint } from '../utils/surfaceShading';
+import { estFruitIllustre } from '../utils/visuels';
 
 /**
  * L'éclairage d'un objet qui tourne. Il ne tourne pas avec lui.
@@ -53,6 +54,12 @@ export class SheenLayer {
       return;
     }
 
+    if (estFruitIllustre(porteur.texture.key)) {
+      // La lumière est peinte dans ces images : un second galbe les ternirait.
+      porteur.clearTint();
+      this.sheen?.setVisible(false);
+      return;
+    }
     applyShadingTint(porteur, radius);
 
     // Création différée : un objet qui n'a jamais volé ne consomme rien.

@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { GAME_FONT, fontPx, px } from '../utils/constants';
+import { DISPLAY_FONT, GAME_FONT, fontPx, px } from '../utils/constants';
+import { createIconButton } from '../utils/ui';
 
 /**
  * La pause — absente jusqu'ici, et c'est le manque le plus gênant sur mobile :
@@ -17,7 +18,7 @@ import { GAME_FONT, fontPx, px } from '../utils/constants';
  */
 export class PauseController {
   private overlay!: Phaser.GameObjects.Container;
-  private button!: Phaser.GameObjects.Text;
+  private button!: Phaser.GameObjects.Container;
   private paused = false;
 
   constructor(
@@ -42,17 +43,8 @@ export class PauseController {
   private createButton(): void {
     // Symétrique du bouton de son, en bas à droite. Cible de 56 px de côté :
     // en dessous, un bouton devient difficile à viser au pouce en pleine action.
-    this.button = this.scene.add
-      .text(this.scene.scale.width - px(52), this.scene.scale.height - px(52), '❚❚', {
-        fontFamily: GAME_FONT,
-        fontSize: fontPx(30),
-        color: '#eef3f7',
-        padding: { x: px(14), y: px(14) },
-      })
-      .setOrigin(0.5)
-      .setDepth(90)
-      .setAlpha(0.85)
-      .setInteractive({ useHandCursor: true });
+    this.button = createIconButton(this.scene,
+      this.scene.scale.width - px(52), this.scene.scale.height - px(52), 'ui_pause').button;
 
     this.button.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       // On arrête la propagation : sans ça, le toucher qui met en pause
@@ -66,12 +58,15 @@ export class PauseController {
     const w = this.scene.scale.width;
     const h = this.scene.scale.height;
 
-    const veil = this.scene.add.rectangle(w / 2, h / 2, w, h, 0x0a0712, 0.82);
+    const veil = this.scene.add.rectangle(w / 2, h / 2, w, h, 0x041f2b, 0.7);
+    const panel = this.scene.add.graphics();
+    panel.fillStyle(0x073b49, 0.94).fillRoundedRect(w / 2 - px(210), h / 2 - px(190), px(420), px(370), px(28));
+    panel.lineStyle(px(1.5), 0x9cdae0, 0.7).strokeRoundedRect(w / 2 - px(210), h / 2 - px(190), px(420), px(370), px(28));
     const title = this.scene.add
       .text(w / 2, h / 2 - px(110), 'Pause', {
-        fontFamily: GAME_FONT,
-        fontSize: fontPx(68),
-        color: '#ffffff',
+        fontFamily: DISPLAY_FONT,
+        fontSize: fontPx(56),
+        color: '#fff3df',
       })
       .setOrigin(0.5);
 
@@ -82,7 +77,7 @@ export class PauseController {
     });
 
     this.overlay = this.scene.add
-      .container(0, 0, [veil, title, resume, quit])
+      .container(0, 0, [veil, panel, title, resume, quit])
       .setDepth(200)
       .setVisible(false);
 
@@ -91,26 +86,31 @@ export class PauseController {
     veil.setInteractive();
   }
 
-  private makeChoice(x: number, y: number, label: string, action: () => void): Phaser.GameObjects.Text {
+  private makeChoice(x: number, y: number, label: string, action: () => void): Phaser.GameObjects.Container {
+    const width = px(300);
+    const height = px(72);
+    const background = this.scene.add.graphics();
+    background.fillStyle(0x0c5362, 1).fillRoundedRect(-width / 2, -height / 2, width, height, px(18));
+    background.lineStyle(px(1), 0x9cdae0, 0.7).strokeRoundedRect(-width / 2, -height / 2, width, height, px(18));
     const text = this.scene.add
-      .text(x, y, label, {
+      .text(0, 0, label, {
         fontFamily: GAME_FONT,
-        fontSize: fontPx(40),
-        color: '#ffffff',
-        backgroundColor: '#2a1a2e',
-        padding: { x: px(34), y: px(16) },
+        fontSize: fontPx(32),
+        fontStyle: '600',
+        color: '#fff3df',
       })
-      .setOrigin(0.5)
+      .setOrigin(0.5);
+    const button = this.scene.add.container(x, y, [background, text]).setSize(width, height)
       .setInteractive({ useHandCursor: true });
 
-    text.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+    button.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       pointer.event.stopPropagation();
       action();
     });
-    text.on('pointerover', () => text.setColor('#ffd76a'));
-    text.on('pointerout', () => text.setColor('#ffffff'));
+    button.on('pointerover', () => text.setColor('#ffd79d'));
+    button.on('pointerout', () => text.setColor('#fff3df'));
 
-    return text;
+    return button;
   }
 
   private bindKeyboard(): void {

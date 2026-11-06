@@ -511,7 +511,7 @@ export const FRENZY_AURA_SCALE = 2.8; // taille du halo, en multiples du rayon
 export const SLICE_BUFFER_SIZE = 12; // nb max de points conservés pour la traînée
 export const SLICE_POINT_MAX_AGE_MS = 200; // durée de vie d'un point de traînée
 export const SLICE_MIN_SPEED = 0.35; // vitesse min du geste (px/ms) pour qu'une coupe soit valide
-export const TRAIL_MAX_HALF_WIDTH = px(9); // demi-largeur du ruban de lame à la pointe (px)
+export const TRAIL_MAX_HALF_WIDTH = px(6); // demi-largeur du ruban de lame à la pointe (px)
 
 // Fruits
 export const FRUIT_RADIUS = px(62); // rayon du placeholder et du cercle de collision
@@ -548,7 +548,7 @@ export const STROKE_MAX_MS = 700;
 // Un ruban entièrement blanc paraissait plat ; le dégradé de température lui
 // donne l'éclat d'une vraie lame.
 export const COLOR_TRAIL = 0xffffff;
-export const COLOR_TRAIL_GLOW = 0x7fd4ff; // halo extérieur, bleuté
+export const COLOR_TRAIL_GLOW = 0x63e8ed; // halo extérieur, turquoise
 export const COLOR_TRAIL_CORE = 0xffffff; // corps du ruban
 export const COLOR_TRAIL_SPARK = 0xfff3c4; // éclat central, chaud
 
@@ -738,7 +738,7 @@ export const SPLAT_FADE_MS = 7000; // durée avant disparition complète d'une t
 export const SCREEN_BLEED = px(36);
 
 export const GAME_DARKEN_COLOR = 0x0a1a26;
-export const GAME_DARKEN_ALPHA = 0.4;
+export const GAME_DARKEN_ALPHA = 0.14;
 
 // Profondeurs de rendu (depth) : fond 0 < voile < taches < moitiés < fruits < jus < UI
 export const DEPTH_DARKEN = 1;
@@ -1077,8 +1077,8 @@ export const BRUME_PERIODE_MS = 11_000;
 
 export const DEPTH_VIGNETTE = 45; // au-dessus du jeu et du jus, sous le HUD (50)
 // HUD en cartouches translucides arrondis
-export const HUD_PANEL_COLOR = 0x0b2a3a;
-export const HUD_PANEL_ALPHA = 0.4;
+export const HUD_PANEL_COLOR = 0x073b49;
+export const HUD_PANEL_ALPHA = 0.88;
 
 // ------------------------------------------------------------------
 // Le fruit cyclone : la frénésie en un seul coup de sabre

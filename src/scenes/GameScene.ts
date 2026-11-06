@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { estFruitIllustre } from '../utils/visuels';
 import { Fruit } from '../entities/Fruit';
 import { Bomb } from '../entities/Bomb';
 import { SliceTrail } from '../entities/SliceTrail';
@@ -640,7 +641,11 @@ export class GameScene extends Phaser.Scene {
       if (!moitie.active || !moitie.visible) {
         continue;
       }
-      applyShadingTint(moitie, moitie.sliceRadius ?? moitie.displayWidth / 3);
+      if (estFruitIllustre(moitie.texture.key)) {
+        moitie.clearTint();
+      } else {
+        applyShadingTint(moitie, moitie.sliceRadius ?? moitie.displayWidth / 3);
+      }
     }
   }
 
@@ -1050,7 +1055,7 @@ export class GameScene extends Phaser.Scene {
     const etat = alerte ? 'alerte' : 'normal';
     if (etat !== this.etatChrono) {
       this.etatChrono = etat;
-      this.infoText.setColor(alerte ? '#ff5252' : '#ffffff');
+      this.infoText.setColor(alerte ? '#ff5252' : '#fff3df');
     }
     if (remainingMs <= 0) {
       this.gameEnded = true;
@@ -1075,12 +1080,13 @@ export class GameScene extends Phaser.Scene {
           fontFamily: GAME_FONT,
           fontSize: fontPx(22),
           fontStyle: '600',
-          color: '#9fd0e6',
+          color: '#fff3df',
         })
         .setDepth(50)
     );
     this.scoreValue = this.add
       .bitmapText(px(36), px(44), FONT_DIGITS, '0', px(44))
+      .setLetterSpacing(-px(14))
       .setOrigin(0, 0)
       .setDepth(50);
     this.hudElements.push(this.scoreValue);
@@ -1121,23 +1127,23 @@ export class GameScene extends Phaser.Scene {
       this.hudElements.push(addHudPanel(this, w - px(14) - px(160), px(12), px(160), px(84)));
       this.hudElements.push(
         this.add
-          .text(w - 36, 20, 'TEMPS', {
+          .text(w - px(36), px(24), 'TEMPS', {
             fontFamily: GAME_FONT,
             fontSize: fontPx(22),
             fontStyle: '600',
-            color: '#9fd0e6',
+            color: '#fff3df',
           })
           .setOrigin(1, 0)
           .setDepth(50)
       );
       this.infoText = this.add
-        .text(w - 36, 44, '60 s', {
+        .text(w - px(36), px(44), '60 s', {
           fontFamily: GAME_FONT,
           fontSize: fontPx(40),
           fontStyle: '700',
-          color: '#ffffff',
-          stroke: '#2d3a4a',
-          strokeThickness: px(6),
+          color: '#fff3df',
+          stroke: '#103c49',
+          strokeThickness: px(2),
         })
         .setOrigin(1, 0)
         .setDepth(50);

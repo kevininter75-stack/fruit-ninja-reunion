@@ -16,7 +16,9 @@
   <body>
     <canvas id="sheet"></canvas>
     <script type="module">
-      import { FRUIT_VARIETIES, BONUS_VARIETY, FRENZY_VARIETY } from '/src/utils/fruitCatalog.ts';
+      import { FRUIT_VARIETIES, BONUS_VARIETY, FRENZY_VARIETY, CYCLONE_VARIETY, GEL_VARIETY } from '/src/utils/fruitCatalog.ts';
+      import { FICHIERS_FRUITS } from '/src/utils/visuels.ts';
+      import { px, RENDER_SCALE } from '/src/utils/constants.ts';
       import { paintWhole, paintCut } from '/src/utils/fruitArt.ts';
 
       const params = new URLSearchParams(location.search);
@@ -31,8 +33,18 @@
       //
       // ?zoom=N agrandit le TRACÉ, il n'étire pas une image : on veut juger la
       // netteté réelle du dessin, pas des pixels agrandis.
+      const planches = new Map();
       function renderVariant(variety, variant) {
-        const size = (variety.radius * 2 + 64) * zoom;
+        const size = (variety.radius * 2 + px(64)) * zoom;
+        const image = planches.get(variety.key);
+        if (image) {
+          const cv = document.createElement('canvas');
+          cv.width = cv.height = size;
+          const ctx = cv.getContext('2d');
+          const i = ['whole', 'left', 'right'].indexOf(variant);
+          ctx.drawImage(image, i * image.height, 0, image.height, image.height, 0, 0, size, size);
+          return cv;
+        }
         const echelle = SUPERSAMPLE * zoom;
 
         const grand = document.createElement('canvas');
@@ -72,7 +84,13 @@
 
       // ?only=<clé> n'affiche qu'une variété, en haut de page : sur une planche
       // de dix fruits il fallait faire défiler pour juger le dernier.
-      let all = [...FRUIT_VARIETIES, BONUS_VARIETY, FRENZY_VARIETY];
+      let all = [...FRUIT_VARIETIES, BONUS_VARIETY, FRENZY_VARIETY, CYCLONE_VARIETY, GEL_VARIETY];
+      await Promise.all(all.map(async (v) => {
+        const image = new Image();
+        image.src = `${import.meta.env.BASE_URL}assets/fruits/illustres/${FICHIERS_FRUITS[v.key]}-v1.webp`;
+        await image.decode();
+        planches.set(v.key, image);
+      }));
       if (only) {
         const filtre = all.filter((v) => v.key === only);
         if (filtre.length > 0) {
@@ -81,7 +99,7 @@
           document.title = 'CLE INCONNUE';
         }
       }
-      const CELL = 210 * zoom;
+      const CELL = 280 * zoom;
       const ROW = CELL + 46;
       const sheet = document.getElementById('sheet');
       sheet.width = CELL * 3 + 40;
@@ -99,8 +117,10 @@
         ctx.fillText(variety.displayName, 20, y + 8);
         ['whole', 'left', 'right'].forEach((variant, col) => {
           const cv = renderVariant(variety, variant);
-          const x = 20 + col * CELL + (CELL - cv.width) / 2;
-          ctx.drawImage(cv, x, y + 18);
+          const width = cv.width / RENDER_SCALE;
+          const height = cv.height / RENDER_SCALE;
+          const x = 20 + col * CELL + (CELL - width) / 2;
+          ctx.drawImage(cv, x, y + 18, width, height);
         });
       });
       document.title = 'PRET';
