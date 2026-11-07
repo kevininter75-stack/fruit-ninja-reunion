@@ -14,7 +14,7 @@
  * immédiatement ; le client se recharge alors une fois (voir main.ts,
  * écouteur 'controllerchange'). Incrémenter CACHE_NAME purge l'ancien cache.
  */
-const CACHE_NAME = 'kout-sab-maloya-v3';
+const CACHE_NAME = 'kout-sab-lagon-v4';
 const PRECACHE = [
   '.',
   'index.html',
@@ -49,11 +49,11 @@ const PRECACHE = [
   'assets/ui/speaker-high.svg',
   'assets/ui/speaker-slash.svg',
   'assets/ui/pause.svg',
-  'icons/icon-192.png',
-  'icons/icon-512.png',
-  'icons/icon-192-maskable.png',
-  'icons/icon-512-maskable.png',
-  'icons/icon-180.png',
+  'icons/lagon-192.png',
+  'icons/lagon-512.png',
+  'icons/lagon-192-maskable.png',
+  'icons/lagon-512-maskable.png',
+  'icons/lagon-180.png',
 ];
 
 self.addEventListener('install', (event) => {

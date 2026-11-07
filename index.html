@@ -7,13 +7,13 @@
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
     <meta name="description" content="Kout Sab' — un coup de sabre dans les fruits péi !" />
-    <meta name="theme-color" content="#1478a0" />
+    <meta name="theme-color" content="#0b454b" />
     <!-- PWA : installable depuis le navigateur mobile.
          Chemins relatifs pour supporter un hébergement en sous-chemin (GitHub Pages). -->
     <link rel="manifest" href="manifest.webmanifest" />
-    <link rel="icon" type="image/png" href="icons/icon-192.png" />
+    <link rel="icon" type="image/png" href="icons/lagon-192.png" />
     <!-- iOS : icône et mode plein écran une fois épinglé -->
-    <link rel="apple-touch-icon" href="icons/icon-180.png" />
+    <link rel="apple-touch-icon" href="icons/lagon-180.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Kout Sab'" />
@@ -84,24 +84,25 @@
         background: rgba(4, 31, 43, .38);
       }
       #startup > * { position: relative; }
+      .startup-icon { justify-self: center; width: clamp(64px, 16vmin, 104px); height: auto; border-radius: 24%; margin-bottom: 12px; box-shadow: 0 8px 26px #052f4099; }
       #startup h1 {
-        margin: 0 0 30px;
+        margin: 0 0 12px;
         font: 400 clamp(36px, 8vw, 80px) 'Shrikhand', 'Trebuchet MS', sans-serif;
         text-shadow: 0 3px 8px #103c49;
       }
       #startup p {
         margin: 0;
-        padding: 16px 28px;
+        padding: 6px 16px; justify-self: center;
         background: rgba(7, 59, 73, .9);
         border: 1px solid #9cdae0;
         border-radius: 18px;
-        font-size: 20px;
+        font-size: 16px;
       }
     </style>
   </head>
   <body>
     <div id="game"></div>
-    <div id="startup" role="status" aria-live="polite"><h1>Kout Sab'</h1><p>Chargement…</p></div>
+    <div id="startup" role="status" aria-live="polite"><img class="startup-icon" src="icons/lagon-192.png" width="96" height="96" alt=""><h1>Kout Sab'</h1><p>Chargement…</p></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
