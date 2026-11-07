@@ -14,7 +14,7 @@
  * immédiatement ; le client se recharge alors une fois (voir main.ts,
  * écouteur 'controllerchange'). Incrémenter CACHE_NAME purge l'ancien cache.
  */
-const CACHE_NAME = 'kout-sab-visuel-v2';
+const CACHE_NAME = 'kout-sab-maloya-v3';
 const PRECACHE = [
   '.',
   'index.html',
@@ -30,6 +30,7 @@ const PRECACHE = [
   // Le bruit de tranchage : 123 Ko, décodés une fois au démarrage. Sans lui en
   // cache, une partie hors ligne retomberait sur le tranchage synthétisé.
   'assets/sfx/tranche.wav',
+  'assets/music/kout-sab-v2.mp3',
   // Les images peintes doivent rester disponibles après la première installation.
   'assets/decors/lagon-v1.webp',
   'assets/effets/jus-v1.webp',

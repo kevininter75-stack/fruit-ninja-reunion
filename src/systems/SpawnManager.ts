@@ -495,6 +495,8 @@ export class SpawnManager {
     // choses ne peut donc s'y glisser.
     if (this.isDeluge()) {
       this.spawnDelugeBurst();
+      // Le gel reste réservé au Chrono, y compris pendant le cyclone.
+      this.maybeSpawnGel();
       return;
     }
 
@@ -555,7 +557,7 @@ export class SpawnManager {
           // vérification, les fruits ET LES BOMBES de la salve en cours
           // tombaient en pleine frénésie — exactement ce que la suspension des
           // salves cherchait à éviter.
-          if (this.running && !this.isFrenzyOnStage()) {
+          if (this.running && !this.isFrenzyOnStage() && !this.isDelugeCalm()) {
             this.spawnOne(isBomb, clusterBaseX, offsetX);
           }
         });
@@ -604,8 +606,9 @@ export class SpawnManager {
     if (this.scene.time.now - this.lastGelAt < GEL_MIN_GAP_MS) {
       return;
     }
-    // Un seul fruit spécial à la fois, et jamais deux coup sur coup.
-    if (this.scene.time.now - this.lastSpecialAt < SPECIAL_MIN_GAP_MS) {
+    // Hors cyclone, on espace les fruits spéciaux. Pendant le déluge,
+    // le gel peut se combiner à la pluie ; son propre délai reste appliqué.
+    if (!this.isDeluge() && this.scene.time.now - this.lastSpecialAt < SPECIAL_MIN_GAP_MS) {
       return;
     }
     // IL PEUT TOMBER PENDANT LE DÉLUGE, et c'est même son meilleur moment :

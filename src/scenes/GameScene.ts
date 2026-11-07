@@ -519,6 +519,12 @@ export class GameScene extends Phaser.Scene {
     this.updateFrenzyAura();
     this.updateCycloneAura();
     this.updateBrume();
+    if (!this.gameEnded) {
+      const moment = this.physics.world.timeScale > 1 ? 'gel'
+        : this.frenzyPiment?.frenzyActive ? 'piment'
+        : this.spawnManager.isDeluge() ? 'cyclone' : 'normal';
+      music.setGameplay(this.mode, this.spawnManager.getIntensity(), moment);
+    }
     if (this.mode === 'chrono' && !this.gameEnded) {
       this.updateChrono();
     }
