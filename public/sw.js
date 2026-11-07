@@ -14,7 +14,7 @@
  * immédiatement ; le client se recharge alors une fois (voir main.ts,
  * écouteur 'controllerchange'). Incrémenter CACHE_NAME purge l'ancien cache.
  */
-const CACHE_NAME = 'kout-sab-lagon-v4';
+const CACHE_NAME = 'kout-sab-lagon-v5';
 const PRECACHE = [
   '.',
   'index.html',
@@ -78,6 +78,22 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET' || !request.url.startsWith(self.location.origin)) {
     return; // on ne gère que les GET de la même origine
+  }
+
+  // Le manifeste et les icônes gardent parfois leur URL entre deux versions.
+  const pathname = new URL(request.url).pathname;
+  if (pathname.endsWith('/manifest.webmanifest') || pathname.includes('/icons/')) {
+    event.respondWith(
+      fetch(request, { cache: 'no-cache' })
+        .then(async (response) => {
+          if (!response.ok) throw new Error('PWA resource unavailable');
+          const cache = await caches.open(CACHE_NAME);
+          await cache.put(request, response.clone());
+          return response;
+        })
+        .catch(() => caches.match(request).then((cached) => cached || Response.error()))
+    );
+    return;
   }
 
   // Navigations : réseau d'abord (dernière version), cache en secours hors-ligne
