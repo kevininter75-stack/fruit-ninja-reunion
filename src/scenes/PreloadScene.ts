@@ -521,35 +521,10 @@ export class PreloadScene extends Phaser.Scene {
   // Bombe et particules
   // ------------------------------------------------------------------
 
-  /** Bombe placeholder : sphère noire, reflet, mèche et étincelle. */
   /**
-   * LE PÉTARD CHINOIS, à la place de la bombe noire.
-   *
-   * POURQUOI CE CHANGEMENT. Une bombe ronde à mèche est le vocabulaire du jeu
-   * de plateforme américain ; elle ne dit rien d'ici. Le pétard, lui, est un
-   * objet que tout le monde connaît à La Réunion — c'est celui du Nouvel An
-   * chinois, et la communauté sino-réunionnaise fait partie de l'île depuis
-   * le XIXe siècle. Il explose, il a une mèche, il fait peur au bon moment :
-   * il remplit exactement le même office, en parlant créole.
-   *
-   * NOIR À CROIX ROUGE, et non rouge et or. Le rouge et or était le vrai
-   * pétard de fête ; c'est justement le problème — il ressemblait à quelque
-   * chose qu'on ramasse. Le noir barré de rouge ne se lit que d'une seule
-   * façon, et c'est la bonne pour un objet qui coûte la partie entière.
-   *
-   * CE QUI EST CONTRAINT, ET POURQUOI. Le corps doit tenir DANS le cercle de
-   * détection (BOMB_RADIUS), jamais en dépasser. Un objet dessiné plus large
-   * que sa zone de coupe se fait trancher « à côté » — impardonnable pour un
-   * objet dont le contact coûte la partie. Sa demi-diagonale est donc calculée
-   * pour rester sous le rayon, le joueur étant toujours avantagé.
-   *
-   * Le bout de mèche reste EXACTEMENT au même endroit qu'avant (r+17, 8) :
-   * c'est de là que Bomb.fuseTip fait crépiter les étincelles, et cette
-   * position est codée en dur dans l'entité.
-   *
-   * Peint clair, comme le reste : la teinte d'éclairage multiplie la couleur
-   * à l'affichage (cf. surfaceShading), donc un rouge peint à sa valeur finale
-   * ressortirait sombre et boueux.
+   * Fagot de trois bâtons noirs. La texture, le centre, l'enveloppe du corps
+   * et le bout de mèche conservent leurs dimensions précédentes.
+   * La collision reste exclusivement définie par BOMB_RADIUS dans Bomb.
    */
   private createBombTexture(): void {
     this.peindreBombe(TEX_BOMB, true);
@@ -614,45 +589,36 @@ export class PreloadScene extends Phaser.Scene {
     const largeur = demiLargeur * 2;
     const hauteur = demiHauteur * 2;
 
-    // Corps NOIR, galbe peint à la main par bandes verticales.
-    //
-    // POURQUOI PAS UN DÉGRADÉ. `fillGradientStyle` de Phaser ne s'applique PAS
-    // à `fillRoundedRect` : le rectangle sort rempli de la dernière couleur
-    // unie posée. Constaté à l'écran lors du premier jet, qui est ressorti
-    // entièrement doré. Des bandes verticales d'alpha croissant font le même
-    // travail et ne dépendent d'aucun comportement incertain.
-    //
-    // Peint plus clair qu'il ne doit paraître : la teinte d'éclairage multiplie
-    // la couleur à l'affichage (cf. surfaceShading). Un noir posé à sa valeur
-    // finale deviendrait une silhouette plate, sans volume.
-    g.fillStyle(0x2c2c34, 1);
-    g.fillRoundedRect(gauche, haut, largeur, hauteur, px(10));
-
-    // Les bandes sont rentrées verticalement du rayon des coins : sans cela
-    // elles dépasseraient de l'arrondi et le tube aurait les angles carrés.
-    const BANDES = 9;
-    const hautBande = haut + px(10);
-    const hauteurBande = hauteur - px(20);
-    for (let i = 0; i < BANDES; i++) {
-      const t = i / (BANDES - 1); // 0 à gauche, 1 à droite
-      // Cylindre éclairé depuis la gauche : sombre au bord gauche, clair au
-      // tiers, puis assombri vers le bord droit qui fuit.
-      const clarte = Math.sin(t * Math.PI) * 0.9 - Math.abs(t - 0.32) * 0.35;
-      const x = gauche + t * (largeur - largeur / BANDES);
-      if (clarte > 0) {
-        g.fillStyle(0x8d8da0, clarte * 0.3);
-      } else {
-        g.fillStyle(0x000000, -clarte * 0.8);
-      }
-      g.fillRect(x, hautBande, largeur / BANDES + 1, hauteurBande);
+    // Trois cylindres dans l'enveloppe exacte de l'ancien pétard.
+    const tubeWidth = largeur / 3;
+    const corner = Math.min(px(6), tubeWidth / 3);
+    for (let i = 0; i < 3; i++) {
+      const x = gauche + i * tubeWidth;
+      g.fillStyle(0x17191f, 1);
+      g.fillRoundedRect(x, haut, tubeWidth, hauteur, corner);
+      g.fillStyle(0x363a43, 1);
+      g.fillRoundedRect(x + tubeWidth * 0.16, haut + px(3),
+        tubeWidth * 0.42, hauteur - px(6), corner * 0.6);
+      g.fillStyle(0x535963, 0.65);
+      g.fillRoundedRect(x + tubeWidth * 0.22, haut + px(6),
+        Math.max(1, tubeWidth * 0.10), hauteur - px(12), corner * 0.4);
+      g.lineStyle(px(2), 0x8d929b, 0.65);
+      g.strokeRoundedRect(x + px(1), haut + px(1),
+        tubeWidth - px(2), hauteur - px(2), corner);
+      g.fillStyle(0x0b0c12, 1);
+      g.fillEllipse(x + tubeWidth / 2, haut + px(5), tubeWidth * 0.72, px(6));
     }
 
-    // Bagues d'un gris à peine plus clair, en haut et en bas. Elles ne se
-    // voient presque pas, et c'est le but : elles ne servent qu'à dire que
-    // l'objet est un CYLINDRE et non un rectangle posé à plat.
-    g.fillStyle(0x4a4a56, 1);
-    g.fillRoundedRect(gauche, haut, largeur, px(11), px(5));
-    g.fillRoundedRect(gauche, haut + hauteur - px(11), largeur, px(11), px(5));
+    // Deux liens gris réunissent les bâtons, derrière le marquage du mode.
+    for (const y of [cy - demiHauteur * 0.52, cy + demiHauteur * 0.52]) {
+      g.fillStyle(0x090b10, 1);
+      g.fillRect(gauche, y - px(4), largeur, px(9));
+      g.fillStyle(0x777c86, 1);
+      g.fillRect(gauche, y - px(2), largeur, px(3));
+    }
+    g.fillStyle(0x16181f, 1);
+    g.fillRoundedRect(cx - demiLargeur * 0.79, cy - demiHauteur * 0.45,
+      demiLargeur * 1.58, demiHauteur * 0.90, px(4));
 
     // LA CROIX ROUGE. C'est elle, et elle seule, qui dit « ne touche pas ».
     //
@@ -680,14 +646,6 @@ export class PreloadScene extends Phaser.Scene {
         g.strokePath();
       }
     }
-
-    // Contour sombre, et un liseré clair par-dessus : le pétard est noir, or
-    // le décor comporte des montagnes noires. Sans ce liseré, sa silhouette
-    // disparaîtrait au moment précis où il passe devant elles.
-    g.lineStyle(px(5), 0x0a0a10, 0.9);
-    g.strokeRoundedRect(gauche, haut, largeur, hauteur, px(10));
-    g.lineStyle(px(2), 0x9aa0b8, 0.55);
-    g.strokeRoundedRect(gauche + px(2), haut + px(2), largeur - px(4), hauteur - px(4), px(9));
 
     // Mèche tressée, qui part du haut du pétard vers la droite.
     g.lineStyle(px(6), 0xd9c49a, 1);
